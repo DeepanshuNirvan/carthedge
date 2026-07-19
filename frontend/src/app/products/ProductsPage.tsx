@@ -1,0 +1,228 @@
+import { useState } from 'react';
+import { FileUp, Flame, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import type { Product } from '@/api/types';
+import { useProductMutations, useProducts } from '@/api/products';
+import { toast } from '@/store/ui';
+import { PageHeader } from '../shell/PageHeader';
+import { ProductForm } from './ProductForm';
+import { BulkImportModal } from './BulkImportModal';
+import { OffersPanel } from './OffersPanel';
+import { Button, IconButton } from '@/ui/Button';
+import { Input } from '@/ui/Input';
+import { MoneyText } from '@/ui/MoneyText';
+import { Switch } from '@/ui/Switch';
+import { Badge } from '@/ui/Badge';
+import { Skeleton } from '@/ui/Skeleton';
+import { EmptyState } from '@/ui/EmptyState';
+import { Modal } from '@/ui/Modal';
+import { cn } from '@/lib/cn';
+
+function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: () => void; onDelete: () => void }) {
+  const { setStock, setTrending } = useProductMutations();
+  return (
+    <article className="group overflow-hidden rounded-lg bg-surface shadow-soft hairline">
+      <div className="relative aspect-[4/3] bg-surface-2">
+        {product.images[0] ? (
+          <img src={product.images[0]} alt={product.name} loading="lazy" className="size-full object-cover" />
+        ) : (
+          <div className="flex size-full items-center justify-center text-low">
+            <Package className="size-8" aria-hidden />
+          </div>
+        )}
+        {product.trending && (
+          <Badge tone="gold" className="absolute left-2.5 top-2.5">
+            <Flame className="size-3" /> Trending
+          </Badge>
+        )}
+        {!product.inStock && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-semibold text-white">
+            Out of stock
+          </span>
+        )}
+        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity duration-micro group-hover:opacity-100">
+          <IconButton label="Edit product" className="glass" onClick={onEdit}>
+            <Pencil className="size-4" />
+          </IconButton>
+          <IconButton label="Delete product" className="glass" onClick={onDelete}>
+            <Trash2 className="size-4" />
+          </IconButton>
+        </div>
+      </div>
+      <div className="p-3.5">
+        <p className="truncate text-sm font-medium text-hi">{product.name}</p>
+        <p className="mt-0.5 flex items-baseline gap-2 text-sm">
+          <MoneyText paise={product.price} className="font-semibold text-hi" />
+          {product.comparePrice > product.price && <MoneyText paise={product.comparePrice} strike className="text-xs" />}
+          {product.resellerPrice > 0 && (
+            <span className="ml-auto text-xs text-low">
+              reseller <MoneyText paise={product.resellerPrice} className="text-xs" />
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-low">
+          {product.category}
+          {product.variants.length > 0 && ` · ${product.variants.length} variants`}
+        </p>
+        <div className="mt-3 flex items-center justify-between border-t pt-3">
+          <label className="flex items-center gap-2 text-xs text-mid">
+            <Switch
+              checked={product.inStock}
+              label={`Stock for ${product.name}`}
+              onChange={(inStock) => setStock.mutate({ id: product.id, inStock })}
+            />
+            Stock
+          </label>
+          <label className="flex items-center gap-2 text-xs text-mid">
+            <Switch
+              checked={product.trending}
+              label={`Trending for ${product.name}`}
+              onChange={(trending) => setTrending.mutate({ id: product.id, trending })}
+            />
+            Trend
+          </label>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default function ProductsPage() {
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [trendingOnly, setTrendingOnly] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState<Product | null>(null);
+
+  const { data: products, isLoading } = useProducts({ search, category, trending: trendingOnly });
+  const { remove } = useProductMutations();
+
+  const categories = [...new Set((products ?? []).map((p) => p.category).filter(Boolean))];
+
+  return (
+    <>
+      <PageHeader
+        title="Products"
+        subtitle={products ? `${products.length} in catalog` : undefined}
+        actions={
+          <>
+            <Button variant="secondary" icon={<FileUp className="size-4" />} onClick={() => setBulkOpen(true)}>
+              Bulk import
+            </Button>
+            <Button icon={<Plus className="size-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>
+              Add product
+            </Button>
+          </>
+        }
+      />
+
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
+          <Input
+            placeholder="Search products…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 w-56 pl-9"
+            aria-label="Search products"
+          />
+        </div>
+        <button
+          onClick={() => setCategory('')}
+          className={cn(
+            'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro',
+            category === '' ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid hover:text-hi',
+          )}
+        >
+          All
+        </button>
+        {categories.map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategory(c === category ? '' : c)}
+            className={cn(
+              'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro',
+              category === c ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid hover:text-hi',
+            )}
+          >
+            {c}
+          </button>
+        ))}
+        <label className="ml-auto flex items-center gap-2 text-xs text-mid">
+          <Switch checked={trendingOnly} onChange={setTrendingOnly} label="Trending only" />
+          Trending only
+        </label>
+      </div>
+
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-72" />
+          ))}
+        </div>
+      ) : products && products.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {products.map((p) => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              onEdit={() => { setEditing(p); setFormOpen(true); }}
+              onDelete={() => setDeleting(p)}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Package className="size-5" />}
+          title={search || category ? 'Nothing matches' : 'Your catalog is empty'}
+          message={
+            search || category
+              ? 'Try a different search or category.'
+              : 'Add your first product — it goes live on your storefront instantly.'
+          }
+          action={
+            <Button icon={<Plus className="size-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>
+              Add product
+            </Button>
+          }
+        />
+      )}
+
+      <div className="mt-8 max-w-2xl">
+        <OffersPanel />
+      </div>
+
+      <ProductForm open={formOpen} onClose={() => setFormOpen(false)} editing={editing} />
+      <BulkImportModal open={bulkOpen} onClose={() => setBulkOpen(false)} />
+
+      <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Delete product">
+        <p className="text-sm text-mid">
+          Remove <span className="font-medium text-hi">{deleting?.name}</span> from your catalog? Buyers will
+          no longer see it. Existing orders keep their snapshot.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <Button
+            variant="danger"
+            loading={remove.isPending}
+            onClick={() =>
+              deleting &&
+              remove.mutate(deleting.id, {
+                onSuccess: () => {
+                  toast('success', 'Product removed');
+                  setDeleting(null);
+                },
+                onError: (e) => toast('error', 'Delete failed', e.message),
+              })
+            }
+          >
+            Delete
+          </Button>
+          <Button variant="ghost" onClick={() => setDeleting(null)}>
+            Keep it
+          </Button>
+        </div>
+      </Modal>
+    </>
+  );
+}
