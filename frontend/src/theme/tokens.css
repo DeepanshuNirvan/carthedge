@@ -1,0 +1,146 @@
+/* CartHedge design tokens. Every component reads these variables —
+   switching data-theme restyles the whole app instantly. */
+
+:root {
+  /* brand (theme-invariant) */
+  --jade-400: 34 197 130;
+  --jade-500: 15 169 104;
+  --jade-600: 11 138 83;
+  --jade-700: 10 110 68;
+  --gold-400: 232 181 89;
+  --gold-500: 212 155 60;
+
+  --ink-700: 42 42 52;
+  --ink-800: 30 30 38;
+  --ink-850: 22 22 28;
+  --ink-900: 16 16 21;
+  --ink-950: 11 11 14;
+  --paper-50: 251 249 244;
+  --paper-100: 244 241 233;
+  --paper-200: 233 228 216;
+
+  --success: 15 169 104;
+  --warning: 232 181 89;
+  --danger: 224 87 75;
+  --info: 76 141 212;
+
+  /* motion */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-micro: 120ms;
+  --dur-std: 240ms;
+  --dur-expr: 480ms;
+}
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: 11 11 14;
+  --surface: 16 16 21;
+  --surface-2: 22 22 28;
+  --surface-3: 30 30 38;
+  --text-hi: 245 243 238;
+  --text-mid: 169 166 160;
+  --text-low: 110 107 101;
+  --line: 255 255 255;
+  --line-a: 0.07;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -12px rgb(0 0 0 / 0.5);
+  --shadow-raised: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 60px -20px rgb(0 0 0 / 0.6);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: 251 249 244;
+  --surface: 254 253 250;
+  --surface-2: 244 241 233;
+  --surface-3: 233 228 216;
+  --text-hi: 22 22 28;
+  --text-mid: 85 82 75;
+  --text-low: 138 134 125;
+  --line: 22 22 28;
+  --line-a: 0.09;
+  --shadow-soft: 0 1px 2px rgb(22 22 28 / 0.06), 0 12px 32px -16px rgb(22 22 28 / 0.14);
+  --shadow-raised: 0 2px 6px rgb(22 22 28 / 0.07), 0 24px 60px -24px rgb(22 22 28 / 0.2);
+}
+
+* {
+  border-color: rgb(var(--line) / var(--line-a));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text-hi));
+  font-family: 'Satoshi', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgb(var(--jade-500) / 0.3);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--jade-500));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* money & metrics always tabular */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* hairline utility — 1px inset border that respects theme alpha */
+.hairline {
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a));
+}
+
+/* glass for floating nav / sheets over 3D */
+.glass {
+  background: rgb(var(--surface) / 0.65);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a));
+}
+
+/* cinematic film grain for marketing dark sections */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grainShift 9s steps(6) infinite;
+}
+
+@keyframes grainShift {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-4%, 3%); }
+  40% { transform: translate(3%, -5%); }
+  60% { transform: translate(-2%, 4%); }
+  80% { transform: translate(4%, 2%); }
+  100% { transform: translate(0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain::after {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* thin scrollbars that match theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--text-low) / 0.35) transparent;
+}

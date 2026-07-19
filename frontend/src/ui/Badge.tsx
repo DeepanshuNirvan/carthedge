@@ -1,0 +1,63 @@
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/cn';
+import type { OrderStatus } from '@/api/types';
+
+type Tone = 'jade' | 'gold' | 'danger' | 'info' | 'neutral';
+
+const tones: Record<Tone, string> = {
+  jade: 'bg-jade-500/12 text-jade-500',
+  gold: 'bg-gold-400/14 text-gold-500',
+  danger: 'bg-danger/12 text-danger',
+  info: 'bg-info/12 text-info',
+  neutral: 'bg-surface-3 text-mid',
+};
+
+export function Badge({ tone = 'neutral', className, children }: { tone?: Tone; className?: string; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
+        tones[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+const statusTones: Record<string, Tone> = {
+  new: 'info',
+  confirmed: 'jade',
+  packed: 'gold',
+  shipped: 'info',
+  delivered: 'jade',
+  rto: 'danger',
+  cancelled: 'neutral',
+  trial: 'gold',
+  active: 'jade',
+  expired: 'danger',
+  suspended: 'danger',
+  paid: 'jade',
+  pending: 'gold',
+  token_paid: 'gold',
+  open: 'info',
+  contacted: 'gold',
+  closed: 'neutral',
+  draft: 'neutral',
+  sent: 'jade',
+  sending: 'gold',
+  scheduled: 'info',
+};
+
+const statusLabels: Partial<Record<OrderStatus, string>> = { rto: 'RTO' };
+
+export function StatusChip({ status, className }: { status: string; className?: string }) {
+  const label = statusLabels[status as OrderStatus] ?? status.replace(/_/g, ' ');
+  return (
+    <Badge tone={statusTones[status] ?? 'neutral'} className={cn('capitalize', className)}>
+      <span className="size-1.5 rounded-full bg-current" aria-hidden />
+      {label}
+    </Badge>
+  );
+}
