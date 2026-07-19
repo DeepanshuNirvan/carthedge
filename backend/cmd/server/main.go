@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"carthedge/internal/admin"
 	"carthedge/internal/ai"
 	"carthedge/internal/analytics"
 	"carthedge/internal/auth"
@@ -107,6 +108,7 @@ func main() {
 		AI:         ai.NewHandler(aiSvc),
 		Uploads:    storage.NewHandler(store),
 		Public:     publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc),
+		Admin:      admin.NewHandler(admin.NewService(pool, rdb, cfg)),
 		PaySvc:     paySvc,
 	})
 

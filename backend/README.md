@@ -2,7 +2,13 @@
 
 AI-powered order desk for Instagram/WhatsApp-first sellers. Standalone JSON API (Go) — any frontend (web, mobile) plugs in.
 
-**Two-sided model:** sellers get a dashboard behind JWT login; buyers get a share-link checkout with **no login** (phone OTP instead). Every business gets a unique code baked into its links: `/p/{businessCode}/{token}`.
+**Four surfaces, one API:**
+1. **CartHedge website** — public plans (`GET /api/v1/plans`), site content (`GET /api/v1/site`), seller registration + trial
+2. **CartHedge admin** — platform staff manage plans, pricing, businesses, custom-plan requests, site content (`/api/v1/admin/*`)
+3. **Seller dashboard** — reports, inventory, orders, customers behind JWT login (`/api/v1/*`)
+4. **Storefront + link checkout** — buyers browse `/p/{businessCode}/store` or open a shared link, order with **no login** (phone OTP instead)
+
+Every business gets a unique code baked into its store and links: `/p/{businessCode}/...`.
 
 ## Stack
 
@@ -24,6 +30,8 @@ go run ./cmd/server         # migrations auto-run, then listens on :8080
 ```
 
 Seeded demo login: `demo@carthedge.in` / `Demo@123` (business code `demo-store`). Remove `0005_seed.sql` before pointing at a production database.
+
+Seeded platform admin: `admin@carthedge.in` / `Admin@123` — change it right after first login (`PUT /api/v1/admin/password`).
 
 Tests: `go test ./...`
 
@@ -50,7 +58,8 @@ backend/
     order/             order creation, pricing, kanban board, transitions, COD flow
     courier/           Shiprocket handoff (optional, env-based)
     payment/           Razorpay client, buyer checkout/verify, webhook
-    publicapi/         buyer-facing endpoints (no auth, OTP-gated)
+    publicapi/         buyer-facing endpoints: storefront + link checkout (no auth, OTP-gated)
+    admin/             platform admin: overview, businesses, plans, requests, site content
     analytics/         dashboard, RTO savings meter, sales series, reports
     broadcast/         segment drops + minute scheduler
     invoice/           GST-lite numbered invoices
@@ -66,7 +75,7 @@ backend/
 
 **RTO defense:** COD orders start unconfirmed → automated WhatsApp confirm flow; repeat refusers get `riskFlagged` (auto at 2 RTOs); dashboard `rtoMeter` shows ₹ saved vs the seller's baseline RTO rate.
 
-**Subscriptions:** register → 15-day trial (plan set by `TRIAL_PLAN_CODE`). Expired → seller APIs return `402 subscriptionExpired` (plan/billing routes stay open), buyer links show `paused`. `POST /api/v1/subscription/checkout` → Razorpay → `verify` extends 30 days. Custom plans: rows with `is_custom` + per-subscription `custom_price`; `POST /api/v1/plans/custom-request` emails the platform.
+**Subscriptions:** register → 15-day trial (plan set by `TRIAL_PLAN_CODE`). Expired → seller APIs return `402 subscriptionExpired` (plan/billing routes stay open), buyer links show `paused`. `POST /api/v1/subscription/checkout` → Razorpay → `verify` extends 30 days. Custom plans: `POST /api/v1/plans/custom-request` lands in the admin panel (`plan_requests`) + optional email; admin creates an `is_custom` plan and assigns it with a negotiated `customPrice` via `POST /admin/businesses/{id}/plan`.
 
 ## API surface
 
@@ -89,6 +98,10 @@ Seller (Bearer JWT; * = also requires active subscription):
 | Uploads* | `POST /uploads` (multipart image → URL) |
 
 Buyer (public, rate-limited): `GET /p/{biz}/{token}`, `POST /p/{biz}/otp`, `POST /p/{biz}/otp/verify`, `POST /p/{biz}/{token}/order`, `POST /p/{biz}/waitlist`, `GET /p/orders/{code}`, `POST /p/orders/{code}/pay|confirm`, `POST /p/payments/verify`
+
+Storefront (public): `GET /p/{biz}/store` (business card, categories, trending, offers), `GET /p/{biz}/store/products?search=&category=`, `GET /p/{biz}/store/products/{id}`, `POST /p/{biz}/store/order` (OTP-gated, whole catalog). Reseller prices and SKUs never leave the seller API.
+
+Platform admin (Bearer JWT with admin role): `POST /admin/login`, `PUT /admin/password`, `GET /admin/overview` (businesses, trials, MRR, GMV, revenue), `GET /admin/businesses?search=&status=`, `GET /admin/businesses/{id}`, `PATCH /admin/businesses/{id}/status` (suspend pauses seller + store instantly), `POST /admin/businesses/{id}/plan` (assign plan, custom price, extend days), `GET/POST /admin/plans`, `PUT /admin/plans/{id}`, `GET /admin/plan-requests?status=`, `PATCH /admin/plan-requests/{id}`, `GET /admin/payments`, `GET/PUT /admin/settings`. Public mirror for the website: `GET /api/v1/site`.
 
 Webhooks: `POST /webhooks/razorpay` (signature-verified, idempotent; safety net for payments + subscription activation)
 

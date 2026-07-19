@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"carthedge/internal/admin"
 	"carthedge/internal/ai"
 	"carthedge/internal/analytics"
 	"carthedge/internal/auth"
@@ -44,6 +45,7 @@ type Deps struct {
 	AI         *ai.Handler
 	Uploads    *storage.Handler
 	Public     *publicapi.Handler
+	Admin      *admin.Handler
 	PaySvc     *payment.Service
 }
 
@@ -51,6 +53,7 @@ func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
 	authed := middleware.Auth(d.Cfg.JWTSecret)
+	adminAuthed := middleware.AdminAuth(d.Cfg.JWTSecret)
 	active := middleware.Middleware(d.PlanSvc.RequireActive)
 	byIP := func(name string, limit int, window time.Duration) middleware.Middleware {
 		return middleware.RateLimit(d.Rdb, name, limit, window, middleware.ClientIP)
@@ -145,6 +148,32 @@ func New(d Deps) http.Handler {
 	if d.Cfg.StorageDriver == "local" {
 		mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(d.Cfg.UploadDir))))
 	}
+
+	// platform admin (CartHedge staff)
+	handle("POST /api/v1/admin/login", d.Admin.Login, byIP("adminLogin", 10, time.Minute))
+	handle("PUT /api/v1/admin/password", d.Admin.ChangePassword, adminAuthed)
+	handle("GET /api/v1/admin/overview", d.Admin.Overview, adminAuthed)
+	handle("GET /api/v1/admin/businesses", d.Admin.Businesses, adminAuthed)
+	handle("GET /api/v1/admin/businesses/{id}", d.Admin.BusinessDetail, adminAuthed)
+	handle("PATCH /api/v1/admin/businesses/{id}/status", d.Admin.SetBusinessStatus, adminAuthed)
+	handle("POST /api/v1/admin/businesses/{id}/plan", d.Admin.AssignPlan, adminAuthed)
+	handle("GET /api/v1/admin/plans", d.Admin.Plans, adminAuthed)
+	handle("POST /api/v1/admin/plans", d.Admin.CreatePlan, adminAuthed)
+	handle("PUT /api/v1/admin/plans/{id}", d.Admin.UpdatePlan, adminAuthed)
+	handle("GET /api/v1/admin/plan-requests", d.Admin.PlanRequests, adminAuthed)
+	handle("PATCH /api/v1/admin/plan-requests/{id}", d.Admin.UpdatePlanRequest, adminAuthed)
+	handle("GET /api/v1/admin/payments", d.Admin.Payments, adminAuthed)
+	handle("GET /api/v1/admin/settings", d.Admin.Settings, adminAuthed)
+	handle("PUT /api/v1/admin/settings", d.Admin.UpdateSettings, adminAuthed)
+
+	// CartHedge website content (public)
+	handle("GET /api/v1/site", d.Admin.Site)
+
+	// public storefront (browse + direct buy, no login)
+	handle("GET /p/{businessCode}/store", d.Public.Store)
+	handle("GET /p/{businessCode}/store/products", d.Public.StoreProducts)
+	handle("GET /p/{businessCode}/store/products/{id}", d.Public.StoreProduct)
+	handle("POST /p/{businessCode}/store/order", d.Public.StoreOrder, byIP("order", 10, time.Minute))
 
 	// buyer-facing public API (link checkout, no login)
 	handle("GET /p/{businessCode}/{token}", d.Public.ResolveLink)

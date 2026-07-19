@@ -184,21 +184,23 @@ func (s *Service) Cancel(ctx context.Context, bizID string) error {
 	return err
 }
 
-// CustomRequest emails the platform team a custom-plan enquiry.
+// CustomRequest records a custom-plan enquiry for the admin panel and
+// notifies the platform team by email when configured.
 func (s *Service) CustomRequest(ctx context.Context, bizID, message string, expectedOrders int) error {
 	var name, email string
 	if err := s.pool.QueryRow(ctx, `select name, email from businesses where id=$1`, bizID).Scan(&name, &email); err != nil {
 		return err
 	}
-	to := s.cfg.AdminEmail
-	if to == "" {
-		s.log.Info("custom plan request", "business", name, "email", email, "expectedOrders", expectedOrders, "message", message)
-		return nil
+	if _, err := s.pool.Exec(ctx, `insert into plan_requests (business_id, message, expected_orders)
+		values ($1, $2, $3)`, bizID, message, expectedOrders); err != nil {
+		return err
 	}
-	s.notify.Async("customPlan", func() error {
-		return s.notify.Email(to, "Custom plan request: "+name,
-			fmt.Sprintf("Business: %s (%s)\nExpected orders/month: %d\n\n%s", name, email, expectedOrders, message))
-	})
+	if to := s.cfg.AdminEmail; to != "" {
+		s.notify.Async("customPlan", func() error {
+			return s.notify.Email(to, "Custom plan request: "+name,
+				fmt.Sprintf("Business: %s (%s)\nExpected orders/month: %d\n\n%s", name, email, expectedOrders, message))
+		})
+	}
 	return nil
 }
 
@@ -209,8 +211,10 @@ func (s *Service) IsActive(ctx context.Context, bizID string) bool {
 		return v == "1"
 	}
 	var active bool
-	err := s.pool.QueryRow(ctx, `select exists(select 1 from subscriptions
-		where business_id = $1 and status in ('trial','active','cancelled') and ends_at > now())`, bizID).Scan(&active)
+	err := s.pool.QueryRow(ctx, `select exists(select 1 from subscriptions s
+		join businesses b on b.id = s.business_id
+		where s.business_id = $1 and b.status = 'active'
+		and s.status in ('trial','active','cancelled') and s.ends_at > now())`, bizID).Scan(&active)
 	if err != nil {
 		return false
 	}
