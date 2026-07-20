@@ -64,22 +64,22 @@ function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: 
           {product.variants.length > 0 && ` · ${product.variants.length} variants`}
         </p>
         <div className="mt-3 flex items-center justify-between border-t pt-3">
-          <label className="flex items-center gap-2 text-xs text-mid">
+          <span className="flex items-center gap-2 text-xs text-mid">
             <Switch
               checked={product.inStock}
               label={`Stock for ${product.name}`}
               onChange={(inStock) => setStock.mutate({ id: product.id, inStock })}
             />
             Stock
-          </label>
-          <label className="flex items-center gap-2 text-xs text-mid">
+          </span>
+          <span className="flex items-center gap-2 text-xs text-mid">
             <Switch
               checked={product.trending}
               label={`Trending for ${product.name}`}
               onChange={(trending) => setTrending.mutate({ id: product.id, trending })}
             />
             Trend
-          </label>
+          </span>
         </div>
       </div>
     </article>
@@ -149,10 +149,10 @@ export default function ProductsPage() {
             {c}
           </button>
         ))}
-        <label className="ml-auto flex items-center gap-2 text-xs text-mid">
+        <span className="ml-auto flex items-center gap-2 text-xs text-mid">
           <Switch checked={trendingOnly} onChange={setTrendingOnly} label="Trending only" />
           Trending only
-        </label>
+        </span>
       </div>
 
       {isLoading ? (

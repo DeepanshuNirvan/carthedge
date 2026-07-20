@@ -184,7 +184,7 @@ function PaymentsSection() {
         </form>
 
         <div className="grid gap-4 border-t pt-5 sm:grid-cols-3">
-          <label className="flex items-center gap-2.5 text-sm text-hi">
+          <span className="flex items-center gap-2.5 text-sm text-hi">
             <Switch
               checked={business.codEnabled}
               label="COD enabled"
@@ -193,7 +193,7 @@ function PaymentsSection() {
               }
             />
             Accept COD
-          </label>
+          </span>
           <Field label="COD token ₹" hint="Optional advance that filters refusers">
             <Input
               inputMode="decimal"

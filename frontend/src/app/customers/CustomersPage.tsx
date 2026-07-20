@@ -72,7 +72,7 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
               </Select>
             </Field>
             <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2.5 text-sm text-hi">
+              <span className="flex items-center gap-2.5 text-sm text-hi">
                 <Switch
                   checked={customer.riskFlagged}
                   label="Risk flag"
@@ -84,7 +84,7 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
                   }
                 />
                 Flag as COD risk
-              </label>
+              </span>
             </div>
           </div>
 
@@ -147,10 +147,10 @@ export default function CustomersPage() {
               <option value="retail">Retail</option>
               <option value="reseller">Reseller</option>
             </Select>
-            <label className="flex items-center gap-2 text-xs text-mid">
+            <span className="flex items-center gap-2 text-xs text-mid">
               <Switch checked={riskOnly} onChange={setRiskOnly} label="Risk only" />
               Risk only
-            </label>
+            </span>
           </>
         }
       />

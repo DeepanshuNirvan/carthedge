@@ -171,14 +171,14 @@ export default function PlansPage() {
               <Textarea rows={4} value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} />
             </Field>
           </div>
-          <label className="flex items-center gap-2.5 text-sm text-hi">
+          <span className="flex items-center gap-2.5 text-sm text-hi">
             <Switch checked={form.isCustom} onChange={(isCustom) => setForm({ ...form, isCustom })} label="Custom plan" />
             Custom (hidden from pricing)
-          </label>
-          <label className="flex items-center gap-2.5 text-sm text-hi">
+          </span>
+          <span className="flex items-center gap-2.5 text-sm text-hi">
             <Switch checked={form.active} onChange={(active) => setForm({ ...form, active })} label="Active" />
             Active
-          </label>
+          </span>
         </div>
         <Button className="mt-5" onClick={submit} loading={create.isPending || update.isPending}>
           {editing ? 'Save plan' : 'Create plan'}

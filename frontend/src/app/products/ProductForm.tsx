@@ -197,14 +197,14 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
         </div>
 
         <div className="flex items-center gap-6 sm:col-span-2">
-          <label className="flex items-center gap-2.5 text-sm text-hi">
+          <span className="flex items-center gap-2.5 text-sm text-hi">
             <Switch checked={inStock} onChange={(v) => setValue('inStock', v)} label="In stock" />
             In stock
-          </label>
-          <label className="flex items-center gap-2.5 text-sm text-hi">
+          </span>
+          <span className="flex items-center gap-2.5 text-sm text-hi">
             <Switch checked={trending} onChange={(v) => setValue('trending', v)} label="Trending" />
             Trending
-          </label>
+          </span>
         </div>
 
         <div className="flex gap-3 sm:col-span-2">

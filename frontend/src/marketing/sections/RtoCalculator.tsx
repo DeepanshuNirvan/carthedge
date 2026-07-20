@@ -26,13 +26,14 @@ function Slider({
 }) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
-    <label className="block">
-      <span className="flex items-baseline justify-between text-sm">
+    <div>
+      <p className="flex items-baseline justify-between text-sm">
         <span className="font-medium text-hi">{label}</span>
         <span className="font-mono text-jade-500 tnum">{format(value)}</span>
-      </span>
+      </p>
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}
@@ -43,7 +44,7 @@ function Slider({
           background: `linear-gradient(90deg, rgb(var(--jade-500)) ${pct}%, rgb(var(--surface-3)) ${pct}%)`,
         }}
       />
-    </label>
+    </div>
   );
 }
 

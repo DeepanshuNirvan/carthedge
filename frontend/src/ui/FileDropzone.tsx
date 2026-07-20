@@ -37,7 +37,7 @@ export function FileDropzone({ images, onChange, max = 6 }: FileDropzoneProps) {
     <div className="flex flex-wrap gap-3">
       {images.map((url, i) => (
         <div key={url} className="group relative size-24 overflow-hidden rounded-md hairline">
-          <img src={url} alt={`Product image ${i + 1}`} className="size-full object-cover" />
+          <img src={url} alt={`Upload ${i + 1}`} className="size-full object-cover" />
           <button
             type="button"
             aria-label="Remove image"
