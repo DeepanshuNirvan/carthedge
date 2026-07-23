@@ -61,7 +61,7 @@ export function Problem() {
     <section id="problem" ref={root} className="relative flex min-h-dvh items-center overflow-hidden">
       <div className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
         <div className="mb-14 text-center">
-          <span className="rounded-full bg-danger/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-danger">
+          <span className="glass inline-flex rounded-full px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-danger">
             {problem.eyebrow}
           </span>
           <h2 className="mx-auto mt-4 max-w-2xl font-display text-d2 font-semibold text-hi">{problem.title}</h2>
@@ -74,14 +74,20 @@ export function Problem() {
               <div
                 key={stat.label}
                 data-chaos
-                className="rounded-lg bg-surface p-7 shadow-soft hairline"
+                className="glass sheen relative overflow-hidden rounded-2xl p-7 shadow-float"
               >
-                <Icon className="size-6 text-danger" aria-hidden />
-                <p className="mt-5 font-display text-5xl font-semibold tracking-tight text-hi tnum">
+                <div
+                  aria-hidden
+                  className="absolute -right-10 -top-10 size-28 rounded-full bg-danger/15 blur-2xl"
+                />
+                <span className="relative flex size-11 items-center justify-center rounded-md neu text-danger">
+                  <Icon className="size-5" aria-hidden />
+                </span>
+                <p className="relative mt-5 font-display text-[3.25rem] font-semibold leading-none tracking-tight text-hi tnum">
                   <span data-count={stat.value}>{reduced ? stat.value : 0}</span>
                   <span className="text-danger">{stat.suffix}</span>
                 </p>
-                <p className="mt-3 text-sm leading-relaxed text-mid">{stat.label}</p>
+                <p className="relative mt-3 text-sm leading-relaxed text-mid">{stat.label}</p>
               </div>
             );
           })}

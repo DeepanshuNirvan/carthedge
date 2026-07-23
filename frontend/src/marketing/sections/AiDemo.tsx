@@ -47,34 +47,37 @@ export function AiDemo() {
   return (
     <Section id="ai">
       <SectionHead eyebrow={aiDemo.eyebrow} title={aiDemo.title} sub={aiDemo.sub} />
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid items-stretch gap-6 lg:grid-cols-[1fr_1.05fr]">
         {/* the DM thread */}
-        <Reveal>
-          <div className="rounded-xl bg-surface p-5 shadow-soft hairline">
+        <Reveal className="h-full">
+          <div className="glass sheen flex h-full flex-col rounded-2xl p-5 shadow-float sm:p-6">
             <div className="mb-4 flex items-center gap-2.5 border-b pb-3.5">
-              <span className="size-8 rounded-full bg-gradient-to-br from-jade-500 to-gold-400" aria-hidden />
+              <span className="size-9 rounded-full bg-gradient-to-br from-jade-500 to-gold-400 shadow-[inset_0_1px_1px_rgb(255_255_255/0.3)]" aria-hidden />
               <div>
                 <p className="text-sm font-semibold text-hi">priya.sharma_11</p>
-                <p className="text-xs text-low">Instagram DM</p>
+                <p className="text-xs text-low">Instagram DM · Hinglish</p>
               </div>
+              <span className="ml-auto flex items-center gap-1.5 rounded-full bg-surface-2/70 px-2.5 py-1 text-[11px] text-low">
+                <span className="size-1.5 animate-pulse rounded-full bg-jade-400" /> live
+              </span>
             </div>
-            <div className="flex min-h-56 flex-col gap-2.5">
+            <div className="flex min-h-56 flex-1 flex-col gap-2.5">
               {messages.slice(0, visibleMsgs).map((msg) => (
                 <motion.p
                   key={msg}
                   initial={reduced ? false : { opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-surface-2 px-4 py-2.5 text-sm text-hi"
+                  className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-surface-2/80 px-4 py-2.5 text-sm text-hi"
                 >
                   {msg}
                 </motion.p>
               ))}
             </div>
             <Button
-              variant="secondary"
+              variant="glass"
               size="sm"
-              className="mt-4"
+              className="mt-4 self-start"
               icon={<RotateCcw className="size-4" />}
               onClick={() => setRun((r) => r + 1)}
             >
@@ -84,20 +87,22 @@ export function AiDemo() {
         </Reveal>
 
         {/* the parsed order card */}
-        <Reveal delay={0.1}>
-          <div className="relative rounded-xl bg-surface p-5 shadow-soft hairline">
+        <Reveal delay={0.1} className="h-full">
+          <div className="panel relative flex h-full flex-col rounded-2xl p-5 shadow-soft sm:p-6">
             <div className="mb-4 flex items-center justify-between border-b pb-3.5">
               <p className="flex items-center gap-2 text-sm font-semibold text-hi">
-                <Sparkles className="size-4 text-jade-500" />
+                <span className="grid size-7 place-items-center rounded-full bg-jade-500/15 text-jade-400">
+                  <Sparkles className="size-4" />
+                </span>
                 AI-drafted order
               </p>
               {filledFields >= 7 && <Badge tone="jade">{p.confidence}% confident</Badge>}
             </div>
-            <dl className="flex flex-col">
+            <dl className="flex flex-1 flex-col">
               {fields.map((f, i) => (
                 <div key={f.label} className="flex items-start justify-between gap-4 border-b py-2.5 last:border-0">
                   <dt className="text-xs font-medium uppercase tracking-wider text-low">{f.label}</dt>
-                  <dd className="text-right text-sm text-hi">
+                  <dd className="text-right text-sm font-medium text-hi">
                     {i < filledFields ? (
                       <motion.span
                         initial={reduced ? false : { opacity: 0, x: 8 }}

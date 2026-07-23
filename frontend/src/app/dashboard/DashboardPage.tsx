@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, IndianRupee, KanbanSquare, Repeat, ShieldCheck, ShoppingBag } from 'lucide-react';
+import { motion, useSpring, useTransform } from 'framer-motion';
+import { AlertTriangle, IndianRupee, KanbanSquare, Repeat, ShieldCheck, ShoppingBag, TrendingDown } from 'lucide-react';
 import { useDashboard, useSales, useTopProducts } from '@/api/analytics';
 import { useOrders } from '@/api/orders';
 import { formatPaise } from '@/lib/money';
@@ -14,28 +15,80 @@ import { Progress } from '@/ui/Progress';
 import { Skeleton, SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 
-function RtoMeterCard() {
+function SavedAmount({ paise }: { paise: number }) {
+  const spring = useSpring(0, { stiffness: 60, damping: 20 });
+  spring.set(paise);
+  const text = useTransform(spring, (v) => formatPaise(Math.round(v)));
+  return <motion.span className="font-display tnum">{text}</motion.span>;
+}
+
+/** The emotional hero of the whole app — money the seller kept, in rupees. */
+function RtoMeterHero() {
   const { data, isLoading } = useDashboard();
   const meter = data?.rtoMeter;
+  const baseline = meter?.baselinePercent ?? 30;
+  const actual = meter?.actualPercent ?? 8;
+  const reduction = baseline > 0 ? Math.round(((baseline - actual) / baseline) * 100) : 0;
+
   return (
-    <Card className="relative overflow-hidden p-5">
-      <div aria-hidden className="absolute -right-10 -top-10 size-32 rounded-full bg-jade-500/20 blur-3xl" />
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="size-4.5 text-jade-500" aria-hidden />
-        <p className="text-[13px] font-medium text-mid">Saved from RTO this month</p>
+    <Card glass className="relative overflow-hidden rounded-2xl p-6 shadow-float sm:p-8">
+      <div aria-hidden className="absolute -right-20 -top-24 size-64 rounded-full bg-jade-500/20 blur-[90px]" />
+      <div aria-hidden className="absolute -left-16 bottom-[-6rem] size-52 rounded-full bg-gold-400/12 blur-[80px]" />
+      <div className="relative grid items-center gap-8 sm:grid-cols-[1.35fr_1fr]">
+        <div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
+            <ShieldCheck className="size-3.5" /> RTO shield · this month
+          </span>
+          {isLoading ? (
+            <Skeleton className="mt-4 h-14 w-56" />
+          ) : (
+            <p className="mt-4 font-display text-[3rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[3.75rem]">
+              <SavedAmount paise={meter?.savedThisMonth ?? 0} />
+            </p>
+          )}
+          <p className="mt-3 text-sm text-mid">
+            You kept this from refused deliveries. RTO is down to{' '}
+            <span className="font-semibold text-jade-400">{actual}%</span> from a{' '}
+            <span className="font-semibold text-danger">{baseline}%</span> baseline
+            {meter ? ` · ${meter.codOutcomes} COD outcomes` : ''}.
+          </p>
+        </div>
+
+        {/* the reduction, visualised */}
+        <div className="rounded-xl neu p-5">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-hi">
+              <TrendingDown className="size-4 text-jade-400" /> RTO cut
+            </span>
+            <span className="font-display text-2xl font-semibold tnum text-jade-400">{reduction}%</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            <div>
+              <div className="flex justify-between text-xs text-mid">
+                <span>Baseline</span>
+                <span className="tnum text-danger">{baseline}%</span>
+              </div>
+              <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
+                <div className="h-full rounded-full bg-gradient-to-r from-danger to-[rgb(210_78_66)]" style={{ width: '100%' }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-xs text-mid">
+                <span>With CartHedge</span>
+                <span className="tnum text-jade-400">{actual}%</span>
+              </div>
+              <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-jade-400 to-jade-500 shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${baseline > 0 ? (actual / baseline) * 100 : 0}%` }}
+                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      {isLoading ? (
-        <Skeleton className="mt-2 h-9 w-32" />
-      ) : (
-        <p className="mt-1.5 font-display text-3xl font-semibold tracking-tight text-jade-500 tnum">
-          {formatPaise(meter?.savedThisMonth ?? 0)}
-        </p>
-      )}
-      {meter && (
-        <p className="mt-1.5 text-xs text-low">
-          RTO {meter.actualPercent}% vs {meter.baselinePercent}% baseline · {meter.codOutcomes} COD outcomes
-        </p>
-      )}
     </Card>
   );
 }
@@ -50,7 +103,9 @@ export default function DashboardPage() {
     <>
       <PageHeader title="Dashboard" subtitle="Today at a glance" />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <RtoMeterHero />
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatTile
           label="Today's sales"
           value={<MoneyText paise={dash?.todayRevenue ?? 0} />}
@@ -66,7 +121,6 @@ export default function DashboardPage() {
           icon={<ShoppingBag className="size-4.5" />}
           loading={isLoading}
         />
-        <RtoMeterCard />
         <StatTile
           label="Pending orders"
           value={dash?.pendingOrders ?? 0}

@@ -7,6 +7,7 @@ type SwitchProps = {
   disabled?: boolean;
 };
 
+/** Neumorphic toggle — recessed track, physical raised knob. */
 export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
   return (
     <button
@@ -17,14 +18,16 @@ export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-std disabled:opacity-50',
-        checked ? 'bg-jade-500' : 'bg-surface-3',
+        'relative h-7 w-12 shrink-0 rounded-full transition-colors duration-std ease-enter disabled:opacity-50',
+        checked
+          ? 'bg-gradient-to-b from-jade-400 to-jade-500 shadow-[inset_0_1px_2px_rgb(0_0_0/0.25)]'
+          : 'neu-inset',
       )}
     >
       <span
         aria-hidden
         className={cn(
-          'absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform duration-std ease-enter',
+          'absolute top-1 left-1 size-5 rounded-full bg-white shadow-[0_2px_4px_rgb(0_0_0/0.3)] transition-transform duration-std ease-spring',
           checked && 'translate-x-5',
         )}
       />

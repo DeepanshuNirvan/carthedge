@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, useSpring, useTransform } from 'framer-motion';
+import { PiggyBank, TrendingDown } from 'lucide-react';
 import { calculator } from '@/strings/marketing';
 import { Section, SectionHead, Reveal } from '../Section';
 import { formatPaise } from '@/lib/money';
@@ -29,7 +30,7 @@ function Slider({
     <div>
       <p className="flex items-baseline justify-between text-sm">
         <span className="font-medium text-hi">{label}</span>
-        <span className="font-mono text-jade-500 tnum">{format(value)}</span>
+        <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-jade-400 tnum">{format(value)}</span>
       </p>
       <input
         type="range"
@@ -39,7 +40,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full accent-jade-500"
+        className="slider mt-3.5 w-full cursor-pointer"
         style={{
           background: `linear-gradient(90deg, rgb(var(--jade-500)) ${pct}%, rgb(var(--surface-3)) ${pct}%)`,
         }}
@@ -74,9 +75,10 @@ export function RtoCalculator() {
 
   return (
     <Section id="calculator">
-      <SectionHead eyebrow={calculator.eyebrow} title={calculator.title} sub={calculator.sub} />
+      <SectionHead eyebrow={calculator.eyebrow} title={calculator.title} sub={calculator.sub} tone="gold" />
       <Reveal>
-        <div className="grid gap-8 rounded-xl bg-surface p-6 shadow-raised hairline sm:p-10 lg:grid-cols-[1fr_1.1fr]">
+        <div className="glass sheen grid gap-8 rounded-2xl p-6 shadow-float sm:p-10 lg:grid-cols-[1fr_1.1fr]">
+          {/* the seller's numbers */}
           <div className="flex flex-col gap-8">
             <Slider
               label={calculator.orders}
@@ -108,39 +110,53 @@ export function RtoCalculator() {
             <p className="text-xs leading-relaxed text-low">{calculator.assumption}</p>
           </div>
 
-          <div className="flex flex-col justify-center gap-6 rounded-lg bg-surface-2 p-6 sm:p-8">
-            <div>
-              <p className="font-display text-5xl font-semibold tracking-tight text-jade-500 sm:text-6xl">
+          {/* the money */}
+          <div className="relative flex flex-col justify-center gap-6 overflow-hidden rounded-xl neu p-6 sm:p-8">
+            <div
+              aria-hidden
+              className="absolute -right-16 -top-16 size-48 rounded-full bg-jade-500/15 blur-3xl"
+            />
+            <div className="relative">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
+                <PiggyBank className="size-4" /> {calculator.savedLabel}
+              </p>
+              <p className="mt-2 font-display text-[3.25rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[4.25rem]">
                 <AnimatedRupees paise={saved} />
               </p>
-              <p className="mt-1.5 text-sm font-medium uppercase tracking-wider text-mid">
-                {calculator.savedLabel}
-              </p>
             </div>
-            <div className="flex flex-col gap-3">
+
+            <div className="relative flex flex-col gap-4">
               <div>
-                <div className="flex justify-between text-xs text-mid">
-                  <span>{calculator.lossNow}</span>
+                <div className="flex justify-between text-xs">
+                  <span className="flex items-center gap-1 text-mid">{calculator.lossNow}</span>
                   <span className="font-mono tnum text-danger">{formatPaise(lossNow)}</span>
                 </div>
-                <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-surface-3">
-                  <div className="h-full rounded-full bg-danger/80 transition-all duration-expr ease-enter" style={{ width: '100%' }} />
+                <div className="mt-1.5 h-3 overflow-hidden rounded-full neu-inset">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-danger to-[rgb(210_78_66)]"
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  />
                 </div>
               </div>
               <div>
-                <div className="flex justify-between text-xs text-mid">
-                  <span>{calculator.withUs}</span>
-                  <span className="font-mono tnum text-jade-500">{formatPaise(lossWith)}</span>
+                <div className="flex justify-between text-xs">
+                  <span className="flex items-center gap-1 text-mid">
+                    <TrendingDown className="size-3.5 text-jade-400" /> {calculator.withUs}
+                  </span>
+                  <span className="font-mono tnum text-jade-400">{formatPaise(lossWith)}</span>
                 </div>
-                <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-surface-3">
-                  <div
-                    className="h-full rounded-full bg-jade-500 transition-all duration-expr ease-enter"
-                    style={{ width: `${(lossWith / maxBar) * 100}%` }}
+                <div className="mt-1.5 h-3 overflow-hidden rounded-full neu-inset">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-jade-400 to-jade-500 shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]"
+                    animate={{ width: `${(lossWith / maxBar) * 100}%` }}
+                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   />
                 </div>
               </div>
             </div>
-            <p className="rounded-md bg-gold-400/10 px-4 py-3 text-sm font-medium text-gold-500">
+
+            <p className="relative rounded-md bg-gold-400/12 px-4 py-3 text-sm font-semibold text-gold-500 shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)]">
               {calculator.paysFor(paysFor)}
             </p>
           </div>

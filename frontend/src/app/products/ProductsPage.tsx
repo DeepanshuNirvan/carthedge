@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn';
 function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: () => void; onDelete: () => void }) {
   const { setStock, setTrending } = useProductMutations();
   return (
-    <article className="group overflow-hidden rounded-lg bg-surface shadow-soft hairline">
+    <article className="panel group overflow-hidden rounded-lg transition-transform duration-std ease-enter hover:-translate-y-0.5 hover:shadow-raised">
       <div className="relative aspect-[4/3] bg-surface-2">
         {product.images[0] ? (
           <img src={product.images[0]} alt={product.name} loading="lazy" className="size-full object-cover" />

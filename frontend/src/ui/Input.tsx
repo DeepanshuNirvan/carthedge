@@ -10,8 +10,11 @@ import {
 } from 'react';
 import { cn } from '@/lib/cn';
 
+// neu-inset gives fields a recessed, tactile well; jade ring on focus.
 const fieldClass =
-  'w-full rounded-md bg-surface-2 px-3.5 text-sm text-hi placeholder:text-low hairline transition-shadow duration-micro focus:shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))] focus:outline-none disabled:opacity-50';
+  'w-full rounded-md neu-inset px-3.5 text-sm text-hi placeholder:text-dim transition-shadow duration-micro ' +
+  'focus:shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400)),0_0_0_4px_rgb(var(--jade-500)/0.14)] focus:outline-none ' +
+  'disabled:opacity-50 aria-[invalid=true]:shadow-[inset_0_0_0_1.5px_rgb(var(--danger))]';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
@@ -28,9 +31,23 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...rest }, ref) {
     return (
-      <select ref={ref} className={cn(fieldClass, 'h-11 appearance-none pr-9', className)} {...rest}>
-        {children}
-      </select>
+      <div className="relative">
+        <select ref={ref} className={cn(fieldClass, 'h-11 appearance-none pr-9', className)} {...rest}>
+          {children}
+        </select>
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-low"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
     );
   },
 );
@@ -53,11 +70,11 @@ export function Field({ label, error, hint, optional, children }: FieldProps) {
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="flex items-baseline justify-between text-sm font-medium text-hi">
         {label}
-        {optional && <span className="text-xs font-normal text-low">optional</span>}
+        {optional && <span className="text-xs font-normal text-dim">optional</span>}
       </label>
       {control}
       {error ? (
-        <p role="alert" className="text-xs text-danger">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       ) : hint ? (

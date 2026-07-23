@@ -32,8 +32,8 @@ export function Pricing() {
                 <Reveal key={plan.code} delay={i * 0.07}>
                   <article
                     className={cn(
-                      'relative flex h-full flex-col rounded-xl bg-surface p-7 shadow-soft hairline',
-                      popular && 'shadow-glow ring-1 ring-jade-500/50',
+                      'relative flex h-full flex-col rounded-2xl p-7 transition-transform duration-std ease-enter hover:-translate-y-1',
+                      popular ? 'glass sheen shadow-glow' : 'panel shadow-soft',
                     )}
                   >
                     {popular && (
@@ -61,7 +61,7 @@ export function Pricing() {
                     </ul>
                     <Link
                       to="/app/register"
-                      className={cn('mt-auto pt-7', buttonLink(popular ? 'primary' : 'secondary'), 'w-full')}
+                      className={cn('mt-8', buttonLink(popular ? 'primary' : 'secondary'), 'w-full')}
                     >
                       {pricing.cta}
                     </Link>
@@ -71,10 +71,14 @@ export function Pricing() {
             })}
 
         <Reveal delay={0.21}>
-          <article className="flex h-full flex-col rounded-xl border border-dashed border-gold-400/40 bg-gold-400/[0.04] p-7">
-            <h3 className="font-display text-lg font-semibold text-gold-400">{pricing.custom.title}</h3>
-            <p className="mt-3 text-sm leading-relaxed text-mid">{pricing.custom.copy}</p>
-            <Link to="/contact" className={cn('mt-auto pt-7', buttonLink('gold'), 'w-full')}>
+          <article className="glass sheen relative flex h-full flex-col overflow-hidden rounded-2xl p-7 shadow-soft">
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-[radial-gradient(120%_100%_at_100%_0%,rgb(var(--gold-400)/0.14),transparent_55%)]"
+            />
+            <h3 className="relative font-display text-lg font-semibold text-gold-500">{pricing.custom.title}</h3>
+            <p className="relative mt-3 text-sm leading-relaxed text-mid">{pricing.custom.copy}</p>
+            <Link to="/contact" className={cn('relative mt-8', buttonLink('gold'), 'w-full')}>
               {pricing.custom.cta}
             </Link>
           </article>

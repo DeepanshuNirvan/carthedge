@@ -8,6 +8,7 @@ import { router } from './router';
 import { ApiError } from './api/http';
 import './theme/fonts.css';
 import './theme/tokens.css';
+import './theme/glass.css';
 import './index.css';
 
 const queryClient = new QueryClient({

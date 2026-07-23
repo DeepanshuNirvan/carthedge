@@ -1,6 +1,7 @@
 import { Seo, organizationJsonLd } from '@/lib/seo';
 import { guides } from '@/strings/marketing';
 import { useLenis } from '../useLenis';
+import { MarketingBackground } from '../MarketingBackground';
 import { MarketingNav } from '../MarketingNav';
 import { Footer } from '../Footer';
 import { Hero } from '../sections/Hero';
@@ -35,6 +36,7 @@ export default function HomePage() {
         path="/"
         jsonLd={[organizationJsonLd, faqJsonLd]}
       />
+      <MarketingBackground />
       <MarketingNav />
       <main>
         <Hero />

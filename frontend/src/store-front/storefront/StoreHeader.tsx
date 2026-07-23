@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Instagram, MessageCircle, ShieldCheck, ShoppingBag } from 'lucide-react';
 import type { StoreBusiness } from '@/api/types';
 import { cartCount, useCart } from '@/store/cart';
@@ -10,7 +11,7 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
   const count = cartCount(items);
 
   return (
-    <header className="sticky top-0 z-30 border-b bg-bg/90 backdrop-blur">
+    <header className="glass-nav sticky top-0 z-30">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3">
         <Link to={`/s/${business.code}`} className="flex min-w-0 items-center gap-2.5">
           <Avatar name={business.name} src={business.logoUrl || undefined} className="size-10" />
@@ -56,17 +57,23 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
             >
               <ShoppingBag className="size-5" />
               {count > 0 && (
-                <span className="absolute right-1 top-1 flex min-w-4.5 items-center justify-center rounded-full bg-jade-500 px-1 font-mono text-[10px] font-semibold text-white tnum">
+                <motion.span
+                  key={count}
+                  initial={{ scale: 0.4 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                  className="absolute right-1 top-1 flex min-w-[18px] items-center justify-center rounded-full bg-gradient-to-b from-jade-400 to-jade-500 px-1 font-mono text-[10px] font-bold text-[rgb(var(--text-on-accent))] tnum shadow-[0_2px_6px_-1px_rgb(var(--jade-700)/0.6)]"
+                >
                   {count}
-                </span>
+                </motion.span>
               )}
             </button>
           )}
         </div>
       </div>
 
-      <p className="flex items-center justify-center gap-1.5 border-t bg-surface-2/50 py-1.5 text-[11px] text-mid">
-        <ShieldCheck className="size-3.5 text-jade-500" />
+      <p className="flex items-center justify-center gap-1.5 border-t bg-surface-2/40 py-1.5 text-[11px] font-medium text-mid">
+        <ShieldCheck className="size-3.5 text-jade-400" />
         Payments secured by Razorpay · Seller verified
       </p>
     </header>

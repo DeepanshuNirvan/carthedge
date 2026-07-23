@@ -36,8 +36,8 @@ export function MarketingNav() {
       <nav
         aria-label="Main"
         className={cn(
-          'flex w-full max-w-6xl items-center justify-between gap-4 rounded-xl px-4 py-2.5 transition-all duration-std sm:px-5',
-          scrolled ? 'glass shadow-soft' : 'bg-transparent',
+          'flex w-full max-w-6xl items-center justify-between gap-4 rounded-2xl px-4 py-2.5 transition-all duration-std sm:px-5',
+          scrolled ? 'glass-nav sheen shadow-raised' : 'bg-transparent',
         )}
       >
         <Link to="/" aria-label="CartHedge home" className="shrink-0">

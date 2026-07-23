@@ -8,6 +8,7 @@ import { Seo } from '@/lib/seo';
 import { contact } from '@/strings/marketing';
 import { emailSchema, phoneSchema } from '@/lib/validators';
 import { useSite } from '@/api/site';
+import { MarketingBackground } from '../MarketingBackground';
 import { MarketingNav } from '../MarketingNav';
 import { Footer } from '../Footer';
 import { Field, Input, Textarea } from '@/ui/Input';
@@ -49,6 +50,7 @@ export default function ContactPage() {
         description="Questions about CartHedge plans, migrations or custom volume pricing? We reply within a working day."
         path="/contact"
       />
+      <MarketingBackground />
       <MarketingNav />
       <main className="mx-auto grid min-h-dvh w-full max-w-6xl gap-12 px-5 pb-24 pt-36 sm:px-8 lg:grid-cols-[1.2fr_1fr]">
         <div>
@@ -59,7 +61,7 @@ export default function ContactPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mt-10 flex items-center gap-3 rounded-lg bg-jade-500/10 p-5 text-jade-500"
+              className="glass sheen mt-10 flex items-center gap-3 rounded-2xl p-5 text-jade-400 shadow-float"
             >
               <CheckCircle2 className="size-6 shrink-0" />
               <p className="text-sm font-medium">{contact.form.success}</p>
@@ -91,12 +93,12 @@ export default function ContactPage() {
         </div>
 
         <aside className="flex flex-col gap-4 lg:pt-16">
-          <div className="rounded-lg bg-surface p-6 shadow-soft hairline">
+          <div className="panel rounded-2xl p-6 shadow-soft">
             <Mail className="size-5 text-jade-500" aria-hidden />
             <p className="mt-3 text-sm font-medium text-hi">{site?.contact.email || 'hello@carthedge.in'}</p>
             <p className="mt-1 text-xs text-low">Best for detailed questions</p>
           </div>
-          <div className="rounded-lg bg-surface p-6 shadow-soft hairline">
+          <div className="panel rounded-2xl p-6 shadow-soft">
             <Clock className="size-5 text-gold-400" aria-hidden />
             <p className="mt-3 text-sm font-medium text-hi">{site?.contact.supportHours}</p>
             <p className="mt-1 text-xs text-low">We reply within a working day</p>

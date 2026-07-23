@@ -8,10 +8,16 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside: Re
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden overflow-hidden bg-ink-950 lg:block" data-theme="dark">
+        <img
+          src="/demo/aurora-texture.webp"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 size-full object-cover opacity-80"
+        />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/40 to-transparent" />
         <div aria-hidden className="absolute inset-0">
-          <div className="absolute left-1/4 top-1/4 size-[420px] rounded-full bg-jade-500/25 blur-[130px]" />
-          <div className="absolute bottom-1/4 right-1/5 size-[300px] rounded-full bg-gold-400/18 blur-[110px]" />
-          <div className="absolute inset-0 opacity-[0.05] [background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;)]" />
+          <div className="absolute left-1/4 top-1/4 size-[380px] rounded-full bg-jade-500/20 blur-[130px]" />
+          <div className="absolute bottom-1/4 right-1/5 size-[280px] rounded-full bg-gold-400/16 blur-[110px]" />
         </div>
         <div className="relative z-10 flex h-full flex-col justify-between p-10">
           <Link to="/" aria-label="CartHedge home">

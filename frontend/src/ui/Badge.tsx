@@ -5,18 +5,26 @@ import type { OrderStatus } from '@/api/types';
 type Tone = 'jade' | 'gold' | 'danger' | 'info' | 'neutral';
 
 const tones: Record<Tone, string> = {
-  jade: 'bg-jade-500/12 text-jade-500',
-  gold: 'bg-gold-400/14 text-gold-500',
-  danger: 'bg-danger/12 text-danger',
-  info: 'bg-info/12 text-info',
-  neutral: 'bg-surface-3 text-mid',
+  jade: 'bg-jade-500/14 text-jade-400 shadow-[inset_0_0_0_1px_rgb(var(--jade-500)/0.22)]',
+  gold: 'bg-gold-400/16 text-gold-500 shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.28)]',
+  danger: 'bg-danger/14 text-danger shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.24)]',
+  info: 'bg-info/14 text-info shadow-[inset_0_0_0_1px_rgb(var(--info)/0.24)]',
+  neutral: 'bg-surface-3 text-mid shadow-[inset_0_0_0_1px_rgb(var(--line)/var(--line-a))]',
 };
 
-export function Badge({ tone = 'neutral', className, children }: { tone?: Tone; className?: string; children: ReactNode }) {
+export function Badge({
+  tone = 'neutral',
+  className,
+  children,
+}: {
+  tone?: Tone;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold',
         tones[tone],
         className,
       )}

@@ -16,8 +16,10 @@ export function Trust() {
           const Icon = trustIcons[i];
           return (
             <Reveal key={point.title} delay={i * 0.07}>
-              <article className="h-full rounded-lg bg-surface p-6 shadow-soft hairline">
-                <Icon className="size-6 text-gold-400" aria-hidden />
+              <article className="panel h-full rounded-2xl p-6 shadow-soft">
+                <span className="flex size-11 items-center justify-center rounded-md neu text-gold-500">
+                  <Icon className="size-5" aria-hidden />
+                </span>
                 <h3 className="mt-4 font-display text-base font-semibold text-hi">{point.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-mid">{point.copy}</p>
               </article>
@@ -38,8 +40,8 @@ export function Guides() {
       <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {guides.steps.map((step, i) => (
           <Reveal key={step.title} delay={i * 0.07}>
-            <li className="relative h-full rounded-lg bg-surface p-6 pt-8 shadow-soft hairline">
-              <span className="absolute -top-4 left-6 flex size-8 items-center justify-center rounded-full bg-jade-500 font-mono text-sm font-semibold text-white">
+            <li className="panel relative h-full rounded-2xl p-6 pt-8 shadow-soft">
+              <span className="absolute -top-4 left-6 flex size-9 items-center justify-center rounded-full bg-gradient-to-b from-jade-400 to-jade-500 font-mono text-sm font-bold text-[rgb(var(--text-on-accent))] clay">
                 {i + 1}
               </span>
               <h3 className="font-display text-base font-semibold text-hi">{step.title}</h3>
@@ -51,7 +53,7 @@ export function Guides() {
 
       <Reveal className="mt-20">
         <h3 className="mb-6 text-center font-display text-d3 font-semibold text-hi">{guides.faqTitle}</h3>
-        <div className="mx-auto max-w-2xl divide-y rounded-lg bg-surface shadow-soft hairline">
+        <div className="glass sheen mx-auto max-w-2xl divide-y overflow-hidden rounded-2xl shadow-float">
           {guides.faqs.map((faq, i) => (
             <div key={faq.q}>
               <button

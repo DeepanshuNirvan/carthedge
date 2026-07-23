@@ -151,9 +151,25 @@ export default function AiDeskPage() {
       <PageHeader title="AI order desk" subtitle="Paste a chat, get an order" />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Parse a DM thread" subtitle="Hinglish works — item, size, address, payment" />
-          <div className="flex flex-col gap-4 p-5 pt-4">
+        <Card glass className="relative overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-jade-400 to-transparent"
+          />
+          <div
+            aria-hidden
+            className="absolute -right-16 -top-16 size-40 rounded-full bg-jade-500/12 blur-3xl"
+          />
+          <CardHeader
+            title="Parse a DM thread"
+            subtitle="Hinglish works — item, size, address, payment"
+            action={
+              <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-400">
+                <Sparkles className="size-4.5" />
+              </span>
+            }
+          />
+          <div className="relative flex flex-col gap-4 p-5 pt-4">
             <Textarea
               rows={7}
               placeholder={'pink wali kurti M size chahiye\nCOD karwa do\n45 Civil Lines Delhi 110054\nPriya 98110 43210'}

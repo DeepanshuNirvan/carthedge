@@ -20,8 +20,15 @@ import { cn } from '@/lib/cn';
 
 const icons = [MessageCircle, KanbanSquare, Link2, ShieldCheck, Podcast, Tags, Users, Bell, Truck, ClipboardCheck, FileText, Bot, Radio];
 
-// bento rhythm: featured tiles span 2 columns on desktop
+// bento rhythm: the two anchor features span two columns and carry a jade wash
 const wide = new Set(['capture', 'cod']);
+
+function spotlight(e: React.MouseEvent<HTMLElement>) {
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+  el.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+}
 
 export function FeaturesBento() {
   return (
@@ -30,21 +37,37 @@ export function FeaturesBento() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {features.items.map((item, i) => {
           const Icon = icons[i];
+          const isWide = wide.has(item.key);
           return (
-            <Reveal key={item.key} delay={(i % 4) * 0.05} className={cn(wide.has(item.key) && 'sm:col-span-2')}>
-              <article className="group relative h-full overflow-hidden rounded-lg bg-surface p-6 shadow-soft hairline transition-transform duration-std ease-enter hover:-translate-y-1">
-                <div
-                  aria-hidden
-                  className="absolute -right-10 -top-10 size-28 rounded-full bg-jade-500/0 blur-2xl transition-colors duration-expr group-hover:bg-jade-500/15"
-                />
-                <div className="flex items-start justify-between">
-                  <span className="flex size-10 items-center justify-center rounded-md bg-surface-2 text-jade-500 transition-colors duration-std group-hover:bg-jade-500/12">
+            <Reveal key={item.key} delay={(i % 4) * 0.05} className={cn(isWide && 'sm:col-span-2')}>
+              <article
+                onMouseMove={spotlight}
+                className={cn(
+                  'spotlight group relative h-full overflow-hidden rounded-lg p-6 transition-transform duration-std ease-enter hover:-translate-y-1',
+                  isWide ? 'glass sheen shadow-float' : 'panel shadow-soft',
+                )}
+              >
+                {isWide && (
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 -z-0 bg-[radial-gradient(120%_100%_at_0%_0%,rgb(var(--jade-500)/0.14),transparent_55%)]"
+                  />
+                )}
+                <div className="relative flex items-start justify-between">
+                  <span
+                    className={cn(
+                      'flex size-11 items-center justify-center rounded-md transition-colors duration-std',
+                      isWide ? 'bg-jade-500/18 text-jade-300' : 'neu text-jade-400 group-hover:text-jade-300',
+                    )}
+                  >
                     <Icon className="size-5" aria-hidden />
                   </span>
                   {item.badge && <Badge tone="gold">{item.badge}</Badge>}
                 </div>
-                <h3 className="mt-4 font-display text-lg font-semibold text-hi">{item.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-mid">{item.copy}</p>
+                <h3 className={cn('relative mt-4 font-display font-semibold text-hi', isWide ? 'text-xl' : 'text-lg')}>
+                  {item.title}
+                </h3>
+                <p className="relative mt-1.5 max-w-md text-sm leading-relaxed text-mid">{item.copy}</p>
               </article>
             </Reveal>
           );

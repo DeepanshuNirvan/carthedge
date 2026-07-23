@@ -28,7 +28,7 @@ export function ProductCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.36, delay: Math.min(index, 8) * 0.035, ease: [0.16, 1, 0.3, 1] }}
-      className="group overflow-hidden rounded-lg bg-surface shadow-soft hairline"
+      className="panel group overflow-hidden rounded-lg transition-transform duration-std ease-enter hover:-translate-y-1 hover:shadow-raised"
     >
       <Link to={`/s/${businessCode}/p/${product.id}`} className="block">
         <div className="relative aspect-[4/5] overflow-hidden bg-surface-2">
@@ -75,9 +75,9 @@ export function ProductCard({
               <Link
                 to={`/s/${businessCode}/p/${product.id}`}
                 aria-label={`Choose options for ${product.name}`}
-                className="flex size-9 items-center justify-center rounded-md bg-surface-2 text-hi transition-colors hover:bg-jade-500 hover:text-white"
+                className="flex size-9 items-center justify-center rounded-md neu text-jade-400 transition-all duration-micro ease-spring hover:bg-gradient-to-b hover:from-jade-400 hover:to-jade-500 hover:text-[rgb(var(--text-on-accent))] active:scale-90"
               >
-                <Plus className="size-4" />
+                <Plus className="size-4" strokeWidth={2.5} />
               </Link>
             ) : (
               <button
@@ -86,9 +86,9 @@ export function ProductCard({
                   add(businessCode, product);
                   toast('success', 'Added to cart', product.name);
                 }}
-                className="flex size-9 items-center justify-center rounded-md bg-surface-2 text-hi transition-colors hover:bg-jade-500 hover:text-white active:scale-95"
+                className="flex size-9 items-center justify-center rounded-md neu text-jade-400 transition-all duration-micro ease-spring hover:bg-gradient-to-b hover:from-jade-400 hover:to-jade-500 hover:text-[rgb(var(--text-on-accent))] active:scale-90"
               >
-                <Plus className="size-4" />
+                <Plus className="size-4" strokeWidth={2.5} />
               </button>
             ))}
         </div>

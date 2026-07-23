@@ -1,0 +1,243 @@
+/* CartHedge morphism system — glass, neumorphic, aurora, clay.
+   One material language across all four surfaces. Every class is token-driven
+   so both themes stay premium by construction. */
+
+/* ---------- hairline: 1px inset border respecting theme alpha ---------- */
+.hairline {
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a));
+}
+.hairline-strong {
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-strong-a));
+}
+
+/* ---------- glass: frosted panel with luminous edge + inner highlight ----------
+   Layered: translucent fill + backdrop blur + thin border + top inner light. */
+.glass {
+  position: relative;
+  background: rgb(var(--glass-bg) / var(--glass-a));
+  backdrop-filter: blur(var(--blur-md)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(1.5);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--line) / var(--glass-border-a)),
+    inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
+    var(--shadow-soft);
+}
+
+/* stronger blur for floating nav / sheets that sit over motion */
+.glass-nav {
+  background: rgb(var(--glass-bg) / 0.72);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.6);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--line) / var(--glass-border-a)),
+    inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
+    var(--shadow-raised);
+}
+
+/* panel = solid-ish card with faint glass sheen; the workhorse card surface */
+.panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.4)), transparent 40%),
+    rgb(var(--surface));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--line) / var(--line-a)),
+    inset 0 1px 0 0 rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.7)),
+    var(--shadow-soft);
+}
+
+/* top-edge light refraction line — drop onto any rounded glass element */
+.sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    130deg,
+    rgb(var(--glass-tint) / 0.5),
+    transparent 30%,
+    transparent 70%,
+    rgb(var(--glass-tint) / 0.18)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* ---------- neumorphic control: soft raised/pressed tactile surface ---------- */
+.neu {
+  background: rgb(var(--surface-2));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--line) / var(--line-a)),
+    2px 2px 6px rgb(var(--neu-dark) / var(--neu-dark-a)),
+    -2px -2px 5px rgb(var(--neu-light) / var(--neu-light-a));
+}
+.neu-inset {
+  background: rgb(var(--surface-2));
+  box-shadow:
+    inset 2px 2px 6px rgb(var(--neu-dark) / var(--neu-dark-a)),
+    inset -2px -2px 5px rgb(var(--neu-light) / var(--neu-light-a));
+}
+
+/* ---------- clay: soft weighty physical element for primary tappables ---------- */
+.clay {
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 0.28),
+    inset 0 -3px 4px rgb(0 0 0 / 0.22),
+    0 10px 24px -8px rgb(var(--jade-700) / 0.55);
+}
+
+/* ---------- aurora: mesh light sources behind glass ---------- */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora::before,
+.aurora::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(var(--blur-xl));
+  opacity: var(--aurora-a);
+}
+.aurora::before {
+  width: 46vw;
+  height: 46vw;
+  top: -12%;
+  left: -8%;
+  background: radial-gradient(circle, rgb(var(--aurora-1)), transparent 62%);
+  animation: auroraDrift1 22s var(--ease-enter) infinite alternate;
+}
+.aurora::after {
+  width: 40vw;
+  height: 40vw;
+  bottom: -14%;
+  right: -6%;
+  background: radial-gradient(circle, rgb(var(--aurora-2)), transparent 62%);
+  animation: auroraDrift2 26s var(--ease-enter) infinite alternate;
+}
+
+@keyframes auroraDrift1 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(8vw, 6vh, 0) scale(1.18); }
+}
+@keyframes auroraDrift2 {
+  from { transform: translate3d(0, 0, 0) scale(1.05); }
+  to { transform: translate3d(-7vw, -5vh, 0) scale(1.28); }
+}
+
+/* ---------- spotlight border card: edge illuminates under cursor ----------
+   drive --mx/--my (0..100%) from JS on hover; degrades to static edge. */
+.spotlight {
+  position: relative;
+}
+.spotlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    180px circle at var(--mx, 50%) var(--my, 0%),
+    rgb(var(--jade-400) / 0.7),
+    transparent 60%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-std) var(--ease-enter);
+  pointer-events: none;
+}
+.spotlight:hover::after {
+  opacity: 1;
+}
+
+/* ---------- cinematic film grain (fixed layer, never on scrolling content) ---------- */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- shimmer for skeletons ---------- */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ---------- gradient brand text ---------- */
+.text-brand-grad {
+  background: linear-gradient(100deg, rgb(var(--jade-400)), rgb(var(--gold-400)) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- premium range slider: recessed track + physical jade knob ---------- */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 999px;
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: grab;
+  background: linear-gradient(180deg, rgb(var(--jade-300)), rgb(var(--jade-500)));
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.5),
+    0 3px 8px -1px rgb(var(--jade-700) / 0.6),
+    0 0 0 4px rgb(var(--jade-500) / 0.14);
+  transition: transform var(--dur-micro) var(--ease-spring);
+}
+.slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.14);
+}
+.slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  cursor: grab;
+  background: linear-gradient(180deg, rgb(var(--jade-300)), rgb(var(--jade-500)));
+  box-shadow: 0 3px 8px -1px rgb(var(--jade-700) / 0.6), 0 0 0 4px rgb(var(--jade-500) / 0.14);
+}
+
+/* reduced transparency: kill blur, fall back to solid so contrast holds */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-nav,
+  .panel {
+    background: rgb(var(--surface));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .aurora::after {
+    animation: none;
+  }
+}

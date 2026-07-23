@@ -1,9 +1,14 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/cn';
 
 export function Section({ className, ...rest }: HTMLAttributes<HTMLElement>) {
-  return <section className={cn('relative mx-auto w-full max-w-6xl px-5 py-24 sm:px-8 md:py-32', className)} {...rest} />;
+  return (
+    <section
+      className={cn('relative mx-auto w-full max-w-6xl px-5 py-24 sm:px-8 md:py-32', className)}
+      {...rest}
+    />
+  );
 }
 
 export function SectionHead({
@@ -11,40 +16,57 @@ export function SectionHead({
   title,
   sub,
   align = 'center',
+  tone = 'jade',
 }: {
   eyebrow: string;
   title: string;
   sub?: string;
   align?: 'center' | 'left';
+  tone?: 'jade' | 'gold' | 'danger';
 }) {
+  const toneCls =
+    tone === 'gold' ? 'text-gold-500' : tone === 'danger' ? 'text-danger' : 'text-jade-400';
   return (
-    <Reveal className={cn('mb-14 flex flex-col gap-4', align === 'center' ? 'items-center text-center' : 'items-start')}>
-      <span className="rounded-full bg-jade-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-jade-500">
+    <Reveal
+      className={cn(
+        'mb-14 flex flex-col gap-4',
+        align === 'center' ? 'items-center text-center' : 'items-start',
+      )}
+    >
+      <span
+        className={cn(
+          'glass inline-flex rounded-full px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.14em]',
+          toneCls,
+        )}
+      >
         {eyebrow}
       </span>
       <h2 className="max-w-2xl font-display text-d2 font-semibold text-hi">{title}</h2>
-      {sub && <p className="max-w-xl text-base text-mid sm:text-lg">{sub}</p>}
+      {sub && <p className="max-w-xl text-base leading-relaxed text-mid sm:text-lg">{sub}</p>}
     </Reveal>
   );
 }
 
-/** Enters when scrolled into view; respects reduced motion via framer. */
+/** Heavy, expensive scroll reveal — rises and de-blurs into place. Respects reduced motion. */
 export function Reveal({
   children,
   className,
   delay = 0,
+  y = 28,
 }: {
   children: ReactNode;
   className?: string;
   delay?: number;
+  y?: number;
 }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={reduced ? false : { opacity: 0, y, filter: 'blur(8px)' }}
+      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.64, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </motion.div>

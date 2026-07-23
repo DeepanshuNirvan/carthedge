@@ -57,13 +57,22 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-micro',
-              isActive ? 'bg-jade-500/12 text-jade-500' : 'text-mid hover:bg-surface-2 hover:text-hi',
+              'group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-micro',
+              isActive
+                ? 'panel text-jade-400 shadow-soft'
+                : 'text-mid hover:bg-surface-2 hover:text-hi',
             )
           }
         >
-          <item.icon className="size-4.5 shrink-0" aria-hidden />
-          {item.label}
+          {({ isActive }) => (
+            <>
+              {isActive && (
+                <span aria-hidden className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-jade-400" />
+              )}
+              <item.icon className="size-[18px] shrink-0" aria-hidden />
+              {item.label}
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -138,9 +147,14 @@ export function AppShell() {
   };
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="relative flex min-h-dvh">
+      {/* faint workspace depth — focused, not loud */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(90%_60%_at_100%_0%,rgb(var(--jade-500)/0.06),transparent_60%),radial-gradient(70%_50%_at_0%_100%,rgb(var(--gold-400)/0.05),transparent_60%)]"
+      />
       {/* desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r bg-surface lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r bg-surface/70 backdrop-blur-xl lg:flex">
         <div className="border-b px-5 py-4">
           <Link to="/app" aria-label="Dashboard">
             <Wordmark />
@@ -168,13 +182,13 @@ export function AppShell() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex lg:hidden"
           >
-            <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setMobileNav(false)} />
+            <button aria-label="Close menu" className="absolute inset-0 bg-[rgb(var(--bg))/0.55] backdrop-blur-md" onClick={() => setMobileNav(false)} />
             <motion.aside
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="relative flex h-full w-64 flex-col bg-surface shadow-raised"
+              className="glass-nav relative flex h-full w-64 flex-col shadow-float"
             >
               <div className="flex items-center justify-between border-b px-5 py-4">
                 <Wordmark />
@@ -190,7 +204,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TrialBanner />
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-bg/85 px-4 py-3 backdrop-blur sm:px-6">
+        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 py-3 sm:px-6">
           <IconButton label="Open menu" className="lg:hidden" onClick={() => setMobileNav(true)}>
             <Menu className="size-5" />
           </IconButton>

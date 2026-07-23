@@ -9,13 +9,13 @@ export function Testimonials() {
       <div className="grid gap-5 md:grid-cols-3">
         {testimonials.items.map((t, i) => (
           <Reveal key={t.name} delay={i * 0.07}>
-            <figure className="flex h-full flex-col rounded-lg bg-surface p-7 shadow-soft hairline">
-              <Quote className="size-5 text-jade-500/60" aria-hidden />
-              <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-hi">“{t.quote}”</blockquote>
+            <figure className="glass sheen flex h-full flex-col rounded-2xl p-7 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
+              <Quote className="size-6 text-jade-400/70" aria-hidden />
+              <blockquote className="mt-4 flex-1 text-[15px] leading-relaxed text-hi">“{t.quote}”</blockquote>
               <figcaption className="mt-6 border-t pt-4">
                 <p className="text-sm font-semibold text-hi">{t.name}</p>
                 <p className="text-xs text-low">{t.business}</p>
-                <p className="mt-2 w-fit rounded-full bg-jade-500/10 px-2.5 py-1 font-mono text-xs text-jade-500 tnum">
+                <p className="mt-2.5 w-fit rounded-full bg-jade-500/12 px-2.5 py-1 font-mono text-xs font-semibold text-jade-400 tnum shadow-[inset_0_0_0_1px_rgb(var(--jade-500)/0.25)]">
                   {t.metric}
                 </p>
               </figcaption>

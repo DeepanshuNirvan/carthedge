@@ -1,14 +1,19 @@
-/* CartHedge design tokens. Every component reads these variables —
-   switching data-theme restyles the whole app instantly. */
+/* CartHedge design tokens — two fully-tuned premium themes.
+   Every component reads these variables; switching data-theme restyles the
+   whole app instantly. Values map to the product: jade = money/confirmed,
+   gold = the ₹-saved hero metric, ink/paper = the chat-to-order surface. */
 
 :root {
   /* brand (theme-invariant) */
-  --jade-400: 34 197 130;
-  --jade-500: 15 169 104;
-  --jade-600: 11 138 83;
-  --jade-700: 10 110 68;
-  --gold-400: 232 181 89;
-  --gold-500: 212 155 60;
+  --jade-300: 74 222 160;
+  --jade-400: 34 201 133;
+  --jade-500: 15 176 108;
+  --jade-600: 11 143 86;
+  --jade-700: 9 112 68;
+  --gold-300: 244 206 133;
+  --gold-400: 233 185 96;
+  --gold-500: 214 158 62;
+  --gold-600: 176 124 42;
 
   --ink-700: 42 42 52;
   --ink-800: 30 30 38;
@@ -19,47 +24,122 @@
   --paper-100: 244 241 233;
   --paper-200: 233 228 216;
 
-  --success: 15 169 104;
-  --warning: 232 181 89;
-  --danger: 224 87 75;
-  --info: 76 141 212;
+  --success: 24 190 120;
+  --warning: 233 185 96;
+  --danger: 233 96 84;
+  --info: 96 156 226;
+
+  /* radius scale */
+  --r-xs: 8px;
+  --r-sm: 11px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --r-2xl: 34px;
+
+  /* blur scale */
+  --blur-sm: 8px;
+  --blur-md: 18px;
+  --blur-lg: 32px;
+  --blur-xl: 56px;
 
   /* motion */
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-micro: 120ms;
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --dur-micro: 130ms;
   --dur-std: 240ms;
   --dur-expr: 480ms;
+  --dur-cine: 720ms;
 }
 
+/* ============================ DARK ============================ */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
-  --bg: 11 11 14;
-  --surface: 16 16 21;
-  --surface-2: 22 22 28;
-  --surface-3: 30 30 38;
-  --text-hi: 245 243 238;
-  --text-mid: 169 166 160;
-  --text-low: 110 107 101;
+
+  --bg: 9 10 13;
+  --bg-2: 13 15 19;
+  --surface: 18 20 25;
+  --surface-2: 25 28 35;
+  --surface-3: 36 40 49;
+
+  /* text — tuned for AA+ on every surface, secondary/muted lifted so nothing washes out */
+  --text-hi: 247 248 251;
+  --text-mid: 189 193 202;
+  --text-low: 148 153 164;
+  --text-dim: 108 113 124;
+  --text-on-accent: 8 16 11;
+
   --line: 255 255 255;
-  --line-a: 0.07;
-  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -12px rgb(0 0 0 / 0.5);
-  --shadow-raised: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 60px -20px rgb(0 0 0 / 0.6);
+  --line-a: 0.09;
+  --line-strong-a: 0.16;
+
+  /* glass — frosted panel over aurora/3D */
+  --glass-bg: 22 25 31;
+  --glass-a: 0.58;
+  --glass-hi: 255 255 255; /* inner top highlight */
+  --glass-hi-a: 0.10;
+  --glass-border-a: 0.14;
+  --glass-tint: 255 255 255; /* refraction sheen colour */
+
+  /* neumorphic control (dark = subtle raised plastic) */
+  --neu-light: 255 255 255;
+  --neu-light-a: 0.05;
+  --neu-dark: 0 0 0;
+  --neu-dark-a: 0.45;
+
+  /* aurora light sources behind glass */
+  --aurora-1: 15 176 108;   /* jade */
+  --aurora-2: 233 185 96;   /* gold */
+  --aurora-3: 40 90 200;    /* deep blue depth */
+  --aurora-a: 0.42;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 34px -14px rgb(0 0 0 / 0.62);
+  --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 30px 70px -24px rgb(0 0 0 / 0.72);
+  --shadow-float: 0 4px 14px rgb(0 0 0 / 0.45), 0 44px 96px -30px rgb(0 0 0 / 0.8);
 }
 
+/* ============================ LIGHT ============================ */
 [data-theme='light'] {
   color-scheme: light;
-  --bg: 251 249 244;
-  --surface: 254 253 250;
-  --surface-2: 244 241 233;
-  --surface-3: 233 228 216;
-  --text-hi: 22 22 28;
-  --text-mid: 85 82 75;
-  --text-low: 138 134 125;
-  --line: 22 22 28;
+
+  --bg: 244 242 236;
+  --bg-2: 249 247 242;
+  --surface: 255 254 251;
+  --surface-2: 245 243 237;
+  --surface-3: 235 232 224;
+
+  --text-hi: 22 23 28;
+  --text-mid: 78 77 72;
+  --text-low: 103 101 93;
+  --text-dim: 150 147 138;
+  --text-on-accent: 8 16 11;
+
+  --line: 24 22 20;
   --line-a: 0.09;
-  --shadow-soft: 0 1px 2px rgb(22 22 28 / 0.06), 0 12px 32px -16px rgb(22 22 28 / 0.14);
-  --shadow-raised: 0 2px 6px rgb(22 22 28 / 0.07), 0 24px 60px -24px rgb(22 22 28 / 0.2);
+  --line-strong-a: 0.16;
+
+  --glass-bg: 255 255 255;
+  --glass-a: 0.62;
+  --glass-hi: 255 255 255;
+  --glass-hi-a: 0.75;
+  --glass-border-a: 0.5;
+  --glass-tint: 255 255 255;
+
+  --neu-light: 255 255 255;
+  --neu-light-a: 0.9;
+  --neu-dark: 120 110 92;
+  --neu-dark-a: 0.16;
+
+  --aurora-1: 15 176 108;
+  --aurora-2: 233 185 96;
+  --aurora-3: 120 150 235;
+  --aurora-a: 0.3;
+
+  --shadow-soft: 0 1px 2px rgb(60 52 40 / 0.06), 0 12px 30px -14px rgb(60 52 40 / 0.16);
+  --shadow-raised: 0 2px 8px rgb(60 52 40 / 0.08), 0 28px 60px -22px rgb(60 52 40 / 0.22);
+  --shadow-float: 0 4px 14px rgb(60 52 40 / 0.1), 0 40px 90px -28px rgb(60 52 40 / 0.28);
 }
 
 * {
@@ -75,18 +155,20 @@ body {
   background-color: rgb(var(--bg));
   color: rgb(var(--text-hi));
   font-family: 'Satoshi', system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv01';
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
 ::selection {
-  background: rgb(var(--jade-500) / 0.3);
+  background: rgb(var(--jade-500) / 0.28);
+  color: rgb(var(--text-hi));
 }
 
 :focus-visible {
-  outline: 2px solid rgb(var(--jade-500));
+  outline: 2px solid rgb(var(--jade-400));
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* money & metrics always tabular */
@@ -94,53 +176,35 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* hairline utility — 1px inset border that respects theme alpha */
-.hairline {
-  box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a));
-}
-
-/* glass for floating nav / sheets over 3D */
-.glass {
-  background: rgb(var(--surface) / 0.65);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a));
-}
-
-/* cinematic film grain for marketing dark sections */
-.grain::after {
-  content: '';
-  position: fixed;
-  inset: -50%;
-  width: 200%;
-  height: 200%;
-  pointer-events: none;
-  z-index: 60;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grainShift 9s steps(6) infinite;
-}
-
-@keyframes grainShift {
-  0% { transform: translate(0, 0); }
-  20% { transform: translate(-4%, 3%); }
-  40% { transform: translate(3%, -5%); }
-  60% { transform: translate(-2%, 4%); }
-  80% { transform: translate(4%, 2%); }
-  100% { transform: translate(0, 0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .grain::after {
-    animation: none;
-  }
-  html {
-    scroll-behavior: auto;
-  }
-}
-
-/* thin scrollbars that match theme */
+/* thin theme-matched scrollbars */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--text-low) / 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--text-low) / 0.28);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--text-low) / 0.45);
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
