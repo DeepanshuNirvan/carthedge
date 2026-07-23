@@ -171,8 +171,10 @@ export default function StorePage() {
             <button
               onClick={() => setCategory('')}
               className={cn(
-                'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro',
-                category === '' ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid',
+                'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
+                category === ''
+                  ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
+                  : 'neu text-mid hover:text-hi',
               )}
             >
               All
@@ -182,8 +184,10 @@ export default function StorePage() {
                 key={c}
                 onClick={() => setCategory(c === category ? '' : c)}
                 className={cn(
-                  'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro',
-                  category === c ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid',
+                  'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
+                  category === c
+                    ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
+                    : 'neu text-mid hover:text-hi',
                 )}
               >
                 {c}
@@ -280,7 +284,12 @@ export default function StorePage() {
               value={maxPrice ?? priceCeiling}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
               aria-label="Maximum price"
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-surface-3 accent-jade-500"
+              className="slider w-full cursor-pointer"
+              style={{
+                background: `linear-gradient(90deg, rgb(var(--jade-500)) ${
+                  priceCeiling > 0 ? ((maxPrice ?? priceCeiling) / priceCeiling) * 100 : 100
+                }%, rgb(var(--surface-3)) ${priceCeiling > 0 ? ((maxPrice ?? priceCeiling) / priceCeiling) * 100 : 100}%)`,
+              }}
             />
             <p className="mt-2 font-mono text-sm text-jade-500 tnum">
               Up to {formatPaise(maxPrice ?? priceCeiling)}
@@ -307,7 +316,9 @@ export default function StorePage() {
                     onClick={() => setCategory(c === category ? '' : c)}
                     className={cn(
                       'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
-                      category === c ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid',
+                      category === c
+                    ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
+                    : 'neu text-mid hover:text-hi',
                     )}
                   >
                     {c}

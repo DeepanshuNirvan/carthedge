@@ -14,8 +14,8 @@ export const nav = {
 
 export const hero = {
   eyebrow: 'For Instagram & WhatsApp sellers',
-  title: 'The DM is the shop.',
-  titleAccent: "Now it's a business.",
+  title: 'You sell in the chat.',
+  titleAccent: 'We run the business.',
   sub: 'CartHedge reads the chat, drafts the order, cuts COD losses, and gets you paid. Keep selling where your buyers already are.',
   ctaPrimary: 'Start 15-day free trial',
   ctaSecondary: 'See how it works',

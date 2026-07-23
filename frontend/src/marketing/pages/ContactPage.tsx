@@ -93,12 +93,12 @@ export default function ContactPage() {
         </div>
 
         <aside className="flex flex-col gap-4 lg:pt-16">
-          <div className="panel rounded-2xl p-6 shadow-soft">
+          <div className="glass sheen rounded-2xl p-6 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
             <Mail className="size-5 text-jade-500" aria-hidden />
             <p className="mt-3 text-sm font-medium text-hi">{site?.contact.email || 'hello@carthedge.in'}</p>
             <p className="mt-1 text-xs text-low">Best for detailed questions</p>
           </div>
-          <div className="panel rounded-2xl p-6 shadow-soft">
+          <div className="glass sheen rounded-2xl p-6 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
             <Clock className="size-5 text-gold-400" aria-hidden />
             <p className="mt-3 text-sm font-medium text-hi">{site?.contact.supportHours}</p>
             <p className="mt-1 text-xs text-low">We reply within a working day</p>

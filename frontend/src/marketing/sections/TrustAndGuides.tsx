@@ -16,7 +16,7 @@ export function Trust() {
           const Icon = trustIcons[i];
           return (
             <Reveal key={point.title} delay={i * 0.07}>
-              <article className="panel h-full rounded-2xl p-6 shadow-soft">
+              <article className="glass sheen h-full rounded-2xl p-6 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
                 <span className="flex size-11 items-center justify-center rounded-md neu text-gold-500">
                   <Icon className="size-5" aria-hidden />
                 </span>
@@ -40,7 +40,7 @@ export function Guides() {
       <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {guides.steps.map((step, i) => (
           <Reveal key={step.title} delay={i * 0.07}>
-            <li className="panel relative h-full rounded-2xl p-6 pt-8 shadow-soft">
+            <li className="glass sheen relative h-full rounded-2xl p-6 pt-8 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
               <span className="absolute -top-4 left-6 flex size-9 items-center justify-center rounded-full bg-gradient-to-b from-jade-400 to-jade-500 font-mono text-sm font-bold text-[rgb(var(--text-on-accent))] clay">
                 {i + 1}
               </span>

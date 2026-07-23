@@ -33,7 +33,7 @@ export function Pricing() {
                   <article
                     className={cn(
                       'relative flex h-full flex-col rounded-2xl p-7 transition-transform duration-std ease-enter hover:-translate-y-1',
-                      popular ? 'glass sheen shadow-glow' : 'panel shadow-soft',
+                      popular ? 'glass sheen shadow-glow' : 'glass sheen shadow-float',
                     )}
                   >
                     {popular && (

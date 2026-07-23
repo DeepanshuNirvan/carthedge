@@ -9,16 +9,14 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside: Re
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden overflow-hidden bg-ink-950 lg:block" data-theme="dark">
         <img
-          src="/demo/aurora-texture.webp"
-          alt=""
-          aria-hidden
-          className="absolute inset-0 size-full object-cover opacity-80"
+          src="/demo/auth-seller.webp"
+          alt="A boutique seller managing an order over chat"
+          className="absolute inset-0 size-full object-cover object-center"
         />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/40 to-transparent" />
-        <div aria-hidden className="absolute inset-0">
-          <div className="absolute left-1/4 top-1/4 size-[380px] rounded-full bg-jade-500/20 blur-[130px]" />
-          <div className="absolute bottom-1/4 right-1/5 size-[280px] rounded-full bg-gold-400/16 blur-[110px]" />
-        </div>
+        {/* legibility scrims — top for the wordmark, bottom for the copy */}
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/45 to-ink-950/70" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink-950/60 to-transparent" />
+        <div aria-hidden className="absolute -bottom-10 left-0 h-64 w-72 rounded-full bg-jade-500/16 blur-[120px]" />
         <div className="relative z-10 flex h-full flex-col justify-between p-10">
           <Link to="/" aria-label="CartHedge home">
             <Wordmark />

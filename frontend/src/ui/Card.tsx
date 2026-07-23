@@ -4,18 +4,20 @@ import { cn } from '@/lib/cn';
 type CardProps = HTMLAttributes<HTMLDivElement> & {
   /** frosted glass instead of the solid panel surface */
   glass?: boolean;
-  /** cursor-follow luminous edge on hover */
+  /** cursor-follow luminous edge on hover (adds to the default lift) */
   interactive?: boolean;
+  /** opt out of the hover lift — for chart/table containers */
+  flat?: boolean;
 };
 
-export function Card({ glass, interactive, className, ...rest }: CardProps) {
+export function Card({ glass, interactive, flat, className, ...rest }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-lg',
+        'rounded-lg transition-[transform,box-shadow] duration-std ease-enter',
         glass ? 'glass' : 'panel',
-        interactive &&
-          'spotlight transition-transform duration-std ease-enter hover:-translate-y-0.5 hover:shadow-raised',
+        !flat && 'hover:-translate-y-0.5 hover:shadow-raised',
+        interactive && 'spotlight',
         className,
       )}
       {...rest}

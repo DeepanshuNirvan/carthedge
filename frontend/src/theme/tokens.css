@@ -75,12 +75,12 @@
   --line-a: 0.09;
   --line-strong-a: 0.16;
 
-  /* glass — frosted panel over aurora/3D */
-  --glass-bg: 22 25 31;
-  --glass-a: 0.58;
+  /* glass — frosted panel over aurora/3D (lower fill = more see-through frost) */
+  --glass-bg: 20 24 30;
+  --glass-a: 0.48;
   --glass-hi: 255 255 255; /* inner top highlight */
-  --glass-hi-a: 0.10;
-  --glass-border-a: 0.14;
+  --glass-hi-a: 0.14;
+  --glass-border-a: 0.2;
   --glass-tint: 255 255 255; /* refraction sheen colour */
 
   /* neumorphic control (dark = subtle raised plastic) */
@@ -89,11 +89,12 @@
   --neu-dark: 0 0 0;
   --neu-dark-a: 0.45;
 
-  /* aurora light sources behind glass */
-  --aurora-1: 15 176 108;   /* jade */
-  --aurora-2: 233 185 96;   /* gold */
-  --aurora-3: 40 90 200;    /* deep blue depth */
-  --aurora-a: 0.42;
+  /* aurora light sources behind glass — richer, more cinematic */
+  --aurora-1: 20 196 122;   /* jade */
+  --aurora-2: 238 180 84;   /* gold */
+  --aurora-3: 54 104 208;   /* indigo depth */
+  --aurora-a: 0.48;
+  --grid-a: 0.06;
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 34px -14px rgb(0 0 0 / 0.62);
   --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 30px 70px -24px rgb(0 0 0 / 0.72);
@@ -104,42 +105,47 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg: 244 242 236;
-  --bg-2: 249 247 242;
-  --surface: 255 254 251;
-  --surface-2: 245 243 237;
-  --surface-3: 235 232 224;
+  /* warm porcelain paper — bg sits a touch below surface so every card lifts */
+  --bg: 238 235 229;
+  --bg-2: 246 244 238;
+  --surface: 255 255 254;
+  --surface-2: 247 245 240;
+  --surface-3: 237 234 227;
 
-  --text-hi: 22 23 28;
-  --text-mid: 78 77 72;
-  --text-low: 103 101 93;
+  --text-hi: 24 24 29;
+  --text-mid: 82 80 74;
+  --text-low: 106 103 95;
   --text-dim: 150 147 138;
   --text-on-accent: 8 16 11;
 
-  --line: 24 22 20;
-  --line-a: 0.09;
-  --line-strong-a: 0.16;
+  --line: 32 27 22;
+  --line-a: 0.1;
+  --line-strong-a: 0.17;
 
+  /* real frosted glass: see-through translucency + crisp white top light + defined edge */
   --glass-bg: 255 255 255;
-  --glass-a: 0.62;
+  --glass-a: 0.5;
   --glass-hi: 255 255 255;
-  --glass-hi-a: 0.75;
-  --glass-border-a: 0.5;
+  --glass-hi-a: 0.9;
+  --glass-border-a: 0.66;
   --glass-tint: 255 255 255;
 
   --neu-light: 255 255 255;
-  --neu-light-a: 0.9;
-  --neu-dark: 120 110 92;
-  --neu-dark-a: 0.16;
+  --neu-light-a: 0.95;
+  --neu-dark: 150 138 118;
+  --neu-dark-a: 0.2;
 
-  --aurora-1: 15 176 108;
-  --aurora-2: 233 185 96;
-  --aurora-3: 120 150 235;
-  --aurora-a: 0.3;
+  /* elegant, present colour — not a muddy wash */
+  --aurora-1: 22 190 128;
+  --aurora-2: 240 194 116;
+  --aurora-3: 128 158 236;
+  --aurora-a: 0.26;
+  --grid-a: 0.05;
 
-  --shadow-soft: 0 1px 2px rgb(60 52 40 / 0.06), 0 12px 30px -14px rgb(60 52 40 / 0.16);
-  --shadow-raised: 0 2px 8px rgb(60 52 40 / 0.08), 0 28px 60px -22px rgb(60 52 40 / 0.22);
-  --shadow-float: 0 4px 14px rgb(60 52 40 / 0.1), 0 40px 90px -28px rgb(60 52 40 / 0.28);
+  /* soft, warm, layered — premium light depth */
+  --shadow-soft: 0 1px 2px rgb(72 60 44 / 0.05), 0 10px 24px -12px rgb(72 60 44 / 0.13);
+  --shadow-raised: 0 2px 6px rgb(72 60 44 / 0.07), 0 24px 52px -20px rgb(72 60 44 / 0.19);
+  --shadow-float: 0 4px 14px rgb(72 60 44 / 0.09), 0 38px 84px -26px rgb(72 60 44 / 0.24);
 }
 
 * {
@@ -169,6 +175,12 @@ body {
   outline: 2px solid rgb(var(--jade-400));
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* display headings: open the gap between words so multi-word titles breathe
+   (word-spacing only — letters stay tightly tracked by the fontSize tokens) */
+.font-display {
+  word-spacing: 0.09em;
 }
 
 /* money & metrics always tabular */

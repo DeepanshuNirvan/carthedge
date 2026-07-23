@@ -22,7 +22,7 @@ const accentGlow: Record<NonNullable<StatTileProps['accent']>, string> = {
 
 export function StatTile({ label, value, delta, hint, icon, accent, loading }: StatTileProps) {
   return (
-    <Card interactive className="group relative overflow-hidden p-5">
+    <Card glass interactive className="group relative overflow-hidden p-5">
       {accent && (
         <div
           aria-hidden

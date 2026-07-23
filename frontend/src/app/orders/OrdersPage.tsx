@@ -39,7 +39,7 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
         e.dataTransfer.effectAllowed = 'move';
       }}
       onClick={onOpen}
-      className="w-full cursor-grab rounded-md bg-surface p-3.5 text-left shadow-soft hairline transition-transform duration-micro hover:-translate-y-0.5 active:cursor-grabbing"
+      className="panel w-full cursor-grab rounded-md p-3.5 text-left transition-[transform,box-shadow] duration-micro ease-enter hover:-translate-y-0.5 hover:shadow-raised active:cursor-grabbing active:scale-[0.99]"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-sm font-medium text-hi">{order.customerName}</p>

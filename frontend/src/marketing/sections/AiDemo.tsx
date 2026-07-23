@@ -88,7 +88,7 @@ export function AiDemo() {
 
         {/* the parsed order card */}
         <Reveal delay={0.1} className="h-full">
-          <div className="panel relative flex h-full flex-col rounded-2xl p-5 shadow-soft sm:p-6">
+          <div className="glass sheen relative flex h-full flex-col rounded-2xl p-5 shadow-float sm:p-6">
             <div className="mb-4 flex items-center justify-between border-b pb-3.5">
               <p className="flex items-center gap-2 text-sm font-semibold text-hi">
                 <span className="grid size-7 place-items-center rounded-full bg-jade-500/15 text-jade-400">
