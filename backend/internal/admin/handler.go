@@ -115,7 +115,8 @@ func (h *Handler) Plans(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusInternalServerError, "could not load plans")
 		return
 	}
-	httpx.OK(w, httpx.M{"plans": plans})
+	// capabilities is the vocabulary the plan editor picks entitlements from
+	httpx.OK(w, httpx.M{"plans": plans, "capabilities": Capabilities})
 }
 
 func (h *Handler) CreatePlan(w http.ResponseWriter, r *http.Request) {

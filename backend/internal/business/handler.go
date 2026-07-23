@@ -36,6 +36,7 @@ type Profile struct {
 	UpiID              string `json:"upiId"`
 	LogoURL            string `json:"logoUrl"`
 	ShippingFee        int    `json:"shippingFee"`
+	FreeShippingAbove  int    `json:"freeShippingAbove"` // 0 = off
 	CodEnabled         bool   `json:"codEnabled"`
 	CodTokenAmount     int    `json:"codTokenAmount"`
 	BaselineRtoPercent int    `json:"baselineRtoPercent"`
@@ -48,12 +49,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var p Profile
 	var secretEnc string
 	err := h.pool.QueryRow(r.Context(), `select id, code, name, owner_name, email, phone, whatsapp, instagram,
-		address, city, state, pincode, gstin, upi_id, logo_url, shipping_fee, cod_enabled, cod_token_amount,
-		baseline_rto_percent, razorpay_key_id, razorpay_key_secret
+		address, city, state, pincode, gstin, upi_id, logo_url, shipping_fee, free_shipping_above,
+		cod_enabled, cod_token_amount, baseline_rto_percent, razorpay_key_id, razorpay_key_secret
 		from businesses where id = $1`, bizID).Scan(
 		&p.ID, &p.Code, &p.Name, &p.OwnerName, &p.Email, &p.Phone, &p.WhatsApp, &p.Instagram,
 		&p.Address, &p.City, &p.State, &p.Pincode, &p.Gstin, &p.UpiID, &p.LogoURL, &p.ShippingFee,
-		&p.CodEnabled, &p.CodTokenAmount, &p.BaselineRtoPercent, &p.RazorpayKeyID, &secretEnc)
+		&p.FreeShippingAbove, &p.CodEnabled, &p.CodTokenAmount, &p.BaselineRtoPercent, &p.RazorpayKeyID, &secretEnc)
 	if err != nil {
 		httpx.Err(w, http.StatusNotFound, "business not found")
 		return
@@ -77,6 +78,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		Gstin              string `json:"gstin"`
 		LogoURL            string `json:"logoUrl"`
 		ShippingFee        *int   `json:"shippingFee"`
+		FreeShippingAbove  *int   `json:"freeShippingAbove"`
 		CodEnabled         *bool  `json:"codEnabled"`
 		CodTokenAmount     *int   `json:"codTokenAmount"`
 		BaselineRtoPercent *int   `json:"baselineRtoPercent"`
@@ -101,13 +103,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		name=$2, owner_name=$3, phone=$4, whatsapp=$5, instagram=$6, address=$7, city=$8, state=$9,
 		pincode=$10, gstin=$11, logo_url=$12,
 		shipping_fee=coalesce($13, shipping_fee),
-		cod_enabled=coalesce($14, cod_enabled),
-		cod_token_amount=coalesce($15, cod_token_amount),
-		baseline_rto_percent=coalesce($16, baseline_rto_percent),
+		free_shipping_above=coalesce($14, free_shipping_above),
+		cod_enabled=coalesce($15, cod_enabled),
+		cod_token_amount=coalesce($16, cod_token_amount),
+		baseline_rto_percent=coalesce($17, baseline_rto_percent),
 		updated_at=now()
 		where id=$1`,
 		bizID, in.Name, in.OwnerName, phone, in.WhatsApp, in.Instagram, in.Address, in.City, in.State,
-		in.Pincode, in.Gstin, in.LogoURL, in.ShippingFee, in.CodEnabled, in.CodTokenAmount, in.BaselineRtoPercent)
+		in.Pincode, in.Gstin, in.LogoURL, in.ShippingFee, in.FreeShippingAbove, in.CodEnabled,
+		in.CodTokenAmount, in.BaselineRtoPercent)
 	if err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "update failed")
 		return

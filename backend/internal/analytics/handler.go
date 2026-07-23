@@ -2,10 +2,14 @@ package analytics
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
+	"carthedge/internal/events"
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
 
@@ -27,7 +31,7 @@ func NewHandler(pool *pgxpool.Pool, rdb *redis.Client) *Handler {
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	bizID := middleware.BusinessID(ctx)
-	cacheKey := "dash:" + bizID
+	cacheKey := events.DashboardKey(bizID)
 	if cached, err := h.rdb.Get(ctx, cacheKey).Result(); err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(cached))
@@ -201,7 +205,96 @@ func (h *Handler) TopProducts(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"products": top})
 }
 
-// MonthlyReport: the accountant-ready summary for ?month=YYYY-MM (default current).
+// Insights is the seller's "what should I do next" panel: best sellers, buyers
+// to watch, repeat-rate movement, the hour their buyers actually order in, and
+// the RTO trend. All derived from their own data — no model call, no cost.
+func (h *Handler) Insights(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	bizID := middleware.BusinessID(ctx)
+	out := httpx.M{}
+
+	type seller struct {
+		Name    string `json:"name"`
+		Units   int    `json:"units"`
+		Revenue int64  `json:"revenue"`
+	}
+	best := []seller{}
+	rows, err := h.pool.Query(ctx, `select i->>'name', sum((i->>'qty')::int), sum((i->>'qty')::int * (i->>'price')::int)
+		from orders o, jsonb_array_elements(o.items) i
+		where o.business_id=$1 and o.created_at >= date_trunc('month', now())
+		and o.status not in ('cancelled','rto')
+		group by 1 order by 3 desc limit 5`, bizID)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not load insights")
+		return
+	}
+	for rows.Next() {
+		var s seller
+		if rows.Scan(&s.Name, &s.Units, &s.Revenue) == nil {
+			best = append(best, s)
+		}
+	}
+	rows.Close()
+	out["bestSellers"] = best
+
+	type risky struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Phone       string `json:"phone"`
+		CodRefusals int    `json:"codRefusals"`
+		OpenCod     int    `json:"openCodOrders"`
+	}
+	watch := []risky{}
+	rows, err = h.pool.Query(ctx, `select c.id, c.name, c.phone, c.cod_refusals,
+		count(o.id) filter (where o.payment_method='cod' and o.status in ('new','confirmed','packed'))
+		from customers c left join orders o on o.customer_id = c.id
+		where c.business_id=$1 and (c.risk_flagged or c.cod_refusals > 0)
+		group by c.id order by c.cod_refusals desc, 5 desc limit 5`, bizID)
+	if err == nil {
+		for rows.Next() {
+			var c risky
+			if rows.Scan(&c.ID, &c.Name, &c.Phone, &c.CodRefusals, &c.OpenCod) == nil {
+				watch = append(watch, c)
+			}
+		}
+		rows.Close()
+	}
+	out["codRiskBuyers"] = watch
+
+	var thisMonth, lastMonth int
+	h.pool.QueryRow(ctx, `select
+		count(distinct customer_id) filter (where created_at >= date_trunc('month', now())),
+		count(distinct customer_id) filter (where created_at >= date_trunc('month', now()) - interval '1 month'
+			and created_at < date_trunc('month', now()))
+		from orders o where business_id=$1 and status <> 'cancelled'
+		and (select orders_count from customers c where c.id = o.customer_id) > 1`, bizID).Scan(&thisMonth, &lastMonth)
+	out["repeatBuyers"] = httpx.M{"thisMonth": thisMonth, "lastMonth": lastMonth}
+
+	var hour, hourOrders int
+	if h.pool.QueryRow(ctx, `select extract(hour from created_at)::int, count(*) from orders
+		where business_id=$1 and created_at > now() - interval '90 days'
+		group by 1 order by 2 desc limit 1`, bizID).Scan(&hour, &hourOrders) == nil {
+		out["suggestedBroadcastWindow"] = httpx.M{
+			"hour": hour, "label": fmt.Sprintf("%02d:00–%02d:00", hour, (hour+1)%24), "orders": hourOrders,
+		}
+	}
+
+	if rto, err := h.rtoSavings(ctx, bizID); err == nil {
+		var prevDelivered, prevRto int
+		h.pool.QueryRow(ctx, `select count(*) filter (where status='delivered'), count(*) filter (where status='rto')
+			from orders where business_id=$1 and payment_method='cod'
+			and updated_at >= date_trunc('month', now()) - interval '1 month'
+			and updated_at < date_trunc('month', now())`, bizID).Scan(&prevDelivered, &prevRto)
+		if prev := prevDelivered + prevRto; prev > 0 {
+			rto["lastMonthPercent"] = prevRto * 100 / prev
+		}
+		out["rtoTrend"] = rto
+	}
+	httpx.OK(w, out)
+}
+
+// MonthlyReport: the accountant-ready summary for ?month=YYYY-MM (default
+// current). ?format=csv exports the month's orders as a spreadsheet.
 func (h *Handler) MonthlyReport(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	bizID := middleware.BusinessID(ctx)
@@ -212,6 +305,11 @@ func (h *Handler) MonthlyReport(w http.ResponseWriter, r *http.Request) {
 		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	}
 	end := start.AddDate(0, 1, 0)
+
+	if r.URL.Query().Get("format") == "csv" {
+		h.exportCSV(w, r, bizID, start, end)
+		return
+	}
 
 	byStatus := map[string]int{}
 	rows, err := h.pool.Query(ctx, `select status, count(*) from orders
@@ -251,3 +349,42 @@ func (h *Handler) MonthlyReport(w http.ResponseWriter, r *http.Request) {
 		"quota": quota, "rtoMeter": rto,
 	})
 }
+
+// exportCSV streams the month's orders for the seller's accountant. Amounts are
+// written in rupees — the spreadsheet is read by a human, not the API.
+func (h *Handler) exportCSV(w http.ResponseWriter, r *http.Request, bizID string, start, end time.Time) {
+	rows, err := h.pool.Query(r.Context(), `select o.order_code, o.created_at, c.name, c.phone,
+		coalesce(o.address->>'city', ''), coalesce(o.address->>'pincode', ''),
+		o.payment_method, o.payment_status, o.status,
+		o.subtotal, o.discount, o.shipping, o.total, coalesce(i.invoice_number, '')
+		from orders o join customers c on c.id = o.customer_id
+		left join invoices i on i.order_id = o.id
+		where o.business_id=$1 and o.created_at >= $2 and o.created_at < $3
+		order by o.created_at`, bizID, start, end)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not export report")
+		return
+	}
+	defer rows.Close()
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="carthedge-`+start.Format("2006-01")+`.csv"`)
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+	cw.Write([]string{"orderCode", "date", "customer", "phone", "city", "pincode", "paymentMethod",
+		"paymentStatus", "status", "subtotal", "discount", "shipping", "total", "invoiceNumber"})
+
+	for rows.Next() {
+		var code, name, phone, city, pincode, method, payStatus, status, invoice string
+		var createdAt time.Time
+		var subtotal, discount, shipping, total int
+		if err := rows.Scan(&code, &createdAt, &name, &phone, &city, &pincode, &method, &payStatus, &status,
+			&subtotal, &discount, &shipping, &total, &invoice); err != nil {
+			return // headers are already out; truncate rather than write a broken body
+		}
+		cw.Write([]string{code, createdAt.Format("2006-01-02"), name, phone, city, pincode, method, payStatus, status,
+			rupees(subtotal), rupees(discount), rupees(shipping), rupees(total), invoice})
+	}
+}
+
+func rupees(paise int) string { return strconv.FormatFloat(float64(paise)/100, 'f', 2, 64) }

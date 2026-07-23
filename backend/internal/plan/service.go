@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"carthedge/internal/config"
@@ -41,6 +42,7 @@ type Plan struct {
 	OrderQuota   int      `json:"orderQuota"`
 	PerOrderFee  int      `json:"perOrderFee"`
 	Features     []string `json:"features"`
+	Capabilities []string `json:"capabilities"`
 	IsCustom     bool     `json:"isCustom"`
 }
 
@@ -56,7 +58,8 @@ type Subscription struct {
 }
 
 func (s *Service) List(ctx context.Context) ([]Plan, error) {
-	rows, err := s.pool.Query(ctx, `select id, code, name, price_monthly, order_quota, per_order_fee, features, is_custom
+	rows, err := s.pool.Query(ctx, `select id, code, name, price_monthly, order_quota, per_order_fee,
+		features, capabilities, is_custom
 		from plans where active and not is_custom order by price_monthly`)
 	if err != nil {
 		return nil, err
@@ -65,11 +68,13 @@ func (s *Service) List(ctx context.Context) ([]Plan, error) {
 	var plans []Plan
 	for rows.Next() {
 		var p Plan
-		var features []byte
-		if err := rows.Scan(&p.ID, &p.Code, &p.Name, &p.PriceMonthly, &p.OrderQuota, &p.PerOrderFee, &features, &p.IsCustom); err != nil {
+		var features, caps []byte
+		if err := rows.Scan(&p.ID, &p.Code, &p.Name, &p.PriceMonthly, &p.OrderQuota, &p.PerOrderFee,
+			&features, &caps, &p.IsCustom); err != nil {
 			return nil, err
 		}
 		json.Unmarshal(features, &p.Features)
+		json.Unmarshal(caps, &p.Capabilities)
 		plans = append(plans, p)
 	}
 	return plans, rows.Err()
@@ -96,7 +101,8 @@ func (s *Service) Current(ctx context.Context, bizID string) (*Subscription, err
 	return &sub, nil
 }
 
-// Checkout creates a platform Razorpay order for one month of the given plan.
+// Checkout creates a platform Razorpay order for one month of the given plan
+// plus any per-order fees the seller ran up above their current quota.
 func (s *Service) Checkout(ctx context.Context, bizID, planCode string) (httpx.M, error) {
 	var planID string
 	var price int
@@ -116,7 +122,13 @@ func (s *Service) Checkout(ctx context.Context, bizID, planCode string) (httpx.M
 			price = *customPrice
 		}
 	}
-	rzpOrderID, err := s.platform.CreateOrder(ctx, price, "sub-"+bizID[:8], map[string]string{
+	overage, overageOrders, err := s.Overage(ctx, bizID)
+	if err != nil {
+		return nil, err
+	}
+	total := price + overage
+
+	rzpOrderID, err := s.platform.CreateOrder(ctx, total, "sub-"+bizID[:8], map[string]string{
 		"businessId": bizID, "planCode": planCode, "kind": "subscription",
 	})
 	if err != nil {
@@ -124,10 +136,28 @@ func (s *Service) Checkout(ctx context.Context, bizID, planCode string) (httpx.M
 	}
 	notes, _ := json.Marshal(map[string]string{"businessId": bizID, "planCode": planCode})
 	if _, err := s.pool.Exec(ctx, `insert into payments (business_id, kind, razorpay_order_id, amount, notes)
-		values ($1, 'subscription', $2, $3, $4::jsonb)`, bizID, rzpOrderID, price, string(notes)); err != nil {
+		values ($1, 'subscription', $2, $3, $4::jsonb)`, bizID, rzpOrderID, total, string(notes)); err != nil {
 		return nil, err
 	}
-	return httpx.M{"razorpayOrderId": rzpOrderID, "razorpayKeyId": s.platform.KeyID(), "amount": price, "currency": "INR", "planCode": planCode}, nil
+	return httpx.M{"razorpayOrderId": rzpOrderID, "razorpayKeyId": s.platform.KeyID(),
+		"amount": total, "planAmount": price, "overageAmount": overage, "overageOrders": overageOrders,
+		"currency": "INR", "planCode": planCode}, nil
+}
+
+// Overage prices the orders taken above the plan quota in the current period.
+// Billed at renewal, so seller cost scales with seller success.
+func (s *Service) Overage(ctx context.Context, bizID string) (fee, orders int, err error) {
+	var quota, perOrderFee, used int
+	err = s.pool.QueryRow(ctx, `select p.order_quota, p.per_order_fee,
+		(select count(*) from orders o where o.business_id = s.business_id
+			and o.created_at >= s.starts_at and o.status <> 'cancelled')
+		from subscriptions s join plans p on p.id = s.plan_id where s.business_id = $1`,
+		bizID).Scan(&quota, &perOrderFee, &used)
+	if err != nil {
+		return 0, 0, err
+	}
+	orders = max(used-quota, 0)
+	return orders * perOrderFee, orders, nil
 }
 
 // VerifyCheckout confirms the Razorpay payment and activates/extends the plan.
@@ -204,39 +234,63 @@ func (s *Service) CustomRequest(ctx context.Context, bizID, message string, expe
 	return nil
 }
 
-// IsActive reports whether the business can take orders; cached 2 minutes.
-func (s *Service) IsActive(ctx context.Context, bizID string) bool {
+// Access is what every seller request needs to know about the plan: whether it
+// still runs, and which paid features it may reach.
+type Access struct {
+	Active       bool     `json:"active"`
+	Capabilities []string `json:"capabilities"`
+}
+
+// access loads the subscription gate and plan entitlements in one round trip;
+// cached 2 minutes and dropped wherever the subscription changes.
+func (s *Service) access(ctx context.Context, bizID string) Access {
 	key := "sub:" + bizID
-	if v, err := s.rdb.Get(ctx, key).Result(); err == nil {
-		return v == "1"
+	var a Access
+	if raw, err := s.rdb.Get(ctx, key).Bytes(); err == nil && json.Unmarshal(raw, &a) == nil {
+		return a
 	}
-	var active bool
-	err := s.pool.QueryRow(ctx, `select exists(select 1 from subscriptions s
-		join businesses b on b.id = s.business_id
-		where s.business_id = $1 and b.status = 'active'
-		and s.status in ('trial','active','cancelled') and s.ends_at > now())`, bizID).Scan(&active)
+	var caps []byte
+	err := s.pool.QueryRow(ctx, `select
+		b.status = 'active' and s.status in ('trial','active','cancelled') and s.ends_at > now(),
+		p.capabilities
+		from subscriptions s join businesses b on b.id = s.business_id
+		join plans p on p.id = s.plan_id where s.business_id = $1`, bizID).Scan(&a.Active, &caps)
 	if err != nil {
-		return false
+		return Access{}
 	}
-	v := "0"
-	if active {
-		v = "1"
+	json.Unmarshal(caps, &a.Capabilities)
+	if raw, err := json.Marshal(a); err == nil {
+		s.rdb.Set(ctx, key, raw, 2*time.Minute)
 	}
-	s.rdb.Set(ctx, key, v, 2*time.Minute)
-	return active
+	return a
+}
+
+// IsActive reports whether the business can take orders.
+func (s *Service) IsActive(ctx context.Context, bizID string) bool {
+	return s.access(ctx, bizID).Active
+}
+
+// HasFeature reports whether the plan includes a capability; used on buyer
+// routes, which carry no seller context to read it from.
+func (s *Service) HasFeature(ctx context.Context, bizID, feature string) bool {
+	a := s.access(ctx, bizID)
+	return a.Active && slices.Contains(a.Capabilities, feature)
 }
 
 func (s *Service) invalidate(ctx context.Context, bizID string) {
 	s.rdb.Del(ctx, "sub:"+bizID)
 }
 
-// RequireActive blocks seller APIs once the trial/subscription lapses.
+// RequireActive blocks seller APIs once the trial/subscription lapses, and
+// carries the plan's capabilities forward for the per-feature gates.
 func (s *Service) RequireActive(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !s.IsActive(r.Context(), middleware.BusinessID(r.Context())) {
+		ctx := r.Context()
+		a := s.access(ctx, middleware.BusinessID(ctx))
+		if !a.Active {
 			httpx.JSON(w, http.StatusPaymentRequired, httpx.M{"error": "subscription expired", "code": "subscriptionExpired"})
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(middleware.WithFeatures(ctx, a.Capabilities)))
 	})
 }

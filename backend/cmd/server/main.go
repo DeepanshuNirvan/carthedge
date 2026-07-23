@@ -20,7 +20,9 @@ import (
 	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/database"
+	"carthedge/internal/events"
 	"carthedge/internal/invoice"
+	"carthedge/internal/jobs"
 	"carthedge/internal/link"
 	"carthedge/internal/logger"
 	"carthedge/internal/notify"
@@ -80,9 +82,10 @@ func main() {
 	shiprocket := courier.New(cfg.ShiprocketEmail, cfg.ShiprocketPassword, rdb)
 	platformRzp := payment.NewClient(cfg.RazorpayKeyID, cfg.RazorpayKeySecret)
 
+	bus := events.New(rdb, log)
 	customerSvc := customer.NewService(pool)
 	productSvc := product.NewService(pool, notifier, log)
-	orderSvc := order.NewService(pool, rdb, customerSvc, productSvc, notifier, shiprocket, log, cfg.PublicBaseURL)
+	orderSvc := order.NewService(pool, rdb, customerSvc, productSvc, notifier, shiprocket, bus, log, cfg.PublicBaseURL)
 	linkSvc := link.NewService(pool, productSvc, cfg.PublicBaseURL)
 	planSvc := plan.NewService(pool, rdb, cfg, platformRzp, notifier, log)
 	paySvc := payment.NewService(pool, rdb, orderSvc, cipher, cfg, log)
@@ -91,6 +94,7 @@ func main() {
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log)
+	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)
 
 	handler := server.New(server.Deps{
 		Cfg: cfg, Log: log, Rdb: rdb,
@@ -107,9 +111,10 @@ func main() {
 		Invoices:   invoice.NewHandler(pool),
 		AI:         ai.NewHandler(aiSvc),
 		Uploads:    storage.NewHandler(store),
-		Public:     publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc),
+		Public:     publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc, shiprocket),
 		Admin:      admin.NewHandler(admin.NewService(pool, rdb, cfg)),
 		PaySvc:     paySvc,
+		Events:     bus,
 	})
 
 	srv := &http.Server{

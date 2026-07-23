@@ -197,10 +197,6 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 	return &res, nil
 }
 
-func (s *Service) CountOrder(ctx context.Context, linkID string) {
-	s.pool.Exec(ctx, `update order_links set orders_count = orders_count + 1 where id=$1`, linkID)
-}
-
 func orEmptyRefs(refs []ItemRef) []ItemRef {
 	if refs == nil {
 		return []ItemRef{}

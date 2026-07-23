@@ -3,6 +3,7 @@ package product
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"carthedge/internal/httpx"
@@ -16,8 +17,7 @@ type Handler struct {
 func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	products, err := h.svc.List(r.Context(), middleware.BusinessID(r.Context()), q.Get("search"), q.Get("category"), q.Get("trending") == "true")
+	products, err := h.svc.List(r.Context(), middleware.BusinessID(r.Context()), FilterFrom(r.URL.Query()))
 	if err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "could not load products")
 		return
@@ -71,14 +71,21 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
+// SetStock toggles availability and/or sets the counted quantity
+// (stockQty: -1 leaves the product untracked).
 func (h *Handler) SetStock(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		InStock bool `json:"inStock"`
+		InStock  *bool `json:"inStock"`
+		StockQty *int  `json:"stockQty"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	if err := h.svc.SetStock(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), in.InStock); err != nil {
+	if in.InStock == nil && in.StockQty == nil {
+		httpx.Err(w, http.StatusBadRequest, "inStock or stockQty is required")
+		return
+	}
+	if err := h.svc.SetStock(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), in.InStock, in.StockQty); err != nil {
 		respondErr(w, err)
 		return
 	}
@@ -99,9 +106,13 @@ func (h *Handler) SetTrending(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
-// Bulk imports products from a JSON array or an uploaded CSV file.
+// Bulk imports products from a JSON array or an uploaded CSV file. Rows are
+// matched on SKU, so the same sheet uploaded twice updates stock instead of
+// duplicating the catalog.
 func (h *Handler) Bulk(w http.ResponseWriter, r *http.Request) {
 	bizID := middleware.BusinessID(r.Context())
+	var inputs []Input
+
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		if err := r.ParseMultipartForm(5 << 20); err != nil {
 			httpx.Err(w, http.StatusBadRequest, "invalid upload")
@@ -113,26 +124,43 @@ func (h *Handler) Bulk(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer file.Close()
-		created, err := h.svc.BulkCSV(r.Context(), bizID, file)
-		if err != nil {
-			httpx.JSON(w, http.StatusBadRequest, httpx.M{"error": err.Error(), "created": created})
+		if inputs, err = ParseCSV(file); err != nil {
+			httpx.Err(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		httpx.Created(w, httpx.M{"created": created})
-		return
+	} else {
+		var in struct {
+			Products []Input `json:"products"`
+		}
+		if !httpx.Bind(w, r, &in) {
+			return
+		}
+		inputs = in.Products
 	}
-	var in struct {
-		Products []Input `json:"products"`
-	}
-	if !httpx.Bind(w, r, &in) {
-		return
-	}
-	created, err := h.svc.BulkJSON(r.Context(), bizID, in.Products)
+
+	res, err := h.svc.Bulk(r.Context(), bizID, inputs)
 	if err != nil {
-		httpx.JSON(w, http.StatusBadRequest, httpx.M{"error": err.Error(), "created": created})
+		httpx.JSON(w, http.StatusBadRequest, httpx.M{"error": err.Error(), "created": res.Created, "updated": res.Updated})
 		return
 	}
-	httpx.Created(w, httpx.M{"created": created})
+	httpx.Created(w, res)
+}
+
+// LowStock powers the restock queue: tracked products at or under ?threshold=.
+func (h *Handler) LowStock(w http.ResponseWriter, r *http.Request) {
+	threshold := 5
+	if n, err := strconv.Atoi(r.URL.Query().Get("threshold")); err == nil && n >= 0 {
+		threshold = n
+	}
+	products, err := h.svc.LowStock(r.Context(), middleware.BusinessID(r.Context()), threshold)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not load low stock")
+		return
+	}
+	if products == nil {
+		products = []Product{}
+	}
+	httpx.OK(w, httpx.M{"products": products, "threshold": threshold})
 }
 
 func (h *Handler) CreateOffer(w http.ResponseWriter, r *http.Request) {

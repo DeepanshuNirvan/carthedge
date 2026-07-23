@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
 	"carthedge/internal/order"
@@ -55,7 +56,7 @@ func toPublic(products []product.Product) []publicProduct {
 	for i, p := range products {
 		variants := make([]publicVariant, len(p.Variants))
 		for j, v := range p.Variants {
-			variants[j] = publicVariant{ID: v.ID, Name: v.Name, Price: v.Price, InStock: v.InStock}
+			variants[j] = publicVariant{ID: v.ID, Name: v.Name, Price: v.Price, InStock: v.Stocked()}
 		}
 		out[i] = publicProduct{ID: p.ID, Name: p.Name, Description: p.Description, Category: p.Category,
 			Price: p.Price, ComparePrice: p.ComparePrice, Images: p.Images, InStock: p.InStock,
@@ -84,7 +85,8 @@ func (h *Handler) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trending, err := h.products.List(r.Context(), biz.ID, "", "", true)
+	// sold-out items stay visible — that is what drives waitlist signups
+	trending, err := h.products.List(r.Context(), biz.ID, product.Filter{Trending: true})
 	if err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "could not load store")
 		return
@@ -126,20 +128,46 @@ func (h *Handler) Store(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// StoreProducts lists the catalog with optional ?search= and ?category=.
+// StoreProducts lists the catalog: ?search= &category= &minPrice= &maxPrice=
+// (rupees) &inStock=true &sort=priceAsc|priceDesc|name|newest.
 func (h *Handler) StoreProducts(w http.ResponseWriter, r *http.Request) {
 	biz, err := h.storeBusiness(r.Context(), r.PathValue("businessCode"))
 	if err != nil {
 		httpx.Err(w, http.StatusNotFound, "store not found")
 		return
 	}
-	q := r.URL.Query()
-	products, err := h.products.List(r.Context(), biz.ID, q.Get("search"), q.Get("category"), false)
+	f := product.FilterFrom(r.URL.Query())
+	f.Limit, f.Offset = httpx.Page(r)
+	products, err := h.products.List(r.Context(), biz.ID, f)
 	if err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "could not load products")
 		return
 	}
-	httpx.OK(w, httpx.M{"products": toPublic(products)})
+	total, _ := h.products.Count(r.Context(), biz.ID, f)
+	httpx.OK(w, httpx.M{"products": toPublic(products), "total": total, "limit": f.Limit, "offset": f.Offset})
+}
+
+// Serviceability tells the buyer at address entry whether couriers reach their
+// pincode — catching undeliverable addresses before the order exists.
+func (h *Handler) Serviceability(w http.ResponseWriter, r *http.Request) {
+	pincode := r.URL.Query().Get("pincode")
+	if !httpx.ValidPincode(pincode) {
+		httpx.Err(w, http.StatusBadRequest, "invalid pincode")
+		return
+	}
+	var pickup string
+	if err := h.pool.QueryRow(r.Context(), `select pincode from businesses where code=$1 and status='active'`,
+		r.PathValue("businessCode")).Scan(&pickup); err != nil {
+		httpx.Err(w, http.StatusNotFound, "store not found")
+		return
+	}
+	res, err := h.courier.Serviceability(r.Context(), pickup, pincode, r.URL.Query().Get("cod") == "true")
+	if err != nil {
+		// aggregator trouble must never block a sale
+		httpx.OK(w, courier.Serviceability{Serviceable: true, CodAvailable: true})
+		return
+	}
+	httpx.OK(w, res)
 }
 
 func (h *Handler) StoreProduct(w http.ResponseWriter, r *http.Request) {

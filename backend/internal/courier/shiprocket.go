@@ -118,6 +118,75 @@ func (s *Shiprocket) CreateShipment(ctx context.Context, in ShipmentInput) (*Shi
 	return &ShipmentResult{ShiprocketOrderID: out.OrderID.String(), ShipmentID: out.ShipmentID.String()}, nil
 }
 
+// Serviceability reports whether couriers deliver to a pincode — a wrong or
+// unserviceable address is a top RTO cause, so checkout checks before it sells.
+// Checked is false when no aggregator is configured; callers must not block on it.
+type Serviceability struct {
+	Serviceable   bool `json:"serviceable"`
+	CodAvailable  bool `json:"codAvailable"`
+	EstimatedDays int  `json:"estimatedDays"`
+	Checked       bool `json:"checked"`
+}
+
+func (s *Shiprocket) Serviceability(ctx context.Context, pickup, delivery string, cod bool) (*Serviceability, error) {
+	if !s.Enabled() || pickup == "" {
+		return &Serviceability{Serviceable: true, CodAvailable: true}, nil
+	}
+	key := fmt.Sprintf("courier:serv:%s:%s:%t", pickup, delivery, cod)
+	var out Serviceability
+	if raw, err := s.rdb.Get(ctx, key).Bytes(); err == nil && json.Unmarshal(raw, &out) == nil {
+		return &out, nil
+	}
+
+	token, err := s.token(ctx)
+	if err != nil {
+		return nil, err
+	}
+	codFlag := 0
+	if cod {
+		codFlag = 1
+	}
+	url := fmt.Sprintf("%s/courier/serviceability/?pickup_postcode=%s&delivery_postcode=%s&cod=%d&weight=0.5",
+		apiBase, pickup, delivery, codFlag)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := s.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("shiprocket serviceability failed: %s", raw)
+	}
+	var body struct {
+		Data struct {
+			Couriers []struct {
+				Cod           json.Number `json:"cod"`
+				EstimatedDays json.Number `json:"estimated_delivery_days"`
+			} `json:"available_courier_companies"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return nil, errors.New("shiprocket returned unexpected response")
+	}
+	out = Serviceability{Checked: true, Serviceable: len(body.Data.Couriers) > 0}
+	for _, c := range body.Data.Couriers {
+		if days, err := c.EstimatedDays.Int64(); err == nil && days > 0 && (out.EstimatedDays == 0 || int(days) < out.EstimatedDays) {
+			out.EstimatedDays = int(days)
+		}
+		if n, err := c.Cod.Int64(); err == nil && n == 1 {
+			out.CodAvailable = true
+		}
+	}
+	cached, _ := json.Marshal(out)
+	s.rdb.Set(ctx, key, cached, 24*time.Hour)
+	return &out, nil
+}
+
 // token logs in and caches the auth token for 8 hours (Shiprocket tokens last 10 days).
 func (s *Shiprocket) token(ctx context.Context) (string, error) {
 	const key = "courier:shiprocket:token"

@@ -20,7 +20,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, offset := httpx.Page(r)
 	orders, err := h.svc.List(r.Context(), middleware.BusinessID(r.Context()), ListFilter{
-		Status: q.Get("status"), Search: q.Get("search"), Payment: q.Get("payment"), Limit: limit, Offset: offset,
+		Status: q.Get("status"), Search: q.Get("search"), Payment: q.Get("payment"),
+		Source: q.Get("source"), RiskOnly: q.Get("risk") == "true",
+		From: q.Get("from"), To: q.Get("to"), Limit: limit, Offset: offset,
 	})
 	if err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "could not load orders")
@@ -105,7 +107,8 @@ func (h *Handler) SetStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // Ship hands the order to a courier: pass courierName+trackingId for manual
-// assignment, or an empty body to push through Shiprocket.
+// assignment, or an empty body to push through Shiprocket. Manual assignment is
+// on every plan; the aggregator handoff is a paid feature.
 func (h *Handler) Ship(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		CourierName string `json:"courierName"`
@@ -114,12 +117,28 @@ func (h *Handler) Ship(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
+	if in.CourierName == "" && !middleware.HasFeature(r.Context(), "courier") {
+		httpx.JSON(w, http.StatusForbidden, httpx.M{
+			"error": "courier handoff is not in your plan — add the courier name and tracking id manually",
+			"code":  "featureNotInPlan", "feature": "courier",
+		})
+		return
+	}
 	o, err := h.svc.Ship(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), in.CourierName, in.TrackingID)
 	if err != nil {
 		respondErr(w, err)
 		return
 	}
 	httpx.OK(w, o)
+}
+
+// ResendCodConfirmation re-sends the COD confirmation link to the buyer.
+func (h *Handler) ResendCodConfirmation(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.ResendCodConfirmation(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id")); err != nil {
+		respondErr(w, err)
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
 }
 
 func respondErr(w http.ResponseWriter, err error) {

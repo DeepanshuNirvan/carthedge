@@ -23,12 +23,16 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Current(w http.ResponseWriter, r *http.Request) {
-	sub, err := h.svc.Current(r.Context(), middleware.BusinessID(r.Context()))
+	ctx := r.Context()
+	bizID := middleware.BusinessID(ctx)
+	sub, err := h.svc.Current(ctx, bizID)
 	if err != nil {
 		httpx.Err(w, http.StatusNotFound, "no subscription found")
 		return
 	}
-	httpx.OK(w, sub)
+	// surface what renewal will actually cost, quota overage included
+	fee, orders, _ := h.svc.Overage(ctx, bizID)
+	httpx.OK(w, httpx.M{"subscription": sub, "overageFee": fee, "overageOrders": orders})
 }
 
 func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {

@@ -92,10 +92,3 @@ func (s *Service) Consume(ctx context.Context, bizCode, phone, token string) boo
 	n, err := s.rdb.Del(ctx, tokenKey).Result()
 	return err == nil && n == 1
 }
-
-// Peek checks a token without burning it (used for prefill lookups).
-func (s *Service) Peek(ctx context.Context, bizCode, phone, token string) bool {
-	tokenKey := fmt.Sprintf("ordertoken:%s:%s:%s", bizCode, phone, token)
-	n, err := s.rdb.Exists(ctx, tokenKey).Result()
-	return err == nil && n == 1
-}

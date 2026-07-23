@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"carthedge/internal/config"
@@ -261,13 +262,18 @@ func (s *Service) AssignPlan(ctx context.Context, bizID, planCode string, custom
 	return nil
 }
 
+// Capabilities are the entitlements a plan can grant. The admin picks from this
+// list; the API gates every paid route against it.
+var Capabilities = []string{"ai", "aiReply", "broadcasts", "offers", "invoices", "courier", "waitlist"}
+
 type PlanInput struct {
 	Code         string   `json:"code"`
 	Name         string   `json:"name"`
 	PriceMonthly int      `json:"priceMonthly"`
 	OrderQuota   int      `json:"orderQuota"`
 	PerOrderFee  int      `json:"perOrderFee"`
-	Features     []string `json:"features"`
+	Features     []string `json:"features"`     // marketing bullets for the pricing page
+	Capabilities []string `json:"capabilities"` // enforced entitlements
 	IsCustom     bool     `json:"isCustom"`
 	Active       *bool    `json:"active"`
 }
@@ -279,12 +285,18 @@ func (in *PlanInput) validate() error {
 	if in.PriceMonthly < 0 || in.OrderQuota < 0 || in.PerOrderFee < 0 {
 		return errors.New("amounts cannot be negative")
 	}
+	for _, c := range in.Capabilities {
+		if !slices.Contains(Capabilities, c) {
+			return fmt.Errorf("unknown capability %q", c)
+		}
+	}
 	return nil
 }
 
 func (s *Service) Plans(ctx context.Context) ([]httpx.M, error) {
 	rows, err := s.pool.Query(ctx, `select p.id, p.code, p.name, p.price_monthly, p.order_quota, p.per_order_fee,
-		p.features, p.is_custom, p.active, (select count(*) from subscriptions s where s.plan_id = p.id and s.ends_at > now())
+		p.features, p.capabilities, p.is_custom, p.active,
+		(select count(*) from subscriptions s where s.plan_id = p.id and s.ends_at > now())
 		from plans p order by p.is_custom, p.price_monthly`)
 	if err != nil {
 		return nil, err
@@ -294,16 +306,17 @@ func (s *Service) Plans(ctx context.Context) ([]httpx.M, error) {
 	for rows.Next() {
 		var id, code, name string
 		var price, quota, fee, subs int
-		var features []byte
+		var features, capabilities []byte
 		var isCustom, active bool
-		if err := rows.Scan(&id, &code, &name, &price, &quota, &fee, &features, &isCustom, &active, &subs); err != nil {
+		if err := rows.Scan(&id, &code, &name, &price, &quota, &fee, &features, &capabilities, &isCustom, &active, &subs); err != nil {
 			return nil, err
 		}
-		var feats []string
+		var feats, caps []string
 		json.Unmarshal(features, &feats)
+		json.Unmarshal(capabilities, &caps)
 		out = append(out, httpx.M{"id": id, "code": code, "name": name, "priceMonthly": price,
-			"orderQuota": quota, "perOrderFee": fee, "features": feats, "isCustom": isCustom,
-			"active": active, "activeSubscriptions": subs})
+			"orderQuota": quota, "perOrderFee": fee, "features": feats, "capabilities": caps,
+			"isCustom": isCustom, "active": active, "activeSubscriptions": subs})
 	}
 	return out, rows.Err()
 }
@@ -313,8 +326,10 @@ func (s *Service) CreatePlan(ctx context.Context, in PlanInput) error {
 		return err
 	}
 	features, _ := json.Marshal(orEmpty(in.Features))
-	_, err := s.pool.Exec(ctx, `insert into plans (code, name, price_monthly, order_quota, per_order_fee, features, is_custom)
-		values ($1,$2,$3,$4,$5,$6::jsonb,$7)`, in.Code, in.Name, in.PriceMonthly, in.OrderQuota, in.PerOrderFee, string(features), in.IsCustom)
+	caps, _ := json.Marshal(orEmpty(in.Capabilities))
+	_, err := s.pool.Exec(ctx, `insert into plans (code, name, price_monthly, order_quota, per_order_fee, features, capabilities, is_custom)
+		values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8)`, in.Code, in.Name, in.PriceMonthly, in.OrderQuota,
+		in.PerOrderFee, string(features), string(caps), in.IsCustom)
 	if err != nil {
 		return errors.New("plan code already exists")
 	}
@@ -326,17 +341,36 @@ func (s *Service) UpdatePlan(ctx context.Context, id string, in PlanInput) error
 		return err
 	}
 	features, _ := json.Marshal(orEmpty(in.Features))
+	caps, _ := json.Marshal(orEmpty(in.Capabilities))
 	active := in.Active == nil || *in.Active
 	ct, err := s.pool.Exec(ctx, `update plans set code=$2, name=$3, price_monthly=$4, order_quota=$5,
-		per_order_fee=$6, features=$7::jsonb, is_custom=$8, active=$9 where id=$1`,
-		id, in.Code, in.Name, in.PriceMonthly, in.OrderQuota, in.PerOrderFee, string(features), in.IsCustom, active)
+		per_order_fee=$6, features=$7::jsonb, capabilities=$8::jsonb, is_custom=$9, active=$10 where id=$1`,
+		id, in.Code, in.Name, in.PriceMonthly, in.OrderQuota, in.PerOrderFee, string(features), string(caps), in.IsCustom, active)
 	if err != nil {
 		return errors.New("plan code already exists")
 	}
 	if ct.RowsAffected() == 0 {
 		return errors.New("plan not found")
 	}
+	// price, quota and entitlements are cached per business — drop them all
+	s.dropAccessCache(ctx, id)
 	return nil
+}
+
+// dropAccessCache clears the cached plan gate for everyone on a plan, so an
+// admin edit takes effect now instead of after the TTL.
+func (s *Service) dropAccessCache(ctx context.Context, planID string) {
+	rows, err := s.pool.Query(ctx, `select business_id from subscriptions where plan_id = $1`, planID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var bizID string
+		if rows.Scan(&bizID) == nil {
+			s.rdb.Del(ctx, "sub:"+bizID)
+		}
+	}
 }
 
 func (s *Service) PlanRequests(ctx context.Context, status string, limit, offset int) ([]httpx.M, error) {

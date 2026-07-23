@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
 	"carthedge/internal/link"
@@ -26,12 +27,14 @@ type Handler struct {
 	plans     *plan.Service
 	products  *product.Service
 	customers *customer.Service
+	courier   *courier.Shiprocket
 }
 
 func NewHandler(pool *pgxpool.Pool, links *link.Service, orders *order.Service, otpSvc *otp.Service,
-	payments *payment.Service, plans *plan.Service, products *product.Service, customers *customer.Service) *Handler {
+	payments *payment.Service, plans *plan.Service, products *product.Service, customers *customer.Service,
+	sr *courier.Shiprocket) *Handler {
 	return &Handler{pool: pool, links: links, orders: orders, otp: otpSvc, payments: payments,
-		plans: plans, products: products, customers: customers}
+		plans: plans, products: products, customers: customers, courier: sr}
 }
 
 // ResolveLink renders the checkout payload; a lapsed seller subscription
@@ -280,6 +283,10 @@ func (h *Handler) Waitlist(w http.ResponseWriter, r *http.Request) {
 	if err := h.pool.QueryRow(r.Context(), `select id from businesses where code=$1 and status='active'`,
 		r.PathValue("businessCode")).Scan(&bizID); err != nil {
 		httpx.Err(w, http.StatusNotFound, "store not found")
+		return
+	}
+	if !h.plans.HasFeature(r.Context(), bizID, "waitlist") {
+		httpx.Err(w, http.StatusForbidden, "back-in-stock alerts are not available for this store")
 		return
 	}
 	if err := h.products.AddWaitlist(r.Context(), bizID, in.ProductID, phone); err != nil {

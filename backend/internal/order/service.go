@@ -11,6 +11,7 @@ import (
 
 	"carthedge/internal/courier"
 	"carthedge/internal/customer"
+	"carthedge/internal/events"
 	"carthedge/internal/notify"
 	"carthedge/internal/product"
 	"carthedge/internal/secure"
@@ -86,13 +87,15 @@ type Service struct {
 	products  *product.Service
 	notify    *notify.Notifier
 	courier   *courier.Shiprocket
+	events    *events.Bus
 	log       *slog.Logger
 	baseURL   string
 }
 
 func NewService(pool *pgxpool.Pool, rdb *redis.Client, customers *customer.Service, products *product.Service,
-	n *notify.Notifier, sr *courier.Shiprocket, log *slog.Logger, baseURL string) *Service {
-	return &Service{pool: pool, rdb: rdb, customers: customers, products: products, notify: n, courier: sr, log: log, baseURL: baseURL}
+	n *notify.Notifier, sr *courier.Shiprocket, bus *events.Bus, log *slog.Logger, baseURL string) *Service {
+	return &Service{pool: pool, rdb: rdb, customers: customers, products: products, notify: n,
+		courier: sr, events: bus, log: log, baseURL: baseURL}
 }
 
 // Create builds a priced order from the live catalog, applies offers, runs the
@@ -109,10 +112,11 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	}
 
 	var bizName, bizWhatsApp string
-	var shippingFee, codTokenAmount int
+	var shippingFee, codTokenAmount, freeShippingAbove int
 	var codEnabled bool
-	err := s.pool.QueryRow(ctx, `select name, whatsapp, shipping_fee, cod_enabled, cod_token_amount
-		from businesses where id=$1 and status='active'`, p.BusinessID).Scan(&bizName, &bizWhatsApp, &shippingFee, &codEnabled, &codTokenAmount)
+	err := s.pool.QueryRow(ctx, `select name, whatsapp, shipping_fee, cod_enabled, cod_token_amount, free_shipping_above
+		from businesses where id=$1 and status='active'`, p.BusinessID).Scan(
+		&bizName, &bizWhatsApp, &shippingFee, &codEnabled, &codTokenAmount, &freeShippingAbove)
 	if err != nil {
 		return nil, errors.New("business not found")
 	}
@@ -156,6 +160,9 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 			return nil, err
 		}
 	}
+	if freeShippingAbove > 0 && subtotal-discount >= freeShippingAbove {
+		shippingFee = 0
+	}
 	total := subtotal - discount + shippingFee
 
 	tokenAmount := 0
@@ -190,6 +197,11 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	if _, err := tx.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'new','order placed')`, orderID); err != nil {
 		return nil, err
 	}
+	// draw down counted inventory in the same transaction — overselling and the
+	// order that caused it must fail together
+	if err := product.Reserve(ctx, tx, lines); err != nil {
+		return nil, err
+	}
 	if p.LinkID != "" {
 		tx.Exec(ctx, `update order_links set orders_count = orders_count + 1 where id=$1`, p.LinkID)
 	}
@@ -208,7 +220,12 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 				code, bizName, notify.Rupees(total), s.trackURL(code)))
 		})
 	}
-	return s.GetByID(ctx, p.BusinessID, orderID)
+
+	o, err := s.GetByID(ctx, p.BusinessID, orderID)
+	if err == nil {
+		s.events.Publish(ctx, p.BusinessID, "orderCreated", o)
+	}
+	return o, err
 }
 
 // startCodFlow sends the RTO-cutting confirmation sequence: summary + address
@@ -230,16 +247,87 @@ func (s *Service) ConfirmCod(ctx context.Context, code, token string) error {
 	if err != nil || stored != token {
 		return errors.New("invalid or expired confirmation link")
 	}
-	var orderID string
+	var orderID, bizID string
 	err = s.pool.QueryRow(ctx, `update orders set cod_confirmed_at = now(),
 		status = case when status='new' then 'confirmed' else status end, updated_at = now()
-		where order_code=$1 and payment_method='cod' returning id`, code).Scan(&orderID)
+		where order_code=$1 and payment_method='cod' returning id, business_id`, code).Scan(&orderID, &bizID)
 	if err != nil {
 		return ErrNotFound
 	}
 	s.rdb.Del(ctx, "codconfirm:"+code)
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed','buyer confirmed COD order')`, orderID)
+	s.publishOrder(ctx, bizID, orderID, "codConfirmed")
 	return nil
+}
+
+// ResendCodConfirmation re-sends the confirmation link — the seller's manual
+// nudge from the order card, and what the background job calls in bulk.
+func (s *Service) ResendCodConfirmation(ctx context.Context, bizID, orderID string) error {
+	var code, phone, bizName string
+	var total, tokenAmount int
+	err := s.pool.QueryRow(ctx, `select o.order_code, c.phone, b.name, o.total, o.token_amount
+		from orders o join customers c on c.id = o.customer_id join businesses b on b.id = o.business_id
+		where o.id=$1 and o.business_id=$2 and o.payment_method='cod'
+		and o.cod_confirmed_at is null and o.status in ('new','confirmed')`,
+		orderID, bizID).Scan(&code, &phone, &bizName, &total, &tokenAmount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errors.New("no unconfirmed COD order to confirm")
+	}
+	if err != nil {
+		return err
+	}
+	s.startCodFlow(code, phone, bizName, total, tokenAmount)
+	s.pool.Exec(ctx, `update orders set cod_reminder_at=now() where id=$1`, orderID)
+	return nil
+}
+
+// NudgePendingCod re-asks buyers who never confirmed their COD order. Runs on a
+// schedule, once per order — the cheapest RTO prevention there is.
+func (s *Service) NudgePendingCod(ctx context.Context, after time.Duration) (int, error) {
+	rows, err := s.pool.Query(ctx, `update orders o set cod_reminder_at = now()
+		from customers c, businesses b
+		where c.id = o.customer_id and b.id = o.business_id
+		and o.payment_method='cod' and o.cod_confirmed_at is null and o.cod_reminder_at is null
+		and o.payment_status <> 'token_paid' and o.status = 'new'
+		and o.created_at < now() - make_interval(mins => $1) and b.status = 'active'
+		returning o.order_code, c.phone, b.name, o.total, o.token_amount`, int(after.Minutes()))
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	sent := 0
+	for rows.Next() {
+		var code, phone, bizName string
+		var total, tokenAmount int
+		if err := rows.Scan(&code, &phone, &bizName, &total, &tokenAmount); err != nil {
+			return sent, err
+		}
+		s.startCodFlow(code, phone, bizName, total, tokenAmount)
+		sent++
+	}
+	return sent, rows.Err()
+}
+
+// restock returns a cancelled or returned order's items to inventory.
+func (s *Service) restock(ctx context.Context, orderID string) {
+	var raw []byte
+	if err := s.pool.QueryRow(ctx, `select items from orders where id=$1`, orderID).Scan(&raw); err != nil {
+		s.log.Error("restock: order items unreadable", "orderId", orderID, "err", err)
+		return
+	}
+	var lines []product.Line
+	if err := json.Unmarshal(raw, &lines); err != nil {
+		return
+	}
+	if err := product.Release(ctx, s.pool, lines); err != nil {
+		s.log.Error("restock failed", "orderId", orderID, "err", err)
+	}
+}
+
+func (s *Service) publishOrder(ctx context.Context, bizID, orderID, kind string) {
+	if o, err := s.GetByID(ctx, bizID, orderID); err == nil {
+		s.events.Publish(ctx, bizID, kind, o)
+	}
 }
 
 // MarkPaid records a captured payment; kind is "order" (full) or "token" (COD token).
@@ -266,6 +354,7 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 	s.notify.Async("paid", func() error {
 		return s.notify.WhatsApp(phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
 	})
+	s.publishOrder(ctx, bizID, orderID, "orderPaid")
 	return nil
 }
 
@@ -306,6 +395,9 @@ func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note
 		s.customers.RecordDelivered(ctx, customerID, total)
 	case "rto":
 		s.customers.RecordRto(ctx, customerID)
+		s.restock(ctx, orderID)
+	case "cancelled":
+		s.restock(ctx, orderID)
 	}
 	if msg, ok := buyerStatusMessage[newStatus]; ok {
 		text := fmt.Sprintf(msg, code)
@@ -315,7 +407,12 @@ func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note
 		text += " Track: " + s.trackURL(code)
 		s.notify.Async("statusUpdate", func() error { return s.notify.WhatsApp(phone, text) })
 	}
-	return s.GetByID(ctx, bizID, orderID)
+
+	o, err := s.GetByID(ctx, bizID, orderID)
+	if err == nil {
+		s.events.Publish(ctx, bizID, "orderStatusChanged", o)
+	}
+	return o, err
 }
 
 // Ship assigns courier details (manual or via Shiprocket) and marks shipped.
@@ -397,30 +494,53 @@ func (s *Service) getOne(ctx context.Context, where string, args ...any) (*Order
 }
 
 type ListFilter struct {
-	Status  string
-	Search  string
-	Payment string
-	Limit   int
-	Offset  int
+	Status   string
+	Search   string
+	Payment  string
+	Source   string // link | store | manual | ai
+	RiskOnly bool
+	From     string // YYYY-MM-DD, inclusive
+	To       string // YYYY-MM-DD, inclusive
+	Limit    int
+	Offset   int
 }
 
 func (s *Service) List(ctx context.Context, bizID string, f ListFilter) ([]Order, error) {
+	where, args := f.sql(bizID)
+	args = append(args, f.Limit, f.Offset)
+	return s.query(ctx, where+fmt.Sprintf(" order by o.created_at desc limit $%d offset $%d", len(args)-1, len(args)), args...)
+}
+
+func (f ListFilter) sql(bizID string) (string, []any) {
 	where := "o.business_id = $1"
 	args := []any{bizID}
+	add := func(clause string, value any) {
+		args = append(args, value)
+		where += fmt.Sprintf(" and "+clause, len(args))
+	}
 	if f.Status != "" {
-		args = append(args, f.Status)
-		where += fmt.Sprintf(" and o.status = $%d", len(args))
+		add("o.status = $%d", f.Status)
 	}
 	if f.Payment != "" {
-		args = append(args, f.Payment)
-		where += fmt.Sprintf(" and o.payment_method = $%d", len(args))
+		add("o.payment_method = $%d", f.Payment)
+	}
+	if f.Source != "" {
+		add("o.source = $%d", f.Source)
+	}
+	if f.RiskOnly {
+		where += " and (o.risk_flagged or (o.payment_method='cod' and o.cod_confirmed_at is null and o.payment_status <> 'token_paid'))"
+	}
+	if f.From != "" {
+		add("o.created_at >= $%d::date", f.From)
+	}
+	if f.To != "" {
+		add("o.created_at < $%d::date + 1", f.To)
 	}
 	if f.Search != "" {
 		args = append(args, "%"+f.Search+"%")
 		where += fmt.Sprintf(" and (o.order_code ilike $%d or c.name ilike $%d or c.phone like $%d)", len(args), len(args), len(args))
 	}
-	args = append(args, f.Limit, f.Offset)
-	return s.query(ctx, where+fmt.Sprintf(" order by o.created_at desc limit $%d offset $%d", len(args)-1, len(args)), args...)
+	return where, args
 }
 
 // Board returns the kanban: counts per status plus recent orders per column.

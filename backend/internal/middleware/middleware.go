@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ const (
 	bizIDKey ctxKey = iota
 	bizCodeKey
 	adminIDKey
+	featuresKey
 )
 
 func BusinessID(ctx context.Context) string {
@@ -38,6 +40,32 @@ func AdminID(ctx context.Context) string {
 	return v
 }
 
+// WithFeatures carries the plan's capabilities from the subscription gate to
+// the per-feature checks, so no handler repeats the lookup.
+func WithFeatures(ctx context.Context, features []string) context.Context {
+	return context.WithValue(ctx, featuresKey, features)
+}
+
+func HasFeature(ctx context.Context, feature string) bool {
+	v, _ := ctx.Value(featuresKey).([]string)
+	return slices.Contains(v, feature)
+}
+
+// RequireFeature gates a paid feature to the plans that include it.
+func RequireFeature(feature string) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !HasFeature(r.Context(), feature) {
+				httpx.JSON(w, http.StatusForbidden, httpx.M{
+					"error": "your plan does not include this feature", "code": "featureNotInPlan", "feature": feature,
+				})
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 type Middleware func(http.Handler) http.Handler
 
 func Chain(h http.Handler, mws ...Middleware) http.Handler {
@@ -50,7 +78,10 @@ func Chain(h http.Handler, mws ...Middleware) http.Handler {
 func parseToken(r *http.Request, secret string) (jwt.MapClaims, error) {
 	raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok {
-		return nil, errors.New("missing bearer token")
+		// EventSource cannot set headers, so the SSE stream passes it as a query param
+		if raw = r.URL.Query().Get("accessToken"); raw == "" {
+			return nil, errors.New("missing bearer token")
+		}
 	}
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) {
@@ -172,6 +203,10 @@ func RateLimit(rdb *redis.Client, name string, limit int, window time.Duration, 
 		})
 	}
 }
+
+// BusinessKey rate-limits per seller instead of per IP; used on the paid-per-call
+// AI routes, where one seller must not be able to burn the whole budget.
+func BusinessKey(r *http.Request) string { return BusinessID(r.Context()) }
 
 func ClientIP(r *http.Request) string {
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
