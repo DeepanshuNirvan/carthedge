@@ -233,7 +233,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount int) {
 	confirmToken := secure.Hex(16)
 	s.rdb.Set(context.Background(), "codconfirm:"+code, confirmToken, 72*time.Hour)
-	msg := fmt.Sprintf("Order %s at %s — total %s (Cash on Delivery).\nPlease confirm your order and address here: %s/p/orders/%s/confirm?token=%s",
+	msg := fmt.Sprintf("Order %s at %s — total %s (Cash on Delivery).\nPlease confirm your order and address here: %s/o/%s/confirm?token=%s",
 		code, bizName, notify.Rupees(total), s.baseURL, code, confirmToken)
 	if tokenAmount > 0 {
 		msg += fmt.Sprintf("\nPay a %s token now to guarantee your order (adjusted in the COD amount).", notify.Rupees(tokenAmount))
@@ -605,5 +605,5 @@ func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]
 }
 
 func (s *Service) trackURL(code string) string {
-	return s.baseURL + "/p/orders/" + code
+	return s.baseURL + "/o/" + code
 }

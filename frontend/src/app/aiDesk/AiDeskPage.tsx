@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Bot, Check, MessageSquareText, Sparkles, Trash2, Wand2 } from 'lucide-react';
+import { Bot, Check, Inbox as InboxIcon, MessageSquareText, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
 import type { AiDraft, DraftData } from '@/api/types';
 import { useAiMutations, useDrafts } from '@/api/ai';
+import { useConversation, useConversations, useChannelMutations } from '@/api/messaging';
 import { toast } from '@/store/ui';
 import { useCopy } from '@/hooks/useCopy';
 import { timeAgo } from '@/lib/date';
+import { cn } from '@/lib/cn';
 import { PageHeader } from '../shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
 import { Button } from '@/ui/Button';
@@ -14,6 +16,121 @@ import { MoneyText } from '@/ui/MoneyText';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 import { Modal } from '@/ui/Modal';
+
+const sourceBadge = (source?: string) =>
+  source === 'whatsapp'
+    ? { label: 'WhatsApp', tone: 'jade' as const }
+    : source === 'instagram'
+      ? { label: 'Instagram', tone: 'gold' as const }
+      : null;
+
+function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
+  const { data: convos, isLoading } = useConversations();
+  return (
+    <Card className="mt-4">
+      <CardHeader title="Inbox" subtitle="DMs captured automatically from your connected channels" />
+      <div className="p-5 pt-4">
+        {isLoading ? (
+          <SkeletonRows rows={3} />
+        ) : convos && convos.length > 0 ? (
+          <ul className="divide-y">
+            {convos.map((c) => {
+              const b = sourceBadge(c.channel);
+              return (
+                <li key={c.id} className="flex items-center gap-3 py-3">
+                  <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(c.id)}>
+                    <p className="flex items-center gap-2 text-sm font-medium text-hi">
+                      {c.contactName || c.contactId}
+                      {c.unread > 0 && (
+                        <span className="rounded-full bg-jade-500/20 px-1.5 text-[10px] font-semibold text-jade-400">
+                          {c.unread} new
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-low">{c.preview}</p>
+                  </button>
+                  {b && <Badge tone={b.tone}>{b.label}</Badge>}
+                  {c.draftId && <Badge tone="jade">draft ready</Badge>}
+                  <span className="hidden text-xs text-low sm:inline">{timeAgo(c.lastMessageAt)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <EmptyState
+            icon={<InboxIcon className="size-5" />}
+            title="No conversations yet"
+            message="Connect Instagram or WhatsApp in Settings — buyer DMs then appear here as order drafts, automatically."
+          />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ConversationModal({
+  id,
+  drafts,
+  onReview,
+  onClose,
+}: {
+  id: string;
+  drafts: AiDraft[];
+  onReview: (d: AiDraft) => void;
+  onClose: () => void;
+}) {
+  const { data: conv, isLoading } = useConversation(id);
+  const { reply } = useChannelMutations();
+  const [text, setText] = useState('');
+  const draft = conv?.draftId ? drafts.find((d) => d.id === conv.draftId && d.status === 'pending') : undefined;
+
+  return (
+    <Modal open onClose={onClose} title={conv ? conv.contactName || conv.contactId : 'Conversation'} wide>
+      {isLoading || !conv ? (
+        <SkeletonRows rows={4} />
+      ) : (
+        <>
+          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-md bg-surface-2 p-3">
+            {conv.messages.map((m, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'max-w-[80%] rounded-lg px-3 py-2 text-sm text-hi',
+                  m.direction === 'in' ? 'bg-surface-1' : 'ml-auto bg-jade-500/15',
+                )}
+              >
+                {m.body}
+              </div>
+            ))}
+          </div>
+          {draft && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-jade-500/30 bg-jade-500/10 p-3">
+              <p className="text-sm text-hi">AI drafted an order from this chat · {draft.confidence}% confident</p>
+              <Button size="sm" onClick={() => onReview(draft)}>
+                Review &amp; confirm
+              </Button>
+            </div>
+          )}
+          <div className="mt-4 flex gap-2">
+            <Input placeholder={`Reply on ${conv.channel}…`} value={text} onChange={(e) => setText(e.target.value)} />
+            <Button
+              icon={<Send className="size-4" />}
+              loading={reply.isPending}
+              onClick={() =>
+                reply.mutate(
+                  { id, text },
+                  { onSuccess: () => setText(''), onError: (e) => toast('error', 'Reply failed', e.message) },
+                )
+              }
+            >
+              Send
+            </Button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
 
 function DraftReview({ draft, onClose }: { draft: AiDraft | null; onClose: () => void }) {
   const { confirm, discard } = useAiMutations();
@@ -126,6 +243,7 @@ export default function AiDeskPage() {
   const [question, setQuestion] = useState('');
   const [reply, setReply] = useState('');
   const [reviewing, setReviewing] = useState<AiDraft | null>(null);
+  const [openConvId, setOpenConvId] = useState<string | null>(null);
   const { data: drafts, isLoading } = useDrafts();
   const { parse, reply: replyMut } = useAiMutations();
   const { copied, copy } = useCopy();
@@ -218,8 +336,10 @@ export default function AiDeskPage() {
         </Card>
       </div>
 
+      <Inbox onOpen={setOpenConvId} />
+
       <Card className="mt-4">
-        <CardHeader title="Pending drafts" subtitle="Parsed orders waiting for your one-tap confirm" />
+        <CardHeader title="Pending drafts" subtitle="Parsed orders waiting for your one-tap confirm — from DMs or paste" />
         <div className="p-5 pt-4">
           {isLoading ? (
             <SkeletonRows rows={3} />
@@ -234,6 +354,7 @@ export default function AiDeskPage() {
                     </p>
                     <p className="mt-0.5 truncate text-xs text-low">{d.conversation.slice(0, 90)}…</p>
                   </div>
+                  {sourceBadge(d.source) && <Badge tone={sourceBadge(d.source)!.tone}>{sourceBadge(d.source)!.label}</Badge>}
                   <Badge tone={d.confidence >= 80 ? 'jade' : 'gold'}>{d.confidence}%</Badge>
                   <span className="text-xs text-low">{timeAgo(d.createdAt)}</span>
                   <Button size="sm" variant="secondary" onClick={() => setReviewing(d)}>
@@ -252,6 +373,17 @@ export default function AiDeskPage() {
         </div>
       </Card>
 
+      {openConvId && (
+        <ConversationModal
+          id={openConvId}
+          drafts={drafts ?? []}
+          onReview={(d) => {
+            setOpenConvId(null);
+            setReviewing(d);
+          }}
+          onClose={() => setOpenConvId(null)}
+        />
+      )}
       {reviewing && <DraftReview draft={reviewing} onClose={() => setReviewing(null)} />}
     </>
   );

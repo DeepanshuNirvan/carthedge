@@ -17,6 +17,7 @@ import (
 	"carthedge/internal/httpx"
 	"carthedge/internal/invoice"
 	"carthedge/internal/link"
+	"carthedge/internal/messaging"
 	"carthedge/internal/middleware"
 	"carthedge/internal/order"
 	"carthedge/internal/payment"
@@ -47,6 +48,7 @@ type Deps struct {
 	Uploads    *storage.Handler
 	Public     *publicapi.Handler
 	Admin      *admin.Handler
+	Messaging  *messaging.Handler
 	PaySvc     *payment.Service
 	Events     *events.Bus
 }
@@ -161,6 +163,14 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/ai/reply", d.AI.Reply, authed, active,
 		middleware.RequireFeature("aiReply"), byBusiness("aiReply", 60, time.Minute))
 
+	// automated DM capture (Instagram + WhatsApp) — feeds the same AI draft pipeline as manual paste
+	handle("GET /api/v1/channels", d.Messaging.ListChannels, authed, active, aiFeature)
+	handle("POST /api/v1/channels", d.Messaging.Connect, authed, active, aiFeature)
+	handle("DELETE /api/v1/channels/{channel}", d.Messaging.Disconnect, authed, active, aiFeature)
+	handle("GET /api/v1/conversations", d.Messaging.ListConversations, authed, active, aiFeature)
+	handle("GET /api/v1/conversations/{id}", d.Messaging.Conversation, authed, active, aiFeature)
+	handle("POST /api/v1/conversations/{id}/reply", d.Messaging.Reply, authed, active, aiFeature)
+
 	// uploads
 	handle("POST /api/v1/uploads", d.Uploads.Upload, authed, active)
 	if d.Cfg.StorageDriver == "local" {
@@ -200,13 +210,17 @@ func New(d Deps) http.Handler {
 	handle("POST /p/{businessCode}/otp/verify", d.Public.VerifyOtp, byIP("otpVerify", 20, 10*time.Minute))
 	handle("POST /p/{businessCode}/{token}/order", d.Public.CreateOrder, byIP("order", 10, time.Minute))
 	handle("POST /p/{businessCode}/waitlist", d.Public.Waitlist, byIP("waitlist", 10, time.Minute))
-	handle("GET /p/orders/{code}", d.Public.Track)
+	handle("GET /p/orders/{code}/track", d.Public.Track)
 	handle("POST /p/orders/{code}/pay", d.Public.Pay, byIP("pay", 20, time.Minute))
 	handle("POST /p/orders/{code}/confirm", d.Public.ConfirmCod, byIP("codConfirm", 20, time.Minute))
 	handle("POST /p/payments/verify", d.Public.VerifyPayment, byIP("payVerify", 30, time.Minute))
 
 	// razorpay webhook (platform account)
 	handle("POST /webhooks/razorpay", d.PaySvc.Webhook)
+
+	// meta webhook: inbound Instagram + WhatsApp DMs (signature-verified, no rate limit — Meta retries)
+	handle("GET /webhooks/meta", d.Messaging.Verify)
+	handle("POST /webhooks/meta", d.Messaging.Webhook)
 
 	return middleware.Chain(mux,
 		middleware.Recover(d.Log),

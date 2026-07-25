@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Landmark, Lock, ShieldCheck } from 'lucide-react';
 import { guides, trust } from '@/strings/marketing';
 import { Section, SectionHead, Reveal } from '../Section';
+import { useSite } from '@/api/site';
 import { cn } from '@/lib/cn';
 
 const trustIcons = [Landmark, Lock, ShieldCheck];
@@ -33,6 +34,7 @@ export function Trust() {
 
 export function Guides() {
   const [open, setOpen] = useState<number | null>(0);
+  const faqs = useSite().data?.faqs ?? guides.faqs;
   return (
     <Section id="guides">
       <SectionHead eyebrow={guides.eyebrow} title={guides.title} />
@@ -54,7 +56,7 @@ export function Guides() {
       <Reveal className="mt-20">
         <h3 className="mb-6 text-center font-display text-d3 font-semibold text-hi">{guides.faqTitle}</h3>
         <div className="glass sheen mx-auto max-w-2xl divide-y overflow-hidden rounded-2xl shadow-float">
-          {guides.faqs.map((faq, i) => (
+          {faqs.map((faq, i) => (
             <div key={faq.q}>
               <button
                 className="flex w-full items-center justify-between gap-4 px-6 py-4.5 text-left"

@@ -50,6 +50,11 @@ type Config struct {
 	WhatsAppAPIURL string
 	WhatsAppToken  string
 
+	MetaAppID        string
+	MetaAppSecret    string
+	MetaVerifyToken  string
+	MetaGraphVersion string
+
 	ShiprocketEmail    string
 	ShiprocketPassword string
 
@@ -98,6 +103,11 @@ func Load() (*Config, error) {
 
 		WhatsAppAPIURL: os.Getenv("WHATSAPP_API_URL"),
 		WhatsAppToken:  os.Getenv("WHATSAPP_API_TOKEN"),
+
+		MetaAppID:        os.Getenv("META_APP_ID"),
+		MetaAppSecret:    os.Getenv("META_APP_SECRET"),
+		MetaVerifyToken:  os.Getenv("META_VERIFY_TOKEN"),
+		MetaGraphVersion: env("META_GRAPH_VERSION", "v21.0"),
 
 		ShiprocketEmail:    os.Getenv("SHIPROCKET_EMAIL"),
 		ShiprocketPassword: os.Getenv("SHIPROCKET_PASSWORD"),

@@ -1,13 +1,15 @@
 import { Quote } from 'lucide-react';
 import { testimonials } from '@/strings/marketing';
 import { Section, SectionHead, Reveal } from '../Section';
+import { useSite } from '@/api/site';
 
 export function Testimonials() {
+  const items = useSite().data?.testimonials ?? testimonials.items;
   return (
     <Section id="stories" className="py-16 md:py-24">
       <SectionHead eyebrow={testimonials.eyebrow} title={testimonials.title} />
       <div className="grid gap-5 md:grid-cols-3">
-        {testimonials.items.map((t, i) => (
+        {items.map((t, i) => (
           <Reveal key={t.name} delay={i * 0.07}>
             <figure className="glass sheen flex h-full flex-col rounded-2xl p-7 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
               <Quote className="size-6 text-jade-400/70" aria-hidden />

@@ -70,7 +70,7 @@ export const joinWaitlist = (code: string, productId: string, phone: string) =>
   post<{ ok: boolean }>(`/p/${code}/waitlist`, { productId, phone }, 'none');
 
 export const trackOrder = (orderCode: string, phone: string) =>
-  get<TrackedOrder>(`/p/orders/${orderCode}`, { phone }, 'none');
+  get<TrackedOrder>(`/p/orders/${orderCode}/track`, { phone }, 'none');
 
 export const buyerPay = (orderCode: string, kind: 'order' | 'token') =>
   post<CheckoutInfo>(`/p/orders/${orderCode}/pay`, { kind }, 'none');

@@ -105,12 +105,18 @@ func (s *Service) VerifyBuyer(ctx context.Context, rzpOrderID, rzpPaymentID, sig
 		return errors.New("payment verification unavailable")
 	}
 	if !VerifySignature(rzpOrderID, rzpPaymentID, signature, secret) {
-		s.pool.Exec(ctx, `update payments set status='failed', updated_at=now() where id=$1`, paymentID)
+		s.pool.Exec(ctx, `update payments set status='failed', updated_at=now() where id=$1 and status<>'paid'`, paymentID)
 		return errors.New("payment signature verification failed")
 	}
-	if _, err := s.pool.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now() where id=$1`,
-		paymentID, rzpPaymentID); err != nil {
+	// Flip pending→paid atomically: if a racing webhook already settled it,
+	// RowsAffected is 0 and we skip MarkPaid so the buyer is not messaged twice.
+	ct, err := s.pool.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
+		where id=$1 and status<>'paid'`, paymentID, rzpPaymentID)
+	if err != nil {
 		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return nil
 	}
 	return s.orders.MarkPaid(ctx, orderID, kind)
 }
@@ -160,7 +166,12 @@ func (s *Service) Webhook(w http.ResponseWriter, r *http.Request) {
 		httpx.OK(w, httpx.M{"ok": true})
 		return
 	}
-	s.pool.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now() where id=$1`, paymentID, entity.ID)
+	ct, _ := s.pool.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
+		where id=$1 and status<>'paid'`, paymentID, entity.ID)
+	if ct.RowsAffected() == 0 { // client-side verify beat us here; side-effects already ran
+		httpx.OK(w, httpx.M{"ok": true})
+		return
+	}
 
 	switch kind {
 	case "order", "token":

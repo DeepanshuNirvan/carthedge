@@ -25,6 +25,7 @@ import (
 	"carthedge/internal/jobs"
 	"carthedge/internal/link"
 	"carthedge/internal/logger"
+	"carthedge/internal/messaging"
 	"carthedge/internal/notify"
 	"carthedge/internal/order"
 	"carthedge/internal/otp"
@@ -94,6 +95,9 @@ func main() {
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log)
+	metaClient := messaging.NewClient(cfg.MetaAppSecret, cfg.MetaGraphVersion)
+	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, log)
+	messagingSvc.Start(ctx)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)
 
 	handler := server.New(server.Deps{
@@ -113,6 +117,7 @@ func main() {
 		Uploads:    storage.NewHandler(store),
 		Public:     publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc, shiprocket),
 		Admin:      admin.NewHandler(admin.NewService(pool, rdb, cfg)),
+		Messaging:  messaging.NewHandler(messagingSvc, metaClient, cfg.MetaVerifyToken),
 		PaySvc:     paySvc,
 		Events:     bus,
 	})

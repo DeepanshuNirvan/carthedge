@@ -298,8 +298,41 @@ export type AiDraft = {
   draft: DraftData;
   confidence: number;
   status: string;
+  source?: 'manual' | 'whatsapp' | 'instagram';
+  conversationId?: string;
   orderId?: string;
   createdAt: string;
+};
+
+export type Channel = {
+  channel: 'whatsapp' | 'instagram';
+  externalId: string;
+  displayName: string;
+  status: string;
+  connectedAt: string;
+};
+
+export type ConversationSummary = {
+  id: string;
+  channel: 'whatsapp' | 'instagram';
+  contactId: string;
+  contactName: string;
+  unread: number;
+  status: string;
+  lastMessageAt: string;
+  draftId: string;
+  preview: string;
+};
+
+export type ConversationMessage = { direction: 'in' | 'out'; body: string; createdAt: string };
+
+export type ConversationDetail = {
+  id: string;
+  channel: 'whatsapp' | 'instagram';
+  contactId: string;
+  contactName: string;
+  draftId: string;
+  messages: ConversationMessage[];
 };
 
 // admin
@@ -388,10 +421,17 @@ export type AdminPayment = {
   planCode: string;
   createdAt: string;
 };
+export type SiteStat = { value: number; suffix: string; label: string };
+export type SiteTestimonial = { quote: string; name: string; business: string; metric: string };
+export type SiteFaq = { q: string; a: string };
+
 export type SiteSettings = {
   contact: { email: string; phone: string; address: string; supportHours: string };
   social: { instagram: string; twitter: string; linkedin: string; youtube: string };
   site: { tagline: string; announcement: string };
+  stats: SiteStat[];
+  testimonials: SiteTestimonial[];
+  faqs: SiteFaq[];
 };
 
 // public storefront

@@ -1,12 +1,74 @@
 import { useEffect, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useAdminSettings, useUpdateSettings } from '@/api/admin';
-import type { SiteSettings } from '@/api/types';
+import { siteFallback } from '@/api/site';
+import type { SiteFaq, SiteSettings, SiteStat, SiteTestimonial } from '@/api/types';
 import { toast } from '@/store/ui';
 import { PageHeader } from '@/app/shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
 import { Field, Input, Textarea } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 import { SkeletonRows } from '@/ui/Skeleton';
+
+type Row = Record<string, string | number>;
+type FieldDef = { key: string; label: string; type?: 'text' | 'number' | 'textarea'; optional?: boolean };
+
+/** Repeatable list of records — the add/remove/edit scaffolding for stats, testimonials and FAQs. */
+function ListEditor({
+  items,
+  fields,
+  blank,
+  addLabel,
+  onChange,
+}: {
+  items: Row[];
+  fields: FieldDef[];
+  blank: () => Row;
+  addLabel: string;
+  onChange: (next: Row[]) => void;
+}) {
+  const set = (i: number, key: string, value: string | number) =>
+    onChange(items.map((it, j) => (j === i ? { ...it, [key]: value } : it)));
+  return (
+    <div className="flex flex-col gap-4 p-5 pt-4">
+      {items.map((it, i) => (
+        <div key={i} className="neu-inset grid gap-3 rounded-lg p-4 sm:grid-cols-2">
+          {fields.map((f) => (
+            <Field key={f.key} label={f.label} optional={f.optional}>
+              {f.type === 'textarea' ? (
+                <Textarea rows={2} value={String(it[f.key] ?? '')} onChange={(e) => set(i, f.key, e.target.value)} />
+              ) : (
+                <Input
+                  type={f.type === 'number' ? 'number' : 'text'}
+                  value={String(it[f.key] ?? '')}
+                  onChange={(e) => set(i, f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+                />
+              )}
+            </Field>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 className="size-4" />}
+            onClick={() => onChange(items.filter((_, j) => j !== i))}
+            className="justify-self-start text-danger sm:col-span-2"
+          >
+            Remove
+          </Button>
+        </div>
+      ))}
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<Plus className="size-4" />}
+        onClick={() => onChange([...items, blank()])}
+        className="self-start"
+      >
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
 
 /** Friendly editor over the site_settings key/value store the marketing site reads. */
 export default function SiteContentPage() {
@@ -15,7 +77,13 @@ export default function SiteContentPage() {
   const [form, setForm] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
-    if (data && !form) setForm(structuredClone(data));
+    if (data && !form) {
+      const next = structuredClone(data);
+      next.stats ??= siteFallback.stats;
+      next.testimonials ??= siteFallback.testimonials;
+      next.faqs ??= siteFallback.faqs;
+      setForm(next);
+    }
   }, [data, form]);
 
   if (isLoading || !form) {
@@ -107,6 +175,51 @@ export default function SiteContentPage() {
               </Field>
             ))}
           </div>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader title="Problem stats" subtitle="The three loss numbers on the landing page" />
+          <ListEditor
+            items={form.stats}
+            fields={[
+              { key: 'value', label: 'Number', type: 'number' },
+              { key: 'suffix', label: 'Suffix' },
+              { key: 'label', label: 'Caption', type: 'textarea' },
+            ]}
+            blank={() => ({ value: 0, suffix: '', label: '' })}
+            addLabel="Add stat"
+            onChange={(next) => setForm({ ...form, stats: next as SiteStat[] })}
+          />
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader title="Testimonials" subtitle="Seller stories on the landing page" />
+          <ListEditor
+            items={form.testimonials}
+            fields={[
+              { key: 'quote', label: 'Quote', type: 'textarea' },
+              { key: 'metric', label: 'Highlight metric' },
+              { key: 'name', label: 'Name' },
+              { key: 'business', label: 'Business' },
+            ]}
+            blank={() => ({ quote: '', name: '', business: '', metric: '' })}
+            addLabel="Add testimonial"
+            onChange={(next) => setForm({ ...form, testimonials: next as SiteTestimonial[] })}
+          />
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader title="FAQs" subtitle="Questions in the Guides section" />
+          <ListEditor
+            items={form.faqs}
+            fields={[
+              { key: 'q', label: 'Question' },
+              { key: 'a', label: 'Answer', type: 'textarea' },
+            ]}
+            blank={() => ({ q: '', a: '' })}
+            addLabel="Add FAQ"
+            onChange={(next) => setForm({ ...form, faqs: next as SiteFaq[] })}
+          />
         </Card>
       </div>
     </>

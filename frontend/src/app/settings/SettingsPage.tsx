@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Landmark, ShieldCheck, Store } from 'lucide-react';
+import { Check, Instagram, Landmark, MessageCircle, ShieldCheck, Store } from 'lucide-react';
 import { useBusiness, useUpdateBusiness, useUpdatePayments } from '@/api/business';
+import { useChannels, useChannelMutations } from '@/api/messaging';
 import { uploadFile } from '@/api/uploads';
 import { toast } from '@/store/ui';
 import { pincodeSchema } from '@/lib/validators';
@@ -11,9 +13,101 @@ import { PageHeader } from '../shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
 import { Field, Input, Textarea } from '@/ui/Input';
 import { Button } from '@/ui/Button';
+import { Badge } from '@/ui/Badge';
 import { Switch } from '@/ui/Switch';
 import { Avatar } from '@/ui/Avatar';
 import { SkeletonRows } from '@/ui/Skeleton';
+
+const channelMeta = {
+  whatsapp: { label: 'WhatsApp', Icon: MessageCircle, idLabel: 'Phone number ID', hint: 'WhatsApp → API Setup in your Meta app' },
+  instagram: { label: 'Instagram', Icon: Instagram, idLabel: 'Instagram account ID', hint: 'Your Instagram professional account id' },
+} as const;
+
+function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
+  const { data: channels } = useChannels();
+  const { connect, disconnect } = useChannelMutations();
+  const existing = channels?.find((c) => c.channel === channel);
+  const [open, setOpen] = useState(false);
+  const [externalId, setExternalId] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const meta = channelMeta[channel];
+  const Icon = meta.Icon;
+
+  const doConnect = () => {
+    if (!externalId.trim() || !accessToken.trim()) {
+      toast('error', 'Missing details', `${meta.idLabel} and access token are required`);
+      return;
+    }
+    connect.mutate(
+      { channel, externalId: externalId.trim(), accessToken: accessToken.trim(), displayName: '' },
+      {
+        onSuccess: () => {
+          toast('success', `${meta.label} connected`, 'DMs now become order drafts automatically.');
+          setOpen(false);
+          setExternalId('');
+          setAccessToken('');
+        },
+        onError: (e) => toast('error', 'Could not connect', e.message),
+      },
+    );
+  };
+
+  return (
+    <div className="neu-inset rounded-lg p-4">
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 place-items-center rounded-md bg-surface-2 text-hi">
+          <Icon className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-hi">{meta.label}</p>
+          <p className="truncate text-xs text-low">{existing ? `Connected · id ${existing.externalId}` : 'Not connected'}</p>
+        </div>
+        {existing ? (
+          <>
+            <Badge tone="jade">
+              <Check className="size-3" /> Connected
+            </Badge>
+            <Button variant="ghost" size="sm" loading={disconnect.isPending} onClick={() => disconnect.mutate(channel)}>
+              Disconnect
+            </Button>
+          </>
+        ) : (
+          <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
+            {open ? 'Cancel' : 'Connect'}
+          </Button>
+        )}
+      </div>
+      {open && !existing && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Field label={meta.idLabel} hint={meta.hint}>
+            <Input value={externalId} onChange={(e) => setExternalId(e.target.value)} />
+          </Field>
+          <Field label="Access token">
+            <Input type="password" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} />
+          </Field>
+          <Button className="sm:col-span-2 sm:justify-self-start" loading={connect.isPending} onClick={doConnect}>
+            Connect {meta.label}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChannelsSection() {
+  return (
+    <Card>
+      <CardHeader title="Connected channels" subtitle="Auto-capture orders from Instagram & WhatsApp DMs — no copy-paste" />
+      <div className="flex flex-col gap-3 p-5 pt-4">
+        <ChannelRow channel="whatsapp" />
+        <ChannelRow channel="instagram" />
+        <p className="text-xs text-low">
+          Connected DMs turn into order drafts on the AI desk for one-tap approval. You can still paste chats manually anytime.
+        </p>
+      </div>
+    </Card>
+  );
+}
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Business name is required'),
@@ -242,6 +336,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
       <div className="flex max-w-3xl flex-col gap-4">
         <ProfileSection />
+        <ChannelsSection />
         <PaymentsSection />
         <p className="flex items-center gap-2 px-1 text-xs text-low">
           <Landmark className="size-3.5" /> CartHedge never holds your money — Razorpay and UPI settle straight to you.

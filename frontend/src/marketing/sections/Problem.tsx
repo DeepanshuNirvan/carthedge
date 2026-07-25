@@ -6,6 +6,7 @@ import { MessageSquareWarning, PackageX, Timer } from 'lucide-react';
 gsap.registerPlugin(ScrollTrigger);
 import { problem } from '@/strings/marketing';
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useSite } from '@/api/site';
 
 const icons = [PackageX, Timer, MessageSquareWarning];
 
@@ -13,6 +14,7 @@ const icons = [PackageX, Timer, MessageSquareWarning];
 export function Problem() {
   const root = useRef<HTMLDivElement>(null);
   const reduced = usePrefersReducedMotion();
+  const stats = useSite().data?.stats ?? problem.stats;
 
   useEffect(() => {
     if (reduced || !root.current) return;
@@ -68,8 +70,8 @@ export function Problem() {
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">
-          {problem.stats.map((stat, i) => {
-            const Icon = icons[i];
+          {stats.map((stat, i) => {
+            const Icon = icons[i] ?? icons[icons.length - 1];
             return (
               <div
                 key={stat.label}

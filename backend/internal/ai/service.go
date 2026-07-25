@@ -59,13 +59,15 @@ type DraftData struct {
 }
 
 type Draft struct {
-	ID           string    `json:"id"`
-	Conversation string    `json:"conversation"`
-	Data         DraftData `json:"draft"`
-	Confidence   int       `json:"confidence"`
-	Status       string    `json:"status"`
-	OrderID      string    `json:"orderId,omitempty"`
-	CreatedAt    string    `json:"createdAt"`
+	ID             string    `json:"id"`
+	Conversation   string    `json:"conversation"`
+	Data           DraftData `json:"draft"`
+	Confidence     int       `json:"confidence"`
+	Status         string    `json:"status"`
+	Source         string    `json:"source"`
+	ConversationID string    `json:"conversationId,omitempty"`
+	OrderID        string    `json:"orderId,omitempty"`
+	CreatedAt      string    `json:"createdAt"`
 }
 
 type Service struct {
@@ -82,6 +84,16 @@ func NewService(pool *pgxpool.Pool, client *Client, orders *order.Service, produ
 
 // ParseOrder reads a pasted DM thread and drafts an order card for one-tap confirm.
 func (s *Service) ParseOrder(ctx context.Context, bizID, conversation string) (*Draft, error) {
+	return s.parse(ctx, bizID, conversation, "manual", "")
+}
+
+// ParseConversation is the automated path: same parse, but the draft is tagged
+// with its channel and linked to the conversation it came from.
+func (s *Service) ParseConversation(ctx context.Context, bizID, conversation, source, conversationID string) (*Draft, error) {
+	return s.parse(ctx, bizID, conversation, source, conversationID)
+}
+
+func (s *Service) parse(ctx context.Context, bizID, conversation, source, conversationID string) (*Draft, error) {
 	if conversation == "" {
 		return nil, errors.New("conversation is required")
 	}
@@ -103,10 +115,10 @@ func (s *Service) ParseOrder(ctx context.Context, bizID, conversation string) (*
 	}
 	draftJSON, _ := json.Marshal(data)
 
-	d := &Draft{Conversation: conversation, Data: data, Confidence: data.Confidence, Status: "pending"}
-	err = s.pool.QueryRow(ctx, `insert into ai_drafts (business_id, conversation, draft, confidence)
-		values ($1,$2,$3::jsonb,$4) returning id, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`,
-		bizID, conversation, string(draftJSON), data.Confidence).Scan(&d.ID, &d.CreatedAt)
+	d := &Draft{Conversation: conversation, Data: data, Confidence: data.Confidence, Status: "pending", Source: source, ConversationID: conversationID}
+	err = s.pool.QueryRow(ctx, `insert into ai_drafts (business_id, conversation, draft, confidence, source, conversation_id)
+		values ($1,$2,$3::jsonb,$4,$5,nullif($6,'')::uuid) returning id, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`,
+		bizID, conversation, string(draftJSON), data.Confidence, source, conversationID).Scan(&d.ID, &d.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +188,7 @@ func (s *Service) DiscardDraft(ctx context.Context, bizID, draftID string) error
 
 func (s *Service) ListDrafts(ctx context.Context, bizID string, limit, offset int) ([]Draft, error) {
 	rows, err := s.pool.Query(ctx, `select id, conversation, draft, confidence, status, coalesce(order_id::text, ''),
-		to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+		source, coalesce(conversation_id::text, ''), to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		from ai_drafts where business_id=$1 order by created_at desc limit $2 offset $3`, bizID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -186,7 +198,7 @@ func (s *Service) ListDrafts(ctx context.Context, bizID string, limit, offset in
 	for rows.Next() {
 		var d Draft
 		var draftJSON []byte
-		if err := rows.Scan(&d.ID, &d.Conversation, &draftJSON, &d.Confidence, &d.Status, &d.OrderID, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Conversation, &draftJSON, &d.Confidence, &d.Status, &d.OrderID, &d.Source, &d.ConversationID, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		json.Unmarshal(draftJSON, &d.Data)
