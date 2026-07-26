@@ -260,7 +260,10 @@
 .slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 10px;
+  /* the visible track stays 10px; padding grows the hit area to a thumb-friendly 28px */
+  height: 28px;
+  padding: 9px 0;
+  background-clip: content-box;
   border-radius: 999px;
   outline: none;
 }

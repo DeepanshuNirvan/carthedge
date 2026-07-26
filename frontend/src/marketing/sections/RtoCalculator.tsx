@@ -77,7 +77,7 @@ export function RtoCalculator() {
     <Section id="calculator">
       <SectionHead eyebrow={calculator.eyebrow} title={calculator.title} sub={calculator.sub} tone="gold" />
       <Reveal>
-        <div className="glass sheen grid gap-8 rounded-2xl p-6 shadow-float sm:p-10 lg:grid-cols-[1fr_1.1fr]">
+        <div className="glass sheen grid gap-8 rounded-2xl p-5 shadow-float sm:p-10 lg:grid-cols-[1fr_1.1fr]">
           {/* the seller's numbers */}
           <div className="flex flex-col gap-8">
             <Slider
@@ -111,7 +111,7 @@ export function RtoCalculator() {
           </div>
 
           {/* the money */}
-          <div className="relative flex flex-col justify-center gap-6 overflow-hidden rounded-xl neu p-6 sm:p-8">
+          <div className="relative flex flex-col justify-center gap-6 overflow-hidden rounded-xl neu p-5 sm:p-8">
             <div
               aria-hidden
               className="absolute -right-16 -top-16 size-48 rounded-full bg-jade-500/15 blur-3xl"
@@ -120,7 +120,7 @@ export function RtoCalculator() {
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
                 <PiggyBank className="size-4" /> {calculator.savedLabel}
               </p>
-              <p className="mt-2 font-display text-[3.25rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[4.25rem]">
+              <p className="mt-2 break-all font-display text-[2.5rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[3.25rem] md:text-[4.25rem]">
                 <AnimatedRupees paise={saved} />
               </p>
             </div>

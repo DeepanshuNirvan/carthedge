@@ -121,7 +121,7 @@ export default function StorePage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-4 flex gap-2 overflow-x-auto pb-1"
+            className="rail -mx-4 mb-4 flex gap-2 px-4 pb-1"
           >
             {store.offers.map((o) => (
               <span
@@ -167,11 +167,11 @@ export default function StorePage() {
         </div>
 
         {store.categories.length > 0 && (
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="rail -mx-4 mt-3 flex gap-2 px-4 pb-1">
             <button
               onClick={() => setCategory('')}
               className={cn(
-                'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
+                'shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
                 category === ''
                   ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
                   : 'neu text-mid hover:text-hi',
@@ -184,7 +184,7 @@ export default function StorePage() {
                 key={c}
                 onClick={() => setCategory(c === category ? '' : c)}
                 className={cn(
-                  'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
+                  'shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
                   category === c
                     ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
                     : 'neu text-mid hover:text-hi',
@@ -200,9 +200,9 @@ export default function StorePage() {
         {!search && !category && store.trending.length > 0 && (
           <section className="mt-6">
             <h2 className="mb-3 font-display text-lg font-semibold text-hi">Trending now</h2>
-            <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2">
+            <div className="rail -mx-4 flex snap-x snap-mandatory gap-3 px-4 pb-2">
               {store.trending.map((p, i) => (
-                <div key={p.id} className="w-40 shrink-0">
+                <div key={p.id} className="w-40 shrink-0 snap-start">
                   <ProductCard product={p} businessCode={businessCode} index={i} />
                 </div>
               ))}
@@ -219,7 +219,7 @@ export default function StorePage() {
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
               aria-label="Sort products"
-              className="h-9 w-auto text-xs"
+              className="h-10 w-auto shrink-0 text-xs sm:text-xs"
             >
               {sortOptions.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -296,13 +296,13 @@ export default function StorePage() {
             </p>
           </div>
 
-          <label className="flex items-center justify-between text-sm text-hi">
+          <label className="flex min-h-11 items-center justify-between text-sm text-hi">
             In stock only
             <input
               type="checkbox"
               checked={inStockOnly}
               onChange={(e) => setInStockOnly(e.target.checked)}
-              className="size-5 accent-jade-500"
+              className="size-6 accent-jade-500"
             />
           </label>
 
@@ -315,7 +315,7 @@ export default function StorePage() {
                     key={c}
                     onClick={() => setCategory(c === category ? '' : c)}
                     className={cn(
-                      'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
+                      'min-h-10 rounded-full px-4 py-2 text-xs font-medium transition-colors active:scale-95',
                       category === c
                     ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
                     : 'neu text-mid hover:text-hi',

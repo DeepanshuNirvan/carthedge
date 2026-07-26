@@ -4,7 +4,7 @@ import type { StoreBusiness } from '@/api/types';
 
 export function StoreFooter({ business }: { business: StoreBusiness }) {
   return (
-    <footer className="border-t bg-surface/40 px-4 py-8">
+    <footer className="border-t bg-surface/40 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 text-center">
         <Link
           to="/track"

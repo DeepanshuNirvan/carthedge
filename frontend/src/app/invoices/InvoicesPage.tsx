@@ -19,8 +19,8 @@ function InvoiceView({ invoice, onClose }: { invoice: Invoice | null; onClose: (
       {invoice && (
         <>
           {/* print-friendly premium layout */}
-          <div id="invoice-print" className="rounded-lg bg-surface-2 p-8">
-            <div className="flex items-start justify-between gap-6 border-b pb-6">
+          <div id="invoice-print" className="rounded-lg bg-surface-2 p-5 sm:p-8">
+            <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
               <div>
                 <p className="font-display text-xl font-semibold text-hi">{business?.name}</p>
                 {business?.gstin && <p className="mt-1 font-mono text-xs text-mid">GSTIN {business.gstin}</p>}
@@ -29,7 +29,7 @@ function InvoiceView({ invoice, onClose }: { invoice: Invoice | null; onClose: (
                   {business?.city} {business?.pincode}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="sm:text-right">
                 <p className="font-mono text-sm font-semibold text-jade-500">{invoice.invoiceNumber}</p>
                 <p className="mt-1 text-xs text-low">{formatDate(invoice.createdAt)}</p>
                 <p className="mt-1 font-mono text-xs text-low">Order #{invoice.orderCode}</p>
@@ -92,9 +92,9 @@ export default function InvoicesPage() {
           <thead>
             <tr>
               <Th>Invoice</Th>
-              <Th>Order</Th>
+              <Th className="hidden sm:table-cell">Order</Th>
               <Th>Customer</Th>
-              <Th>Date</Th>
+              <Th className="hidden sm:table-cell">Date</Th>
               <Th className="text-right">Total</Th>
             </tr>
           </thead>
@@ -102,9 +102,9 @@ export default function InvoicesPage() {
             {invoices.map((inv) => (
               <Tr key={inv.id} onClick={() => setViewing(inv)} className="cursor-pointer">
                 <Td className="font-mono text-xs font-medium text-jade-500">{inv.invoiceNumber}</Td>
-                <Td className="font-mono text-xs">{inv.orderCode}</Td>
+                <Td className="hidden font-mono text-xs sm:table-cell">{inv.orderCode}</Td>
                 <Td className="font-medium text-hi">{inv.customerName}</Td>
-                <Td className="text-xs text-low">{formatDate(inv.createdAt)}</Td>
+                <Td className="hidden text-xs text-low sm:table-cell">{formatDate(inv.createdAt)}</Td>
                 <Td className="text-right">
                   <MoneyText paise={inv.total} />
                 </Td>

@@ -76,13 +76,13 @@ export default function TrackPage() {
       <Seo title="Track your order — CartHedge" description="Check the live status of your order." path="/track" noIndex />
 
       <header className="border-b">
-        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
           <Wordmark />
           <ThemeToggle />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg px-4 py-8">
+      <main className="mx-auto w-full max-w-lg px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-8">
         {!order ? (
           <motion.form
             initial={{ opacity: 0, y: 14 }}

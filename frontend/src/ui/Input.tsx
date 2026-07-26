@@ -11,8 +11,9 @@ import {
 import { cn } from '@/lib/cn';
 
 // neu-inset gives fields a recessed, tactile well; jade ring on focus.
+// text-base below sm is load-bearing: iOS Safari zooms into any field under 16px.
 const fieldClass =
-  'w-full rounded-md neu-inset px-3.5 text-sm text-hi placeholder:text-dim transition-shadow duration-micro ' +
+  'w-full rounded-md neu-inset px-3.5 text-base text-hi placeholder:text-dim transition-shadow duration-micro sm:text-sm ' +
   'focus:shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400)),0_0_0_4px_rgb(var(--jade-500)/0.14)] focus:outline-none ' +
   'disabled:opacity-50 aria-[invalid=true]:shadow-[inset_0_0_0_1.5px_rgb(var(--danger))]';
 

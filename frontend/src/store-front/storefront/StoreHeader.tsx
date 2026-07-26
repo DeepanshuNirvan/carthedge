@@ -12,7 +12,7 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
 
   return (
     <header className="glass-nav sticky top-0 z-30">
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3">
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <Link to={`/s/${business.code}`} className="flex min-w-0 items-center gap-2.5">
           <Avatar name={business.name} src={business.logoUrl || undefined} className="size-10" />
           <span className="min-w-0">
@@ -32,7 +32,7 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
               target="_blank"
               rel="noreferrer"
               aria-label="Instagram"
-              className="flex size-9 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi"
+              className="flex size-11 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi sm:size-10"
             >
               <Instagram className="size-4.5" />
             </a>
@@ -43,7 +43,7 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
               target="_blank"
               rel="noreferrer"
               aria-label="WhatsApp"
-              className="flex size-9 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi"
+              className="flex size-11 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi sm:size-10"
             >
               <MessageCircle className="size-4.5" />
             </a>

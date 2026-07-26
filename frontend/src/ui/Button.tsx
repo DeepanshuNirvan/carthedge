@@ -63,7 +63,8 @@ export const IconButton = forwardRef<
       aria-label={label}
       title={label}
       className={cn(
-        'inline-flex size-10 shrink-0 items-center justify-center rounded-md transition-all duration-micro ease-spring',
+        // 44px on touch, 40px where a cursor can be precise
+        'inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-all duration-micro ease-spring sm:size-10',
         'hover:bg-surface-2 hover:text-hi active:scale-90 disabled:opacity-50',
         active ? 'bg-surface-2 text-hi hairline' : 'text-mid',
         className,

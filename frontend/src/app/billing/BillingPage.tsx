@@ -86,7 +86,7 @@ export default function BillingPage() {
                 {sub.status === 'active' && (
                   <Button
                     variant="ghost"
-                    className="ml-auto text-danger"
+                    className="text-danger sm:ml-auto"
                     loading={cancel.isPending}
                     onClick={() =>
                       cancel.mutate(undefined, {
@@ -104,7 +104,7 @@ export default function BillingPage() {
           </div>
         </Card>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {plans
             ?.filter((p) => !p.isCustom)
             .map((plan) => {

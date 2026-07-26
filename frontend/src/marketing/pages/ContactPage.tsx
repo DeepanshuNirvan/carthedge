@@ -52,7 +52,7 @@ export default function ContactPage() {
       />
       <MarketingBackground />
       <MarketingNav />
-      <main className="mx-auto grid min-h-dvh w-full max-w-6xl gap-12 px-5 pb-24 pt-36 sm:px-8 lg:grid-cols-[1.2fr_1fr]">
+      <main className="mx-auto grid min-h-dvh w-full max-w-6xl gap-10 px-5 pb-20 pt-[calc(7.5rem+env(safe-area-inset-top))] sm:gap-12 sm:px-8 sm:pb-24 lg:grid-cols-[1.2fr_1fr]">
         <div>
           <h1 className="font-display text-d2 font-semibold text-hi">{contact.title}</h1>
           <p className="mt-3 max-w-md text-mid">{contact.sub}</p>

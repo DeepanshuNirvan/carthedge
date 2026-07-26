@@ -54,11 +54,11 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
 
   return (
     <div className="neu-inset rounded-lg p-4">
-      <div className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-md bg-surface-2 text-hi">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface-2 text-hi">
           <Icon className="size-5" aria-hidden />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <p className="text-sm font-medium text-hi">{meta.label}</p>
           <p className="truncate text-xs text-low">{existing ? `Connected · id ${existing.externalId}` : 'Not connected'}</p>
         </div>
@@ -200,16 +200,18 @@ function ProfileSection() {
             <Textarea rows={2} {...register('address')} />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-3">
           <Field label="City">
             <Input {...register('city')} />
           </Field>
           <Field label="State">
             <Input {...register('state')} />
           </Field>
-          <Field label="Pincode" error={errors.pincode?.message}>
-            <Input inputMode="numeric" {...register('pincode')} />
-          </Field>
+          <div className="col-span-2 sm:col-span-1">
+            <Field label="Pincode" error={errors.pincode?.message}>
+              <Input inputMode="numeric" {...register('pincode')} />
+            </Field>
+          </div>
         </div>
         <Button type="submit" loading={update.isPending} className="sm:justify-self-start">
           Save profile
@@ -278,7 +280,7 @@ function PaymentsSection() {
         </form>
 
         <div className="grid gap-4 border-t pt-5 sm:grid-cols-3">
-          <span className="flex items-center gap-2.5 text-sm text-hi">
+          <span className="flex items-center gap-2.5 text-sm text-hi sm:col-span-3 lg:col-span-1">
             <Switch
               checked={business.codEnabled}
               label="COD enabled"

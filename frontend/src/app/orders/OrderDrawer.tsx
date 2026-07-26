@@ -114,7 +114,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
 
           {/* actions */}
           <section className="grid gap-4 rounded-lg bg-surface-2 p-4">
-            <div className="flex items-end gap-2">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
               <Field label="Change status">
                 <Select value={nextStatus} onChange={(e) => setNextStatus(e.target.value as OrderStatus)}>
                   <option value="">Choose…</option>

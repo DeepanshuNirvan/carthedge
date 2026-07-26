@@ -75,7 +75,7 @@ export function CartSheet({
                     <button
                       aria-label="Decrease quantity"
                       onClick={() => setQty(item.productId, item.variantId, item.qty - 1)}
-                      className="flex size-8 items-center justify-center text-mid transition-colors hover:text-hi"
+                      className="flex size-10 items-center justify-center text-mid transition-colors hover:text-hi"
                     >
                       <Minus className="size-3.5" />
                     </button>
@@ -83,7 +83,7 @@ export function CartSheet({
                     <button
                       aria-label="Increase quantity"
                       onClick={() => setQty(item.productId, item.variantId, item.qty + 1)}
-                      className="flex size-8 items-center justify-center text-mid transition-colors hover:text-hi"
+                      className="flex size-10 items-center justify-center text-mid transition-colors hover:text-hi"
                     >
                       <Plus className="size-3.5" />
                     </button>

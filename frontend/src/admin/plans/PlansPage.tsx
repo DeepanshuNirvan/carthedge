@@ -108,10 +108,10 @@ export default function PlansPage() {
             <tr>
               <Th>Plan</Th>
               <Th className="text-right">Price / mo</Th>
-              <Th className="text-right">Quota</Th>
-              <Th className="text-right">Per-order fee</Th>
-              <Th>Flags</Th>
-              <Th className="text-right">Active subs</Th>
+              <Th className="hidden text-right sm:table-cell">Quota</Th>
+              <Th className="hidden text-right md:table-cell">Per-order fee</Th>
+              <Th className="hidden sm:table-cell">Flags</Th>
+              <Th className="hidden text-right md:table-cell">Active subs</Th>
               <Th />
             </tr>
           </thead>
@@ -125,17 +125,17 @@ export default function PlansPage() {
                 <Td className="text-right">
                   <MoneyText paise={p.priceMonthly} />
                 </Td>
-                <Td className="text-right tnum">{p.orderQuota}</Td>
-                <Td className="text-right">
+                <Td className="hidden text-right tnum sm:table-cell">{p.orderQuota}</Td>
+                <Td className="hidden text-right md:table-cell">
                   <MoneyText paise={p.perOrderFee} />
                 </Td>
-                <Td>
+                <Td className="hidden sm:table-cell">
                   <span className="flex gap-1.5">
                     {p.isCustom && <Badge tone="gold">custom</Badge>}
                     {p.active === false && <Badge tone="danger">inactive</Badge>}
                   </span>
                 </Td>
-                <Td className="text-right tnum">{p.activeSubscriptions ?? '—'}</Td>
+                <Td className="hidden text-right tnum md:table-cell">{p.activeSubscriptions ?? '—'}</Td>
                 <Td className="text-right">
                   <IconButton label={`Edit ${p.name}`} onClick={() => openFor(p)}>
                     <Pencil className="size-4" />

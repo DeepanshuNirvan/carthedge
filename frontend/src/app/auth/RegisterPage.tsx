@@ -130,7 +130,7 @@ export default function RegisterPage() {
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col gap-4"
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-4">
                 <Field label="WhatsApp" optional>
                   <Input type="tel" {...register('whatsapp')} />
                 </Field>

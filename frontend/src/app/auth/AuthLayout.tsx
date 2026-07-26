@@ -32,8 +32,8 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside: Re
         </div>
       </div>
 
-      <div className="flex flex-col px-5 py-8 sm:px-12 sm:py-10">
-        <Link to="/" className="mb-10 lg:hidden" aria-label="CartHedge home">
+      <div className="flex flex-col px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-12 sm:pb-10 sm:pt-10">
+        <Link to="/" className="mb-8 lg:hidden" aria-label="CartHedge home">
           <Wordmark />
         </Link>
         <motion.div

@@ -32,7 +32,7 @@ export function Hero() {
   const show3d = !reduced && !mobile && WEBGL_OK; // 3D depth on capable devices only
 
   return (
-    <section id="product" className="relative flex min-h-[100dvh] items-center overflow-hidden pb-16 pt-28">
+    <section id="product" className="relative flex min-h-[100dvh] items-center overflow-hidden pb-16 pt-[calc(7rem+env(safe-area-inset-top))]">
       <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
         {/* left — the message */}
         <motion.div
@@ -65,7 +65,7 @@ export function Hero() {
           </div>
           <p className="mt-4 text-sm text-low">{hero.noCard}</p>
 
-          <dl className="mt-10 flex gap-8 border-t pt-6">
+          <dl className="mt-10 flex flex-wrap gap-x-7 gap-y-4 border-t pt-6 sm:gap-x-8">
             {proof.map(([v, l]) => (
               <div key={l}>
                 <dt className="font-display text-2xl font-semibold tracking-tight tnum text-hi">{v}</dt>

@@ -24,7 +24,7 @@ export default function BusinessesPage() {
         subtitle={data ? `${data.total} on the platform` : undefined}
         actions={
           <>
-            <div className="relative">
+            <div className="relative basis-full sm:basis-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
               <Input
                 placeholder="Name, code, email…"
@@ -33,11 +33,11 @@ export default function BusinessesPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="h-10 w-56 pl-9"
+                className="h-11 pl-9 sm:h-10 sm:w-56"
                 aria-label="Search businesses"
               />
             </div>
-            <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-36" aria-label="Status filter">
+            <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-11 sm:h-10 sm:w-36" aria-label="Status filter">
               <option value="">All statuses</option>
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
@@ -54,11 +54,11 @@ export default function BusinessesPage() {
             <thead>
               <tr>
                 <Th>Business</Th>
-                <Th>Owner</Th>
-                <Th>Plan</Th>
+                <Th className="hidden md:table-cell">Owner</Th>
+                <Th className="hidden sm:table-cell">Plan</Th>
                 <Th>Subscription</Th>
-                <Th>Ends</Th>
-                <Th className="text-right">Orders</Th>
+                <Th className="hidden md:table-cell">Ends</Th>
+                <Th className="hidden text-right sm:table-cell">Orders</Th>
                 <Th>Status</Th>
               </tr>
             </thead>
@@ -71,16 +71,16 @@ export default function BusinessesPage() {
                     </Link>
                     <p className="font-mono text-xs text-low">/{b.code}</p>
                   </Td>
-                  <Td>
+                  <Td className="hidden md:table-cell">
                     <p className="text-mid">{b.ownerName}</p>
                     <p className="text-xs text-low">{b.email}</p>
                   </Td>
-                  <Td className="uppercase text-xs font-medium text-mid">{b.planCode || '—'}</Td>
+                  <Td className="hidden text-xs font-medium uppercase text-mid sm:table-cell">{b.planCode || '—'}</Td>
                   <Td>
                     <StatusChip status={b.subscriptionStatus || 'none'} />
                   </Td>
-                  <Td className="text-xs text-low">{formatDate(b.subscriptionEndsAt)}</Td>
-                  <Td className="text-right tnum">{b.ordersCount}</Td>
+                  <Td className="hidden text-xs text-low md:table-cell">{formatDate(b.subscriptionEndsAt)}</Td>
+                  <Td className="hidden text-right tnum sm:table-cell">{b.ordersCount}</Td>
                   <Td>
                     <StatusChip status={b.status} />
                   </Td>

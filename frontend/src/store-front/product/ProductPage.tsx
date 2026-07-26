@@ -91,7 +91,7 @@ export default function ProductPage() {
   };
 
   return (
-    <div className="min-h-dvh pb-28">
+    <div className="min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <Seo
         title={`${product.name} — ${store.business.name}`}
         description={product.description || `Buy ${product.name} from ${store.business.name}. Secure checkout, no signup.`}
@@ -146,7 +146,7 @@ export default function ProductPage() {
               {discount > 0 && <Badge tone="jade" className="absolute left-3 top-3">{discount}% off</Badge>}
             </div>
             {product.images.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto">
+              <div className="rail mt-3 flex gap-2">
                 {product.images.map((img, i) => (
                   <button
                     key={img}
@@ -167,7 +167,7 @@ export default function ProductPage() {
           {/* details */}
           <div>
             {product.category && <p className="text-xs uppercase tracking-wider text-low">{product.category}</p>}
-            <h1 className="mt-1 font-display text-2xl font-semibold leading-tight text-hi">{product.name}</h1>
+            <h1 className="mt-1 font-display text-xl font-semibold leading-tight text-hi sm:text-2xl">{product.name}</h1>
             <p className="mt-3 flex flex-wrap items-baseline gap-2.5">
               <MoneyText paise={activePrice} className="font-display text-2xl font-semibold text-hi" />
               {discount > 0 && <MoneyText paise={product.comparePrice} strike className="text-sm" />}
@@ -187,7 +187,7 @@ export default function ProductPage() {
                       disabled={!v.inStock}
                       onClick={() => setVariant(v)}
                       className={cn(
-                        'rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-micro',
+                        'min-h-11 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-micro active:scale-95',
                         variant?.id === v.id
                           ? 'bg-jade-500 text-white'
                           : 'bg-surface-2 text-hi hairline hover:bg-surface-3',
@@ -248,8 +248,8 @@ export default function ProductPage() {
         </div>
       </main>
 
-      {/* sticky buy bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-bg/95 p-3 backdrop-blur">
+      {/* sticky buy bar — clears the iOS home indicator */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-bg/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-low">{variant?.name ?? product.name}</p>

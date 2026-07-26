@@ -18,9 +18,10 @@ const accent = {
 export function Toaster() {
   const { toasts, dismissToast } = useUi();
   return (
+    /* on mobile toasts clear the tab bar / sticky buy bar; on desktop they tuck into the corner */
     <div
       aria-live="polite"
-      className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2.5"
+      className="pointer-events-none fixed inset-x-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-[70] flex flex-col gap-2.5 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-full sm:max-w-sm"
     >
       <AnimatePresence>
         {toasts.map((t) => (

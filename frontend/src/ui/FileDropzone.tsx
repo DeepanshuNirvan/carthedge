@@ -42,7 +42,7 @@ export function FileDropzone({ images, onChange, max = 6 }: FileDropzoneProps) {
             type="button"
             aria-label="Remove image"
             onClick={() => onChange(images.filter((u) => u !== url))}
-            className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity duration-micro group-hover:opacity-100"
+            className="absolute right-1 top-1 rounded-full bg-black/60 p-1.5 text-white transition-opacity duration-micro [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
           >
             <X className="size-3.5" />
           </button>

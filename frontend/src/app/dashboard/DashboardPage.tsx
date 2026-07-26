@@ -31,10 +31,10 @@ function RtoMeterHero() {
   const reduction = baseline > 0 ? Math.round(((baseline - actual) / baseline) * 100) : 0;
 
   return (
-    <Card glass className="relative overflow-hidden rounded-2xl p-6 shadow-float sm:p-8">
+    <Card glass className="relative overflow-hidden rounded-2xl p-5 shadow-float sm:p-8">
       <div aria-hidden className="absolute -right-20 -top-24 size-64 rounded-full bg-jade-500/20 blur-[90px]" />
       <div aria-hidden className="absolute -left-16 bottom-[-6rem] size-52 rounded-full bg-gold-400/12 blur-[80px]" />
-      <div className="relative grid items-center gap-8 sm:grid-cols-[1.35fr_1fr]">
+      <div className="relative grid items-center gap-6 sm:gap-8 md:grid-cols-[1.35fr_1fr]">
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
             <ShieldCheck className="size-3.5" /> RTO shield · this month
@@ -55,7 +55,7 @@ function RtoMeterHero() {
         </div>
 
         {/* the reduction, visualised */}
-        <div className="rounded-xl neu p-5">
+        <div className="rounded-xl neu p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-sm font-semibold text-hi">
               <TrendingDown className="size-4 text-jade-400" /> RTO cut
@@ -216,7 +216,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <StatusChip status={o.status} />
-                  <MoneyText paise={o.total} className="w-24 text-right text-sm" />
+                  <MoneyText paise={o.total} className="w-20 shrink-0 text-right text-sm sm:w-24" />
                 </li>
               ))}
             </ul>

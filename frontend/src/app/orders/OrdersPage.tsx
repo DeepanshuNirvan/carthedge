@@ -134,20 +134,20 @@ export default function OrdersPage() {
     <>
       <PageHeader
         title="Orders"
-        subtitle="Drag cards to advance"
+        subtitle="Tap a card to open it · drag between columns on desktop"
         actions={
           <>
-            <div className="relative">
+            <div className="relative basis-full sm:basis-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
               <Input
                 placeholder="Search buyer, code, phone…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-10 w-52 pl-9"
+                className="h-11 pl-9 sm:h-10 sm:w-52"
                 aria-label="Search orders"
               />
             </div>
-            <Select value={payment} onChange={(e) => setPayment(e.target.value)} className="h-10 w-32" aria-label="Payment filter">
+            <Select value={payment} onChange={(e) => setPayment(e.target.value)} className="h-11 sm:h-10 sm:w-32" aria-label="Payment filter">
               <option value="">All payments</option>
               <option value="cod">COD</option>
               <option value="prepaid">Prepaid</option>
@@ -165,7 +165,7 @@ export default function OrdersPage() {
       />
 
       {view === 'board' ? (
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="rail -mx-4 flex snap-x snap-mandatory gap-3 px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0">
           {columns.map((col) => (
             <section
               key={col.status}
@@ -177,7 +177,7 @@ export default function OrdersPage() {
               onDragLeave={() => setDropTarget((t) => (t === col.status ? null : t))}
               onDrop={(e) => onDrop(col.status, e)}
               className={cn(
-                'flex w-64 shrink-0 flex-col rounded-lg bg-surface-2/60 transition-shadow duration-micro',
+                'flex w-[82vw] max-w-72 shrink-0 snap-start flex-col rounded-lg bg-surface-2/60 transition-shadow duration-micro sm:w-64',
                 dropTarget === col.status && 'shadow-[inset_0_0_0_2px_rgb(var(--jade-500))]',
               )}
             >
@@ -208,7 +208,7 @@ export default function OrdersPage() {
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-10 w-40"
+              className="h-11 sm:h-10 sm:w-40"
               aria-label="Status filter"
             >
               <option value="">All statuses</option>
@@ -227,8 +227,8 @@ export default function OrdersPage() {
                 <tr>
                   <Th>Order</Th>
                   <Th>Buyer</Th>
-                  <Th>Items</Th>
-                  <Th>Payment</Th>
+                  <Th className="hidden sm:table-cell">Items</Th>
+                  <Th className="hidden sm:table-cell">Payment</Th>
                   <Th>Status</Th>
                   <Th className="text-right">Total</Th>
                 </tr>
@@ -241,10 +241,10 @@ export default function OrdersPage() {
                       <p className="font-medium text-hi">{o.customerName}</p>
                       <p className="font-mono text-xs text-low">{o.customerPhone}</p>
                     </Td>
-                    <Td className="max-w-52 truncate text-mid">
+                    <Td className="hidden max-w-52 truncate text-mid sm:table-cell">
                       {o.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}
                     </Td>
-                    <Td className="uppercase text-xs text-mid">{o.paymentMethod}</Td>
+                    <Td className="hidden text-xs uppercase text-mid sm:table-cell">{o.paymentMethod}</Td>
                     <Td>
                       <StatusChip status={o.status} />
                     </Td>

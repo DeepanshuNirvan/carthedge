@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { nav } from '@/strings/marketing';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { cn } from '@/lib/cn';
 import { buttonLink } from '@/ui/buttonLink';
 import { ThemeToggle } from '@/ui/ThemeToggle';
@@ -12,6 +13,7 @@ import { Wordmark } from './Wordmark';
 export function MarketingNav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  useScrollLock(open);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -32,7 +34,7 @@ export function MarketingNav() {
     );
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
+    <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
       <nav
         aria-label="Main"
         className={cn(
@@ -67,9 +69,9 @@ export function MarketingNav() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex flex-col bg-bg/95 pt-24 backdrop-blur-xl md:hidden"
+            className="fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain bg-bg/95 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(6rem+env(safe-area-inset-top))] backdrop-blur-xl md:hidden"
           >
-            <div className="flex flex-col gap-2 px-8">
+            <div className="flex flex-col gap-2 px-7">
               {nav.links.map((l, i) => (
                 <motion.div
                   key={l.href}

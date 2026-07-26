@@ -45,13 +45,13 @@ export default function CodConfirmPage() {
     <div className="min-h-dvh">
       <Seo title="Confirm your order — CartHedge" description="Confirm your cash-on-delivery order." noIndex />
       <header className="border-b">
-        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
           <Wordmark />
           <ThemeToggle />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg px-4 py-10">
+      <main className="mx-auto w-full max-w-lg px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-10">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

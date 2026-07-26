@@ -40,6 +40,11 @@ export const carthedgePreset = {
       mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
     },
     extend: {
+      // env() through the spacing scale so pb-safe / h-safe work anywhere
+      spacing: {
+        safe: 'env(safe-area-inset-bottom)',
+        'safe-t': 'env(safe-area-inset-top)',
+      },
       fontSize: {
         d0: ['clamp(3.25rem, 2.2rem + 5.4vw, 7.5rem)', { lineHeight: '0.96', letterSpacing: '-0.035em' }],
         d1: ['clamp(2.75rem, 2rem + 4vw, 6rem)', { lineHeight: '1.0', letterSpacing: '-0.032em' }],

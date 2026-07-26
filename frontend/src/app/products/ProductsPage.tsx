@@ -39,7 +39,8 @@ function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: 
             Out of stock
           </span>
         )}
-        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity duration-micro group-hover:opacity-100">
+        {/* always reachable on touch; reveals on hover only where a cursor exists */}
+        <div className="absolute right-2 top-2 flex gap-1 transition-opacity duration-micro [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
           <IconButton label="Edit product" className="glass" onClick={onEdit}>
             <Pencil className="size-4" />
           </IconButton>
@@ -48,9 +49,9 @@ function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: 
           </IconButton>
         </div>
       </div>
-      <div className="p-3.5">
+      <div className="p-3 sm:p-3.5">
         <p className="truncate text-sm font-medium text-hi">{product.name}</p>
-        <p className="mt-0.5 flex items-baseline gap-2 text-sm">
+        <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-sm">
           <MoneyText paise={product.price} className="font-semibold text-hi" />
           {product.comparePrice > product.price && <MoneyText paise={product.comparePrice} strike className="text-xs" />}
           {product.resellerPrice > 0 && (
@@ -63,7 +64,7 @@ function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: 
           {product.category}
           {product.variants.length > 0 && ` · ${product.variants.length} variants`}
         </p>
-        <div className="mt-3 flex items-center justify-between border-t pt-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
           <span className="flex items-center gap-2 text-xs text-mid">
             <Switch
               checked={product.inStock}
@@ -118,13 +119,13 @@ export default function ProductsPage() {
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <div className="relative">
+        <div className="relative basis-full sm:basis-auto">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
           <Input
             placeholder="Search products…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-10 w-56 pl-9"
+            className="h-11 pl-9 sm:h-10 sm:w-56"
             aria-label="Search products"
           />
         </div>
@@ -156,13 +157,13 @@ export default function ProductsPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }, (_, i) => (
             <Skeleton key={i} className="h-72" />
           ))}
         </div>
       ) : products && products.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((p) => (
             <ProductCard
               key={p.id}

@@ -63,13 +63,13 @@ export default function AnalyticsPage() {
             title="Monthly report"
             subtitle="Accountant-ready summary"
             action={
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <input
                   type="month"
                   aria-label="Report month"
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
-                  className="h-9 rounded-md bg-surface-2 px-3 text-sm text-hi hairline focus:outline-none"
+                  className="h-9 w-[8.5rem] rounded-md bg-surface-2 px-3 text-sm text-hi hairline focus:outline-none"
                 />
                 <Button variant="secondary" size="sm" onClick={exportReport} disabled={!report}>
                   Export

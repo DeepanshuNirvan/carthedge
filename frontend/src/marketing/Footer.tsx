@@ -18,8 +18,8 @@ export function Footer() {
 
   return (
     <footer className="border-t bg-surface/40">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div className="flex flex-col items-start gap-4">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-10 px-5 py-12 sm:px-8 sm:py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="col-span-2 flex flex-col items-start gap-4 md:col-span-1">
           <Wordmark />
           <p className="max-w-xs text-sm text-mid">{site?.site.tagline || footer.tagline}</p>
           {site?.contact.email && (
@@ -65,7 +65,7 @@ export function Footer() {
           </nav>
         ))}
       </div>
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 border-t px-5 py-5 sm:px-8">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 border-t px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-8">
         <p className="text-xs text-low">
           © {new Date().getFullYear()} CartHedge · {footer.madeIn}
         </p>

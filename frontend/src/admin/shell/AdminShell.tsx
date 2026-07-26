@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAdminAuth } from '@/store/adminAuth';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { cn } from '@/lib/cn';
 import { Wordmark } from '@/marketing/Wordmark';
 import { ThemeToggle } from '@/ui/ThemeToggle';
@@ -33,9 +34,10 @@ export function AdminShell() {
   const { name, clear } = useAdminAuth();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  useScrollLock(open);
 
   const nav = (
-    <nav aria-label="Admin" className="flex flex-1 flex-col gap-0.5 px-3 py-4">
+    <nav aria-label="Admin" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
       {navItems.map((item) => (
         <NavLink
           key={item.to}
@@ -44,7 +46,7 @@ export function AdminShell() {
           onClick={() => setOpen(false)}
           className={({ isActive }) =>
             cn(
-              'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-micro',
+              'relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-micro',
               isActive ? 'panel text-gold-500 shadow-soft' : 'text-mid hover:bg-surface-2 hover:text-hi',
             )
           }
@@ -79,8 +81,8 @@ export function AdminShell() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
-          <button aria-label="Close menu" className="absolute inset-0 bg-[rgb(var(--bg))/0.55] backdrop-blur-md" onClick={() => setOpen(false)} />
-          <aside className="glass-nav relative flex h-full w-64 flex-col shadow-float">
+          <button aria-label="Close menu" className="absolute inset-0 bg-bg/60 backdrop-blur-md" onClick={() => setOpen(false)} />
+          <aside className="glass-nav relative flex h-full w-[17rem] max-w-[82vw] flex-col pb-safe pt-safe-t shadow-float">
             <div className="flex items-center justify-between border-b px-4 py-4">
               <Wordmark />
               <IconButton label="Close menu" onClick={() => setOpen(false)}>
@@ -93,11 +95,11 @@ export function AdminShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 py-3 sm:px-6">
+        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6">
           <IconButton label="Open menu" className="lg:hidden" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </IconButton>
-          <p className="text-sm font-medium text-hi">{name}</p>
+          <p className="truncate text-sm font-medium text-hi">{name}</p>
           <div className="ml-auto flex items-center gap-1.5">
             <ThemeToggle />
             <IconButton
@@ -111,7 +113,7 @@ export function AdminShell() {
             </IconButton>
           </div>
         </header>
-        <main className="min-w-0 flex-1 p-4 sm:p-6">
+        <main className="min-w-0 flex-1 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6">
           <Outlet />
         </main>
       </div>

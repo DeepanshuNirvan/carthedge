@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-sm rounded-xl bg-surface p-8 shadow-raised hairline"
+        className="relative w-full max-w-sm rounded-xl bg-surface p-6 shadow-raised hairline sm:p-8"
       >
         <div className="flex items-center justify-between">
           <Wordmark />

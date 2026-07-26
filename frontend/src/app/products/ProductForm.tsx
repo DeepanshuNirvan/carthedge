@@ -177,8 +177,16 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
           ) : (
             <div className="flex flex-col gap-2">
               {fields.map((f, i) => (
-                <div key={f.id} className="grid grid-cols-[1fr_90px_90px_auto_auto] items-center gap-2">
-                  <Input placeholder="M / Red" aria-label="Variant name" {...register(`variants.${i}.name`)} />
+                <div
+                  key={f.id}
+                  className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-2 sm:grid-cols-[1fr_90px_90px_auto_auto]"
+                >
+                  <Input
+                    placeholder="M / Red"
+                    aria-label="Variant name"
+                    className="col-span-4 sm:col-span-1"
+                    {...register(`variants.${i}.name`)}
+                  />
                   <Input placeholder="₹ same" aria-label="Variant price" inputMode="decimal" {...register(`variants.${i}.price`)} />
                   <Input placeholder="SKU" aria-label="Variant SKU" {...register(`variants.${i}.sku`)} />
                   <Switch

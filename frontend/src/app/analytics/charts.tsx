@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import type { SalesPoint, TopProduct } from '@/api/types';
 import { formatPaiseCompact, formatPaise } from '@/lib/money';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 // tokens, not hardcoded colors — charts follow the active theme
 const jade = 'rgb(var(--jade-500))';
@@ -90,6 +91,7 @@ export function OrdersBarChart({ series, height = 260 }: { series: SalesPoint[];
 
 export function TopProductsChart({ products, height = 260 }: { products: TopProduct[]; height?: number }) {
   const data = products.slice(0, 6);
+  const mobile = useIsMobile(); // a 120px label gutter eats half a phone screen
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, bottom: 0, left: 4 }} barCategoryGap="30%">
@@ -98,7 +100,7 @@ export function TopProductsChart({ products, height = 260 }: { products: TopProd
         <YAxis
           type="category"
           dataKey="name"
-          width={120}
+          width={mobile ? 76 : 120}
           tick={{ ...tickStyle, fontFamily: 'Satoshi, sans-serif', fill: 'rgb(var(--text-mid))' }}
           axisLine={false}
           tickLine={false}

@@ -25,11 +25,11 @@ export default function PaymentsPage() {
             <thead>
               <tr>
                 <Th>Business</Th>
-                <Th>Plan</Th>
+                <Th className="hidden sm:table-cell">Plan</Th>
                 <Th className="text-right">Amount</Th>
                 <Th>Status</Th>
-                <Th>Razorpay order</Th>
-                <Th>When</Th>
+                <Th className="hidden md:table-cell">Razorpay order</Th>
+                <Th className="hidden sm:table-cell">When</Th>
               </tr>
             </thead>
             <tbody>
@@ -39,15 +39,15 @@ export default function PaymentsPage() {
                     <p className="font-medium text-hi">{p.businessName}</p>
                     <p className="font-mono text-xs text-low">/{p.businessCode}</p>
                   </Td>
-                  <Td className="uppercase text-xs font-medium text-mid">{p.planCode || '—'}</Td>
+                  <Td className="hidden text-xs font-medium uppercase text-mid sm:table-cell">{p.planCode || '—'}</Td>
                   <Td className="text-right">
                     <MoneyText paise={p.amount} />
                   </Td>
                   <Td>
                     <StatusChip status={p.status} />
                   </Td>
-                  <Td className="font-mono text-xs text-low">{p.razorpayOrderId}</Td>
-                  <Td className="text-xs text-low">{formatDateTime(p.createdAt)}</Td>
+                  <Td className="hidden font-mono text-xs text-low md:table-cell">{p.razorpayOrderId}</Td>
+                  <Td className="hidden text-xs text-low sm:table-cell">{formatDateTime(p.createdAt)}</Td>
                 </Tr>
               ))}
             </tbody>

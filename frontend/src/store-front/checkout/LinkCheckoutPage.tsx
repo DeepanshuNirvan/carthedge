@@ -88,7 +88,7 @@ export default function LinkCheckoutPage() {
       />
 
       <header className="sticky top-0 z-30 border-b bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
           <Avatar name={link.business.name} src={link.business.logoUrl || undefined} className="size-10" />
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-base font-semibold text-hi">{link.business.name}</p>
@@ -147,7 +147,7 @@ export default function LinkCheckoutPage() {
                                   disabled={!v.inStock}
                                   onClick={() => setSelections({ ...selections, [p.id]: { ...sel, variantId: v.id } })}
                                   className={cn(
-                                    'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                                    'min-h-9 rounded px-3 py-1.5 text-xs font-medium transition-colors active:scale-95',
                                     sel.variantId === v.id ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid',
                                     !v.inStock && 'cursor-not-allowed line-through opacity-50',
                                   )}
@@ -164,7 +164,7 @@ export default function LinkCheckoutPage() {
                               onClick={() =>
                                 setSelections({ ...selections, [p.id]: { ...sel, qty: Math.max(1, sel.qty - 1) } })
                               }
-                              className="flex size-8 items-center justify-center text-mid hover:text-hi"
+                              className="flex size-10 items-center justify-center text-mid hover:text-hi"
                             >
                               <Minus className="size-3.5" />
                             </button>
@@ -172,7 +172,7 @@ export default function LinkCheckoutPage() {
                             <button
                               aria-label={`Increase quantity of ${p.name}`}
                               onClick={() => setSelections({ ...selections, [p.id]: { ...sel, qty: sel.qty + 1 } })}
-                              className="flex size-8 items-center justify-center text-mid hover:text-hi"
+                              className="flex size-10 items-center justify-center text-mid hover:text-hi"
                             >
                               <Plus className="size-3.5" />
                             </button>

@@ -15,7 +15,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: Tab
   return (
     <div
       role="tablist"
-      className={cn('relative flex gap-1 overflow-x-auto rounded-md neu-inset p-1', className)}
+      className={cn('rail relative flex gap-1 rounded-md neu-inset p-1', className)}
     >
       {tabs.map((t) => {
         const active = value === t.value;

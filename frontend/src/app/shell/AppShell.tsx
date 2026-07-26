@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/store/auth';
 import { useUi } from '@/store/ui';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { useSubscription } from '@/api/plans';
 import { logout } from '@/api/auth';
 import { daysLeft } from '@/lib/date';
@@ -45,6 +46,46 @@ const navItems = [
   { to: '/app/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/app/settings', label: 'Settings', icon: Settings },
 ];
+
+// the four daily destinations get a native-style tab bar; the rest live behind "More"
+const tabItems = navItems.filter((i) => ['/app', '/app/orders', '/app/products', '/app/ai'].includes(i.to));
+
+function BottomTabs({ onMore }: { onMore: () => void }) {
+  return (
+    <nav
+      aria-label="Primary"
+      className="glass-nav fixed inset-x-0 bottom-0 z-40 flex pb-safe lg:hidden"
+    >
+      {tabItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }) =>
+            cn(
+              'flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-micro',
+              isActive ? 'text-jade-400' : 'text-low',
+            )
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <item.icon className="size-[22px]" aria-hidden strokeWidth={isActive ? 2.4 : 1.9} />
+              {item.label}
+            </>
+          )}
+        </NavLink>
+      ))}
+      <button
+        onClick={onMore}
+        className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-low transition-colors duration-micro active:text-hi"
+      >
+        <Menu className="size-[22px]" aria-hidden strokeWidth={1.9} />
+        More
+      </button>
+    </nav>
+  );
+}
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -140,6 +181,7 @@ export function AppShell() {
   const [mobileNav, setMobileNav] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  useScrollLock(mobileNav);
 
   const signOut = async () => {
     await logout();
@@ -182,13 +224,13 @@ export function AppShell() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex lg:hidden"
           >
-            <button aria-label="Close menu" className="absolute inset-0 bg-[rgb(var(--bg))/0.55] backdrop-blur-md" onClick={() => setMobileNav(false)} />
+            <button aria-label="Close menu" className="absolute inset-0 bg-bg/60 backdrop-blur-md" onClick={() => setMobileNav(false)} />
             <motion.aside
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-nav relative flex h-full w-64 flex-col shadow-float"
+              className="glass-nav relative flex h-full w-[17rem] max-w-[82vw] flex-col pb-safe pt-safe-t shadow-float"
             >
               <div className="flex items-center justify-between border-b px-5 py-4">
                 <Wordmark />
@@ -197,6 +239,17 @@ export function AppShell() {
                 </IconButton>
               </div>
               <NavList onNavigate={() => setMobileNav(false)} />
+              <div className="border-t p-3">
+                <Link
+                  to="/app/billing"
+                  onClick={() => setMobileNav(false)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-mid"
+                >
+                  <Wallet className="size-4.5" aria-hidden />
+                  Billing
+                  {sub && <Badge tone={sub.status === 'trial' ? 'gold' : sub.status === 'expired' ? 'danger' : 'jade'} className="ml-auto">{sub.status}</Badge>}
+                </Link>
+              </div>
             </motion.aside>
           </motion.div>
         )}
@@ -204,10 +257,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TrialBanner />
-        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 py-3 sm:px-6">
-          <IconButton label="Open menu" className="lg:hidden" onClick={() => setMobileNav(true)}>
-            <Menu className="size-5" />
-          </IconButton>
+        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-hi">{businessName}</p>
             <p className="font-mono text-xs text-low">/{businessCode}</p>
@@ -230,16 +280,18 @@ export function AppShell() {
           </div>
         </header>
 
+        {/* no p-* shorthand below: sm:p-6 would out-cascade the tab-bar clearance on tablets */}
         <motion.main
           key={location.pathname}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-          className="min-w-0 flex-1 p-4 sm:p-6"
+          className="min-w-0 flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:pb-6"
         >
           <Outlet />
         </motion.main>
       </div>
+      <BottomTabs onMore={() => setMobileNav(true)} />
       <PaywallGate />
     </div>
   );

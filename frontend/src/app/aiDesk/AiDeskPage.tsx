@@ -37,8 +37,8 @@ function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
             {convos.map((c) => {
               const b = sourceBadge(c.channel);
               return (
-                <li key={c.id} className="flex items-center gap-3 py-3">
-                  <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(c.id)}>
+                <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3">
+                  <button className="min-w-0 flex-1 basis-full text-left sm:basis-0" onClick={() => onOpen(c.id)}>
                     <p className="flex items-center gap-2 text-sm font-medium text-hi">
                       {c.contactName || c.contactId}
                       {c.unread > 0 && (
@@ -95,8 +95,8 @@ function ConversationModal({
               <div
                 key={i}
                 className={cn(
-                  'max-w-[80%] rounded-lg px-3 py-2 text-sm text-hi',
-                  m.direction === 'in' ? 'bg-surface-1' : 'ml-auto bg-jade-500/15',
+                  'max-w-[85%] rounded-lg px-3 py-2 text-sm text-hi',
+                  m.direction === 'in' ? 'bg-surface-3' : 'ml-auto bg-jade-500/15',
                 )}
               >
                 {m.body}
@@ -104,7 +104,7 @@ function ConversationModal({
             ))}
           </div>
           {draft && (
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-jade-500/30 bg-jade-500/10 p-3">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-jade-500/30 bg-jade-500/10 p-3">
               <p className="text-sm text-hi">AI drafted an order from this chat · {draft.confidence}% confident</p>
               <Button size="sm" onClick={() => onReview(draft)}>
                 Review &amp; confirm
@@ -164,16 +164,18 @@ function DraftReview({ draft, onClose }: { draft: AiDraft | null; onClose: () =>
             <Input value={data.address.line} onChange={(e) => setAddress({ line: e.target.value })} />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-3">
           <Field label="City">
             <Input value={data.address.city} onChange={(e) => setAddress({ city: e.target.value })} />
           </Field>
           <Field label="State">
             <Input value={data.address.state} onChange={(e) => setAddress({ state: e.target.value })} />
           </Field>
-          <Field label="Pincode">
-            <Input value={data.address.pincode} onChange={(e) => setAddress({ pincode: e.target.value })} />
-          </Field>
+          <div className="col-span-2 sm:col-span-1">
+            <Field label="Pincode">
+              <Input value={data.address.pincode} onChange={(e) => setAddress({ pincode: e.target.value })} />
+            </Field>
+          </div>
         </div>
       </div>
 
@@ -346,8 +348,8 @@ export default function AiDeskPage() {
           ) : pending.length > 0 ? (
             <ul className="divide-y">
               {pending.map((d) => (
-                <li key={d.id} className="flex items-center gap-3 py-3.5">
-                  <div className="min-w-0 flex-1">
+                <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-0">
                     <p className="truncate text-sm font-medium text-hi">
                       {d.draft.customerName || 'Unknown buyer'} ·{' '}
                       {d.draft.items.map((i) => `${i.qty}× ${i.name}`).join(', ') || 'no items matched'}
@@ -356,8 +358,8 @@ export default function AiDeskPage() {
                   </div>
                   {sourceBadge(d.source) && <Badge tone={sourceBadge(d.source)!.tone}>{sourceBadge(d.source)!.label}</Badge>}
                   <Badge tone={d.confidence >= 80 ? 'jade' : 'gold'}>{d.confidence}%</Badge>
-                  <span className="text-xs text-low">{timeAgo(d.createdAt)}</span>
-                  <Button size="sm" variant="secondary" onClick={() => setReviewing(d)}>
+                  <span className="hidden text-xs text-low sm:inline">{timeAgo(d.createdAt)}</span>
+                  <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setReviewing(d)}>
                     Review
                   </Button>
                 </li>

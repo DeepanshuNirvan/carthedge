@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 export function Section({ className, ...rest }: HTMLAttributes<HTMLElement>) {
   return (
     <section
-      className={cn('relative mx-auto w-full max-w-6xl px-5 py-24 sm:px-8 md:py-32', className)}
+      className={cn('relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24 md:py-32', className)}
       {...rest}
     />
   );
@@ -29,7 +29,7 @@ export function SectionHead({
   return (
     <Reveal
       className={cn(
-        'mb-14 flex flex-col gap-4',
+        'mb-10 flex flex-col gap-4 sm:mb-14',
         align === 'center' ? 'items-center text-center' : 'items-start',
       )}
     >

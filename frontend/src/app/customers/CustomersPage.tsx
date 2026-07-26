@@ -132,22 +132,22 @@ export default function CustomersPage() {
         subtitle="Your buyer ledger, with COD risk built in"
         actions={
           <>
-            <div className="relative">
+            <div className="relative basis-full sm:basis-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
               <Input
                 placeholder="Name or phone…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-10 w-52 pl-9"
+                className="h-11 pl-9 sm:h-10 sm:w-52"
                 aria-label="Search customers"
               />
             </div>
-            <Select value={segment} onChange={(e) => setSegment(e.target.value)} className="h-10 w-32" aria-label="Segment filter">
+            <Select value={segment} onChange={(e) => setSegment(e.target.value)} className="h-11 sm:h-10 sm:w-32" aria-label="Segment filter">
               <option value="">All segments</option>
               <option value="retail">Retail</option>
               <option value="reseller">Reseller</option>
             </Select>
-            <span className="flex items-center gap-2 text-xs text-mid">
+            <span className="flex items-center justify-end gap-2 text-xs text-mid">
               <Switch checked={riskOnly} onChange={setRiskOnly} label="Risk only" />
               Risk only
             </span>
@@ -162,12 +162,12 @@ export default function CustomersPage() {
           <thead>
             <tr>
               <Th>Customer</Th>
-              <Th>Segment</Th>
+              <Th className="hidden sm:table-cell">Segment</Th>
               <Th className="text-right">Orders</Th>
               <Th className="text-right">LTV</Th>
-              <Th className="text-right">Refusals</Th>
+              <Th className="hidden text-right sm:table-cell">Refusals</Th>
               <Th>Risk</Th>
-              <Th>Last order</Th>
+              <Th className="hidden sm:table-cell">Last order</Th>
             </tr>
           </thead>
           <tbody>
@@ -177,16 +177,16 @@ export default function CustomersPage() {
                   <p className="font-medium text-hi">{c.name}</p>
                   <p className="font-mono text-xs text-low">{c.phone}</p>
                 </Td>
-                <Td>
+                <Td className="hidden sm:table-cell">
                   <Badge tone={c.segment === 'reseller' ? 'gold' : 'neutral'}>{c.segment}</Badge>
                 </Td>
                 <Td className="text-right tnum">{c.ordersCount}</Td>
                 <Td className="text-right">
                   <MoneyText paise={c.totalSpent} compact />
                 </Td>
-                <Td className="text-right tnum">{c.codRefusals}</Td>
+                <Td className="hidden text-right tnum sm:table-cell">{c.codRefusals}</Td>
                 <Td>{c.riskFlagged && <AlertTriangle className="size-4 text-danger" aria-label="Risk flagged" />}</Td>
-                <Td className="text-xs text-low">{c.lastOrderAt ? timeAgo(c.lastOrderAt) : '—'}</Td>
+                <Td className="hidden text-xs text-low sm:table-cell">{c.lastOrderAt ? timeAgo(c.lastOrderAt) : '—'}</Td>
               </Tr>
             ))}
           </tbody>

@@ -5,16 +5,20 @@ import { BadgeCheck, Bot, CreditCard, KanbanSquare, MessageCircle, PiggyBank } f
 
 gsap.registerPlugin(ScrollTrigger);
 import { coreLoop } from '@/strings/marketing';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useIsMobile, usePrefersReducedMotion } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/cn';
 
 const icons = [MessageCircle, Bot, BadgeCheck, CreditCard, KanbanSquare, PiggyBank];
 
-/** Signature pinned scene — the pipeline assembles horizontally as you scroll. */
+/** Signature pinned scene — the pipeline assembles horizontally as you scroll.
+ *  Phones get the stacked version instead: pinning a horizontal track steals the
+ *  only scroll gesture a touch device has. */
 export function CoreLoop() {
   const root = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const reduced = usePrefersReducedMotion();
+  const reducedMotion = usePrefersReducedMotion();
+  const mobile = useIsMobile();
+  const reduced = reducedMotion || mobile; // "reduced" == render the stacked, un-pinned version
 
   useEffect(() => {
     if (reduced || !root.current || !track.current) return;
@@ -70,7 +74,7 @@ export function CoreLoop() {
       <div
         ref={track}
         className={cn(
-          'flex gap-6 px-5 py-20 sm:px-[12vw]',
+          'flex gap-6 px-5 py-16 sm:px-[12vw] md:py-20',
           reduced ? 'flex-col items-center sm:px-5' : 'w-max items-stretch',
         )}
       >
@@ -80,7 +84,10 @@ export function CoreLoop() {
             <div key={step.key} className={cn('flex items-center gap-6', reduced && 'w-full max-w-xl')}>
               <article
                 data-stage
-                className="glass sheen relative flex h-full w-[19rem] flex-col gap-4 rounded-2xl p-7 shadow-float sm:w-[22rem]"
+                className={cn(
+                  'glass sheen relative flex h-full flex-col gap-4 rounded-2xl p-6 shadow-float sm:p-7',
+                  reduced ? 'w-full' : 'w-[19rem] sm:w-[22rem]',
+                )}
               >
                 <span
                   aria-hidden

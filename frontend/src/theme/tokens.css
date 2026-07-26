@@ -155,6 +155,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+  /* no grey flash on tap — the single biggest "this is a website" tell on mobile */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -186,6 +188,28 @@ body {
 /* money & metrics always tabular */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* controls stay finger-sized and never fight a long press */
+button,
+[role='button'],
+a,
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* horizontal chip/card rails: scroll, no visible bar, no page scroll-chaining */
+.rail {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.rail::-webkit-scrollbar {
+  display: none;
 }
 
 /* thin theme-matched scrollbars */

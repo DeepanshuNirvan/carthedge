@@ -4,8 +4,9 @@ import { cn } from '@/lib/cn';
 /** Styled table shell — horizontal scroll on mobile, sticky frosted header. */
 export function Table({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn('overflow-x-auto rounded-lg panel', className)}>
-      <table className="w-full min-w-[640px] border-collapse text-sm">{children}</table>
+    <div className={cn('overflow-x-auto overscroll-x-contain rounded-lg panel', className)}>
+      {/* mobile hides the low-value columns instead of forcing a sideways scroll */}
+      <table className="w-full min-w-full border-collapse text-sm sm:min-w-[640px]">{children}</table>
     </div>
   );
 }
