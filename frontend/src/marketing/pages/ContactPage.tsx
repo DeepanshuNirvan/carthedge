@@ -8,6 +8,8 @@ import { Seo } from '@/lib/seo';
 import { contact } from '@/strings/marketing';
 import { emailSchema, phoneSchema } from '@/lib/validators';
 import { useSite } from '@/api/site';
+import { sendContactMessage } from '@/api/site';
+import { toast } from '@/store/ui';
 import { MarketingBackground } from '../MarketingBackground';
 import { MarketingNav } from '../MarketingNav';
 import { Footer } from '../Footer';
@@ -27,20 +29,24 @@ type ContactForm = z.infer<typeof contactSchema>;
 export default function ContactPage() {
   const { data: site } = useSite();
   const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<ContactForm>({ resolver: zodResolver(contactSchema) });
 
-  // no public contact endpoint yet — deliver via mailto with a prefilled body
-  const onSubmit = (data: ContactForm) => {
-    const to = site?.contact.email || 'hello@carthedge.in';
-    const body = encodeURIComponent(
-      `Name: ${data.name}\nBusiness: ${data.business}\nPhone: ${data.phone}\n\n${data.message}`,
-    );
-    location.href = `mailto:${to}?subject=${encodeURIComponent(`CartHedge enquiry — ${data.business}`)}&body=${body}`;
-    setSent(true);
+  // lands in the admin console as a lead and pings the platform inbox
+  const onSubmit = async (data: ContactForm) => {
+    setBusy(true);
+    try {
+      await sendContactMessage(data);
+      setSent(true);
+    } catch (e) {
+      toast('error', 'Could not send', e instanceof Error ? e.message : 'Try again in a moment.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -85,7 +91,7 @@ export default function ContactPage() {
                   <Textarea rows={5} {...register('message')} />
                 </Field>
               </div>
-              <Button type="submit" size="lg" className="sm:col-span-2 sm:justify-self-start">
+              <Button type="submit" size="lg" loading={busy} className="sm:col-span-2 sm:justify-self-start">
                 {contact.form.submit}
               </Button>
             </form>

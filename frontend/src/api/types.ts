@@ -52,6 +52,9 @@ export type BusinessProfile = {
 };
 
 // plans & subscription
+/** Entitlement keys the API gates paid routes on — mirrors admin.Capabilities in Go. */
+export type Capability = 'ai' | 'aiReply' | 'broadcasts' | 'offers' | 'invoices' | 'courier' | 'waitlist';
+
 export type Plan = {
   id: string;
   code: string;
@@ -60,6 +63,7 @@ export type Plan = {
   orderQuota: number;
   perOrderFee: number;
   features: string[];
+  capabilities: Capability[];
   isCustom: boolean;
   active?: boolean;
   activeSubscriptions?: number;
@@ -73,6 +77,8 @@ export type Subscription = {
   perOrderFee: number;
   startsAt: string;
   endsAt: string;
+  capabilities: Capability[];
+  ordersUsed: number;
 };
 export type CheckoutInfo = {
   razorpayOrderId: string;
@@ -97,6 +103,8 @@ export type Product = {
   sku: string;
   images: string[];
   inStock: boolean;
+  /** -1 = untracked, otherwise the counted quantity orders draw down */
+  stockQty: number;
   trending: boolean;
   active: boolean;
   variants: Variant[];
@@ -240,6 +248,14 @@ export type Dashboard = {
   rtoMeter?: RtoMeter;
   quota?: QuotaUsage;
 };
+/** GET /api/v1/insights — derived from the seller's own data, no model call. */
+export type Insights = {
+  bestSellers: { name: string; units: number; revenue: number }[];
+  codRiskBuyers: { id: string; name: string; phone: string; codRefusals: number; openCodOrders: number }[];
+  repeatBuyers: { thisMonth: number; lastMonth: number };
+  suggestedBroadcastWindow?: { hour: number; label: string; orders: number };
+  rtoTrend?: RtoMeter & { lastMonthPercent?: number };
+};
 export type SalesPoint = { date: string; orders: number; revenue: number };
 export type TopProduct = { productId?: string; name: string; units: number; revenue: number };
 export type MonthlyReport = {
@@ -352,6 +368,7 @@ export type AdminOverview = {
   revenueTotal: number;
   revenueThisMonth: number;
   openPlanRequests: number;
+  openEnquiries: number;
 };
 export type AdminBusinessRow = {
   id: string;
@@ -407,6 +424,17 @@ export type PlanRequest = {
   phone: string;
   message: string;
   expectedOrders: number;
+  status: 'open' | 'contacted' | 'closed';
+  adminNote: string;
+  createdAt: string;
+};
+export type ContactMessage = {
+  id: string;
+  name: string;
+  business: string;
+  email: string;
+  phone: string;
+  message: string;
   status: 'open' | 'contacted' | 'closed';
   adminNote: string;
   createdAt: string;

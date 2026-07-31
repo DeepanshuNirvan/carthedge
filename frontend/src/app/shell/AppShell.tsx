@@ -8,6 +8,7 @@ import {
   KanbanSquare,
   LayoutDashboard,
   Link2,
+  Lock,
   LogOut,
   Menu,
   Package,
@@ -22,6 +23,7 @@ import { useAuth } from '@/store/auth';
 import { useUi } from '@/store/ui';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { useSubscription } from '@/api/plans';
+import type { Capability } from '@/api/types';
 import { logout } from '@/api/auth';
 import { daysLeft } from '@/lib/date';
 import { cn } from '@/lib/cn';
@@ -33,16 +35,16 @@ import { Button, IconButton } from '@/ui/Button';
 import { Dropdown, DropdownItem } from '@/ui/Dropdown';
 import { Modal } from '@/ui/Modal';
 
-const navItems = [
+const navItems: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; cap?: Capability }[] = [
   { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/app/orders', label: 'Orders', icon: KanbanSquare },
   { to: '/app/products', label: 'Products', icon: Package },
   { to: '/app/links', label: 'Links', icon: Link2 },
   { to: '/app/customers', label: 'Customers', icon: Users },
-  { to: '/app/ai', label: 'AI Desk', icon: Bot },
+  { to: '/app/ai', label: 'AI Desk', icon: Bot, cap: 'ai' },
   { to: '/app/insights', label: 'Insights', icon: Sparkles },
-  { to: '/app/broadcasts', label: 'Broadcasts', icon: Podcast },
-  { to: '/app/invoices', label: 'Invoices', icon: FileText },
+  { to: '/app/broadcasts', label: 'Broadcasts', icon: Podcast, cap: 'broadcasts' },
+  { to: '/app/invoices', label: 'Invoices', icon: FileText, cap: 'invoices' },
   { to: '/app/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/app/settings', label: 'Settings', icon: Settings },
 ];
@@ -88,6 +90,8 @@ function BottomTabs({ onMore }: { onMore: () => void }) {
 }
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
+  const { data: sub } = useSubscription();
+  const locked = (cap?: Capability) => !!cap && !!sub && !sub.capabilities.includes(cap);
   return (
     <nav aria-label="Workspace" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
       {navItems.map((item) => (
@@ -112,6 +116,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
               )}
               <item.icon className="size-[18px] shrink-0" aria-hidden />
               {item.label}
+              {locked(item.cap) && (
+                <Lock className="ml-auto size-3.5 shrink-0 text-low" aria-label="Not on your plan" />
+              )}
             </>
           )}
         </NavLink>

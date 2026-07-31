@@ -31,6 +31,10 @@ type Config struct {
 	S3Bucket      string
 	S3Region      string
 
+	// FrontendDir serves the built SPA from the API origin so shared links get
+	// server-rendered meta tags. Empty in dev, where Vite serves it.
+	FrontendDir string
+
 	AIProvider  string
 	OpenAIKey   string
 	OpenAIModel string
@@ -50,10 +54,13 @@ type Config struct {
 	WhatsAppAPIURL string
 	WhatsAppToken  string
 
-	MetaAppID        string
-	MetaAppSecret    string
-	MetaVerifyToken  string
-	MetaGraphVersion string
+	MetaAppID         string
+	MetaAppSecret     string
+	MetaVerifyToken   string
+	MetaGraphVersion  string
+	MetaIgAppID       string
+	MetaIgAppSecret   string
+	MetaOAuthRedirect string
 
 	ShiprocketEmail    string
 	ShiprocketPassword string
@@ -84,6 +91,7 @@ func Load() (*Config, error) {
 		UploadDir:     env("UPLOAD_DIR", "uploads"),
 		S3Bucket:      os.Getenv("S3_BUCKET"),
 		S3Region:      os.Getenv("S3_REGION"),
+		FrontendDir:   os.Getenv("FRONTEND_DIR"),
 
 		AIProvider:  env("AI_PROVIDER", "openai"),
 		OpenAIKey:   os.Getenv("OPENAI_API_KEY"),
@@ -108,6 +116,10 @@ func Load() (*Config, error) {
 		MetaAppSecret:    os.Getenv("META_APP_SECRET"),
 		MetaVerifyToken:  os.Getenv("META_VERIFY_TOKEN"),
 		MetaGraphVersion: env("META_GRAPH_VERSION", "v21.0"),
+		MetaIgAppID:      os.Getenv("META_IG_APP_ID"),
+		MetaIgAppSecret:  os.Getenv("META_IG_APP_SECRET"),
+		// must match the redirect registered on the Meta app
+		MetaOAuthRedirect: env("META_OAUTH_REDIRECT_URL", ""),
 
 		ShiprocketEmail:    os.Getenv("SHIPROCKET_EMAIL"),
 		ShiprocketPassword: os.Getenv("SHIPROCKET_PASSWORD"),

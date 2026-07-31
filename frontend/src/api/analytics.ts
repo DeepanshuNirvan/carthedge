@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { get } from './http';
-import type { Dashboard, MonthlyReport, SalesPoint, TopProduct } from './types';
+import type { Dashboard, Insights, MonthlyReport, SalesPoint, TopProduct } from './types';
 
 export const useDashboard = () =>
   useQuery({
@@ -21,6 +21,13 @@ export const useTopProducts = (days = 30) =>
     queryKey: ['analytics', 'products', days],
     queryFn: () => get<{ products: TopProduct[] }>('/api/v1/analytics/products', { days }),
     select: (d) => d.products ?? [],
+  });
+
+export const useInsights = () =>
+  useQuery({
+    queryKey: ['insights'],
+    queryFn: () => get<Insights>('/api/v1/insights'),
+    staleTime: 5 * 60_000,
   });
 
 export const useMonthlyReport = (month?: string) =>

@@ -4,6 +4,7 @@ import { Seo } from '@/lib/seo';
 import LoginPage from './auth/LoginPage';
 import RegisterPage from './auth/RegisterPage';
 import { AppShell } from './shell/AppShell';
+import { FeatureGate } from './shell/FeatureGate';
 import DashboardPage from './dashboard/DashboardPage';
 import OrdersPage from './orders/OrdersPage';
 import ProductsPage from './products/ProductsPage';
@@ -36,10 +37,31 @@ export default function AppRoot() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="links" element={<LinksPage />} />
           <Route path="customers" element={<CustomersPage />} />
-          <Route path="ai" element={<AiDeskPage />} />
+          <Route
+            path="ai"
+            element={
+              <FeatureGate capability="ai">
+                <AiDeskPage />
+              </FeatureGate>
+            }
+          />
           <Route path="insights" element={<InsightsPage />} />
-          <Route path="broadcasts" element={<BroadcastsPage />} />
-          <Route path="invoices" element={<InvoicesPage />} />
+          <Route
+            path="broadcasts"
+            element={
+              <FeatureGate capability="broadcasts">
+                <BroadcastsPage />
+              </FeatureGate>
+            }
+          />
+          <Route
+            path="invoices"
+            element={
+              <FeatureGate capability="invoices">
+                <InvoicesPage />
+              </FeatureGate>
+            }
+          />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="billing" element={<BillingPage />} />

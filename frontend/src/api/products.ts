@@ -16,6 +16,15 @@ export const useProducts = (filters: ProductFilters = {}) =>
     select: (d) => d.products,
   });
 
+/** Counted stock at or below the threshold — untracked products never appear. */
+export const useLowStock = (threshold = 5) =>
+  useQuery({
+    queryKey: ['products', 'lowStock', threshold],
+    queryFn: () => get<{ products: Product[] }>('/api/v1/products/low-stock', { threshold }),
+    select: (d) => d.products ?? [],
+    staleTime: 60_000,
+  });
+
 export const useProduct = (id: string | undefined) =>
   useQuery({
     queryKey: ['products', id],

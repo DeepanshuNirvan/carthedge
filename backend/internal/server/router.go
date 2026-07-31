@@ -25,6 +25,7 @@ import (
 	"carthedge/internal/product"
 	"carthedge/internal/publicapi"
 	"carthedge/internal/storage"
+	"carthedge/internal/web"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -51,6 +52,7 @@ type Deps struct {
 	Messaging  *messaging.Handler
 	PaySvc     *payment.Service
 	Events     *events.Bus
+	Web        *web.Handler // nil in dev, where Vite serves the SPA
 }
 
 func New(d Deps) http.Handler {
@@ -167,6 +169,7 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/channels", d.Messaging.ListChannels, authed, active, aiFeature)
 	handle("POST /api/v1/channels", d.Messaging.Connect, authed, active, aiFeature)
 	handle("DELETE /api/v1/channels/{channel}", d.Messaging.Disconnect, authed, active, aiFeature)
+	handle("GET /api/v1/channels/{channel}/connect-url", d.Messaging.ConnectURL, authed, active, aiFeature)
 	handle("GET /api/v1/conversations", d.Messaging.ListConversations, authed, active, aiFeature)
 	handle("GET /api/v1/conversations/{id}", d.Messaging.Conversation, authed, active, aiFeature)
 	handle("POST /api/v1/conversations/{id}/reply", d.Messaging.Reply, authed, active, aiFeature)
@@ -193,9 +196,12 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/admin/payments", d.Admin.Payments, adminAuthed)
 	handle("GET /api/v1/admin/settings", d.Admin.Settings, adminAuthed)
 	handle("PUT /api/v1/admin/settings", d.Admin.UpdateSettings, adminAuthed)
+	handle("GET /api/v1/admin/enquiries", d.Admin.ContactMessages, adminAuthed)
+	handle("PATCH /api/v1/admin/enquiries/{id}", d.Admin.UpdateContactMessage, adminAuthed)
 
-	// CartHedge website content (public)
+	// CartHedge website content + enquiry form (public)
 	handle("GET /api/v1/site", d.Admin.Site)
+	handle("POST /api/v1/contact", d.Admin.Contact, byIP("contact", 5, 10*time.Minute))
 
 	// public storefront (browse + direct buy, no login)
 	handle("GET /p/{businessCode}/store", d.Public.Store)
@@ -219,8 +225,16 @@ func New(d Deps) http.Handler {
 	handle("POST /webhooks/razorpay", d.PaySvc.Webhook)
 
 	// meta webhook: inbound Instagram + WhatsApp DMs (signature-verified, no rate limit — Meta retries)
+	// browser lands here after the seller authorises on Meta — identity comes
+	// from the signed state, so it cannot be behind the JWT middleware
+	handle("GET /oauth/meta/callback", d.Messaging.OAuthCallback, byIP("metaOauth", 20, time.Minute))
+
 	handle("GET /webhooks/meta", d.Messaging.Verify)
 	handle("POST /webhooks/meta", d.Messaging.Webhook)
+
+	// SPA + per-route meta tags; registered last, its "/" pattern is the
+	// lowest-precedence match so every API route above still wins
+	d.Web.Mount(mux)
 
 	return middleware.Chain(mux,
 		middleware.Recover(d.Log),

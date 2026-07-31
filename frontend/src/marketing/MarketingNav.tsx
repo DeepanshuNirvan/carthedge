@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { nav } from '@/strings/marketing';
+import { useSite } from '@/api/site';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { cn } from '@/lib/cn';
 import { buttonLink } from '@/ui/buttonLink';
@@ -11,6 +12,7 @@ import { IconButton } from '@/ui/Button';
 import { Wordmark } from './Wordmark';
 
 export function MarketingNav() {
+  const announcement = useSite().data?.site.announcement?.trim();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   useScrollLock(open);
@@ -34,7 +36,13 @@ export function MarketingNav() {
     );
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+    <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+      {/* set by CartHedge staff in the admin console; empty hides it */}
+      {announcement && (
+        <p className="line-clamp-2 max-w-6xl rounded-xl bg-gold-400/14 px-4 py-1.5 text-center text-xs font-medium leading-snug text-gold-500 backdrop-blur">
+          {announcement}
+        </p>
+      )}
       <nav
         aria-label="Main"
         className={cn(

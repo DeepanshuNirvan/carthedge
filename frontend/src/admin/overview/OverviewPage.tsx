@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, IndianRupee, Inbox, ShoppingBag } from 'lucide-react';
+import { Building2, IndianRupee, Inbox, Mail, ShoppingBag } from 'lucide-react';
 import { useAdminOverview, useAdminBusinesses } from '@/api/admin';
 import { PageHeader } from '@/app/shell/PageHeader';
 import { StatTile } from '@/ui/StatTile';
@@ -21,6 +21,7 @@ export default function OverviewPage() {
         <StatTile label="Revenue this month" value={<MoneyText paise={o?.revenueThisMonth ?? 0} compact />} hint={o ? `total ${'₹'}${Math.round((o.revenueTotal ?? 0) / 100).toLocaleString('en-IN')}` : undefined} loading={isLoading} />
         <StatTile label="GMV (30d)" value={<MoneyText paise={o?.gmvLast30Days ?? 0} compact />} hint={o ? `${o.ordersLast30Days} orders` : undefined} icon={<ShoppingBag className="size-4.5" />} loading={isLoading} />
         <StatTile label="Open plan requests" value={o?.openPlanRequests ?? 0} icon={<Inbox className="size-4.5" />} accent={o && o.openPlanRequests > 0 ? 'gold' : undefined} loading={isLoading} />
+        <StatTile label="Website enquiries" value={o?.openEnquiries ?? 0} icon={<Mail className="size-4.5" />} accent={o && o.openEnquiries > 0 ? 'gold' : undefined} loading={isLoading} />
         <StatTile label="Businesses" value={o?.totalBusinesses ?? 0} hint={o ? `${o.newLast30Days} new in 30d` : undefined} icon={<Building2 className="size-4.5" />} loading={isLoading} />
         <StatTile label="Paying" value={o?.paying ?? 0} accent="jade" loading={isLoading} />
         <StatTile label="Trials" value={o?.trials ?? 0} loading={isLoading} />

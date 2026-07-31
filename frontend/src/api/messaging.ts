@@ -2,12 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { del, get, post } from './http';
 import type { Channel, ConversationDetail, ConversationSummary } from './types';
 
-export const useChannels = () =>
+type ChannelsResponse = { channels: Channel[]; oauth: Record<'whatsapp' | 'instagram', boolean> };
+
+export const useChannelsInfo = () =>
   useQuery({
     queryKey: ['channels'],
-    queryFn: () => get<{ channels: Channel[] }>('/api/v1/channels'),
-    select: (d) => d.channels ?? [],
+    queryFn: () => get<ChannelsResponse>('/api/v1/channels'),
   });
+
+export const useChannels = () => {
+  const { data, ...rest } = useChannelsInfo();
+  return { ...rest, data: data?.channels ?? [] };
+};
+
+/** One-tap connect: the API mints a signed state and returns the Meta consent URL. */
+export const getChannelConnectUrl = (channel: string) =>
+  get<{ url: string }>(`/api/v1/channels/${channel}/connect-url`);
 
 export const useConversations = () =>
   useQuery({

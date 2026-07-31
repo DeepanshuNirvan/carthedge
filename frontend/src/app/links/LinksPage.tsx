@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import QRCode from 'qrcode';
-import { Check, Copy, Link2, MessageCircle, Plus, QrCode } from 'lucide-react';
+import { useState } from 'react';
+import { ExternalLink, Link2, Plus, Store } from 'lucide-react';
 import type { ShareLink } from '@/api/types';
 import { useLinkMutations, useLinks } from '@/api/links';
 import { useProducts } from '@/api/products';
+import { useBusiness } from '@/api/business';
 import { toast } from '@/store/ui';
-import { useCopy } from '@/hooks/useCopy';
 import { rupeesToPaise } from '@/lib/money';
 import { timeAgo } from '@/lib/date';
 import { PageHeader } from '../shell/PageHeader';
-import { Button, IconButton } from '@/ui/Button';
+import { ShareActions, storeUrl } from '../shell/ShareActions';
+import { Button } from '@/ui/Button';
 import { Field, Input, Select } from '@/ui/Input';
 import { Modal } from '@/ui/Modal';
 import { MoneyText } from '@/ui/MoneyText';
@@ -18,33 +18,42 @@ import { Badge } from '@/ui/Badge';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 
-const linkUrl = (link: ShareLink) => link.url || `${location.origin}${link.token}`;
-
-function QrModal({ link, onClose }: { link: ShareLink | null; onClose: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (link && canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, linkUrl(link), { width: 240, margin: 1 });
-    }
-  }, [link]);
+/** The whole-catalog link — the one a seller puts in their Instagram bio. */
+function StorefrontCard() {
+  const { data: business } = useBusiness();
+  if (!business) return null;
+  const url = storeUrl(business.code);
   return (
-    <Modal open={!!link} onClose={onClose} title={link?.title || 'Share QR'}>
-      <div className="flex flex-col items-center gap-4">
-        <div className="rounded-lg bg-white p-3">
-          <canvas ref={canvasRef} aria-label="QR code for share link" />
-        </div>
-        <p className="break-all text-center font-mono text-xs text-mid">{link && linkUrl(link)}</p>
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-surface p-5 shadow-soft hairline">
+      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-jade-500/12 text-jade-500">
+        <Store className="size-5" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1 basis-52">
+        <p className="text-sm font-medium text-hi">Your storefront</p>
+        <p className="mt-0.5 truncate font-mono text-xs text-low">{url}</p>
+        <p className="mt-1 text-xs text-mid">
+          Your full catalog on one link — put it in your Instagram bio and WhatsApp about.
+        </p>
       </div>
-    </Modal>
+      <div className="flex items-center gap-1">
+        <ShareActions url={url} title={`${business.name} — shop the full collection`} />
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open storefront"
+          className="inline-flex size-9 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi"
+        >
+          <ExternalLink className="size-4" />
+        </a>
+      </div>
+    </div>
   );
 }
 
 function LinkRow({ link }: { link: ShareLink }) {
-  const { copied, copy } = useCopy();
   const { setActive } = useLinkMutations();
-  const [qrOpen, setQrOpen] = useState(false);
-  const url = linkUrl(link);
-  const waShare = `https://wa.me/?text=${encodeURIComponent(`${link.title}\n${url}`)}`;
+  const url = link.url;
 
   return (
     <li className="flex flex-wrap items-center gap-3 py-4">
@@ -62,28 +71,13 @@ function LinkRow({ link }: { link: ShareLink }) {
         <span className="hidden sm:inline">{timeAgo(link.createdAt)}</span>
       </div>
       <div className="flex items-center gap-1">
-        <IconButton label={copied ? 'Copied' : 'Copy link'} onClick={() => copy(url)}>
-          {copied ? <Check className="size-4 text-jade-500" /> : <Copy className="size-4" />}
-        </IconButton>
-        <IconButton label="Show QR" onClick={() => setQrOpen(true)}>
-          <QrCode className="size-4" />
-        </IconButton>
-        <a
-          href={waShare}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Share to WhatsApp"
-          className="inline-flex size-9 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi"
-        >
-          <MessageCircle className="size-4" />
-        </a>
+        <ShareActions url={url} title={link.title || 'Order here'} />
         <Switch
           checked={link.active}
           label={`Toggle ${link.title}`}
           onChange={(active) => setActive.mutate({ id: link.id, active })}
         />
       </div>
-      <QrModal link={qrOpen ? link : null} onClose={() => setQrOpen(false)} />
     </li>
   );
 }
@@ -152,6 +146,8 @@ export default function LinksPage() {
           </Button>
         }
       />
+
+      <StorefrontCard />
 
       {isLoading ? (
         <SkeletonRows rows={4} />

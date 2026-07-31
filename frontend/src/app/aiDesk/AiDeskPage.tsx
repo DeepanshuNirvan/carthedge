@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Bot, Check, Inbox as InboxIcon, MessageSquareText, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Bot, Check, Inbox as InboxIcon, Lock, MessageSquareText, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
 import type { AiDraft, DraftData } from '@/api/types';
 import { useAiMutations, useDrafts } from '@/api/ai';
 import { useConversation, useConversations, useChannelMutations } from '@/api/messaging';
+import { useCan } from '@/api/plans';
 import { toast } from '@/store/ui';
 import { useCopy } from '@/hooks/useCopy';
 import { timeAgo } from '@/lib/date';
@@ -248,6 +250,7 @@ export default function AiDeskPage() {
   const [openConvId, setOpenConvId] = useState<string | null>(null);
   const { data: drafts, isLoading } = useDrafts();
   const { parse, reply: replyMut } = useAiMutations();
+  const canReply = useCan('aiReply').allowed;
   const { copied, copy } = useCopy();
 
   const doParse = () => {
@@ -311,21 +314,31 @@ export default function AiDeskPage() {
                 placeholder="kya isme XL milega? delivery kitne din?"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
+                disabled={!canReply}
               />
             </Field>
-            <Button
-              variant="secondary"
-              icon={<MessageSquareText className="size-4" />}
-              loading={replyMut.isPending}
-              onClick={() =>
-                replyMut.mutate(question, {
-                  onSuccess: (r) => setReply(r.reply),
-                  onError: (e) => toast('error', 'No reply generated', e.message),
-                })
-              }
-            >
-              Suggest reply
-            </Button>
+            {canReply ? (
+              <Button
+                variant="secondary"
+                icon={<MessageSquareText className="size-4" />}
+                loading={replyMut.isPending}
+                onClick={() =>
+                  replyMut.mutate(question, {
+                    onSuccess: (r) => setReply(r.reply),
+                    onError: (e) => toast('error', 'No reply generated', e.message),
+                  })
+                }
+              >
+                Suggest reply
+              </Button>
+            ) : (
+              <p className="flex flex-wrap items-center gap-2 text-xs text-low">
+                <Lock className="size-3.5" /> The reply assistant needs a higher plan.
+                <Link to="/app/billing" className="font-medium text-jade-500 hover:underline">
+                  See plans →
+                </Link>
+              </p>
+            )}
             {reply && (
               <div className="rounded-md bg-surface-2 p-4">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-hi">{reply}</p>

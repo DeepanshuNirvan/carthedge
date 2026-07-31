@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
+	"carthedge/internal/notify"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
@@ -21,13 +23,14 @@ import (
 var ErrBadLogin = errors.New("invalid email or password")
 
 type Service struct {
-	pool *pgxpool.Pool
-	rdb  *redis.Client
-	cfg  *config.Config
+	pool   *pgxpool.Pool
+	rdb    *redis.Client
+	cfg    *config.Config
+	notify *notify.Notifier
 }
 
-func NewService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) *Service {
-	return &Service{pool: pool, rdb: rdb, cfg: cfg}
+func NewService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, n *notify.Notifier) *Service {
+	return &Service{pool: pool, rdb: rdb, cfg: cfg, notify: n}
 }
 
 type Session struct {
@@ -112,6 +115,11 @@ func (s *Service) Overview(ctx context.Context) (httpx.M, error) {
 		return nil, err
 	}
 	out["openPlanRequests"] = open
+	var enquiries int
+	if err := s.pool.QueryRow(ctx, `select count(*) from contact_messages where status = 'open'`).Scan(&enquiries); err != nil {
+		return nil, err
+	}
+	out["openEnquiries"] = enquiries
 	return out, nil
 }
 
@@ -439,6 +447,88 @@ func (s *Service) Payments(ctx context.Context, limit, offset int) ([]httpx.M, e
 			"status": status, "razorpayOrderId": rzpID, "planCode": planCode, "createdAt": createdAt.Format(time.RFC3339)})
 	}
 	return out, rows.Err()
+}
+
+// ContactInput is a marketing-site enquiry: a sales lead, so it is stored and
+// mailed rather than handed to the visitor's mail client.
+type ContactInput struct {
+	Name     string `json:"name"`
+	Business string `json:"business"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Message  string `json:"message"`
+}
+
+func (s *Service) CreateContactMessage(ctx context.Context, in ContactInput) error {
+	in.Name, in.Message = strings.TrimSpace(in.Name), strings.TrimSpace(in.Message)
+	if len(in.Name) < 2 || len(in.Message) < 10 {
+		return errors.New("name and a short message are required")
+	}
+	if !httpx.ValidEmail(in.Email) {
+		return errors.New("a valid email is required")
+	}
+	if in.Phone != "" {
+		phone, ok := httpx.NormalizePhone(in.Phone)
+		if !ok {
+			return errors.New("phone number is not valid")
+		}
+		in.Phone = phone
+	}
+	if _, err := s.pool.Exec(ctx, `insert into contact_messages (name, business, email, phone, message)
+		values ($1,$2,$3,$4,$5)`, in.Name, strings.TrimSpace(in.Business), in.Email, in.Phone, in.Message); err != nil {
+		return err
+	}
+	// a lead is worth an inbox ping, but the row is the source of truth
+	if to := s.cfg.AdminEmail; to != "" {
+		s.notify.Async("contactMessage", func() error {
+			return s.notify.Email(to, "New CartHedge enquiry: "+in.Name,
+				fmt.Sprintf("Name: %s\nBusiness: %s\nEmail: %s\nPhone: %s\n\n%s",
+					in.Name, in.Business, in.Email, in.Phone, in.Message))
+		})
+	}
+	return nil
+}
+
+func (s *Service) ContactMessages(ctx context.Context, status string, limit, offset int) ([]httpx.M, error) {
+	where := "true"
+	args := []any{}
+	if status != "" {
+		args = append(args, status)
+		where = "status = $1"
+	}
+	args = append(args, limit, offset)
+	rows, err := s.pool.Query(ctx, fmt.Sprintf(`select id, name, business, email, phone, message, status, admin_note, created_at
+		from contact_messages where `+where+` order by created_at desc limit $%d offset $%d`, len(args)-1, len(args)), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []httpx.M{}
+	for rows.Next() {
+		var id, name, business, email, phone, message, msgStatus, note string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &name, &business, &email, &phone, &message, &msgStatus, &note, &createdAt); err != nil {
+			return nil, err
+		}
+		out = append(out, httpx.M{"id": id, "name": name, "business": business, "email": email, "phone": phone,
+			"message": message, "status": msgStatus, "adminNote": note, "createdAt": createdAt.Format(time.RFC3339)})
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) UpdateContactMessage(ctx context.Context, id, status, note string) error {
+	if status != "open" && status != "contacted" && status != "closed" {
+		return errors.New("status must be open, contacted or closed")
+	}
+	ct, err := s.pool.Exec(ctx, `update contact_messages set status=$2, admin_note=$3, updated_at=now() where id=$1`,
+		id, status, note)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return errors.New("message not found")
+	}
+	return nil
 }
 
 // Settings returns all site_settings rows as {key: value}.

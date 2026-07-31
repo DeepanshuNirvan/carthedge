@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Clock3, Repeat, ShieldCheck, TrendingUp } from 'lucide-react';
-import { useDashboard, useTopProducts } from '@/api/analytics';
-import { useCustomers } from '@/api/customers';
+import { useDashboard, useInsights } from '@/api/analytics';
 import { PageHeader } from '../shell/PageHeader';
 import { Card } from '@/ui/Card';
 import { MoneyText } from '@/ui/MoneyText';
@@ -43,12 +42,14 @@ function InsightCard({
 
 /** Glanceable, actionable reads on the seller's numbers — not a wall of charts. */
 export default function InsightsPage() {
-  const { data: dash, isLoading } = useDashboard();
-  const { data: top } = useTopProducts();
-  const { data: riskCustomers } = useCustomers({ risk: true });
+  const { data: dash } = useDashboard();
+  const { data: insights, isLoading } = useInsights();
 
-  const bestSeller = top?.[0];
-  const meter = dash?.rtoMeter;
+  const bestSeller = insights?.bestSellers?.[0];
+  const riskBuyers = insights?.codRiskBuyers ?? [];
+  const meter = insights?.rtoTrend ?? dash?.rtoMeter;
+  const window = insights?.suggestedBroadcastWindow;
+  const repeat = insights?.repeatBuyers;
 
   if (isLoading) {
     return (
@@ -84,7 +85,18 @@ export default function InsightsPage() {
             <>
               Your COD refusal rate is <span className="font-medium text-hi">{meter.actualPercent}%</span> against a{' '}
               {meter.baselinePercent}% baseline — that's <MoneyText paise={meter.savedThisMonth} compact /> protected this
-              month. The confirmation flow is earning its keep.
+              month.
+              {insights?.rtoTrend?.lastMonthPercent !== undefined && (
+                <>
+                  {' '}
+                  Last month it was {insights.rtoTrend.lastMonthPercent}%
+                  {meter.actualPercent < insights.rtoTrend.lastMonthPercent
+                    ? ' — the confirmation flow is still pulling it down.'
+                    : meter.actualPercent > insights.rtoTrend.lastMonthPercent
+                      ? ' — it has crept up, so tighten COD confirmation on risky buyers.'
+                      : ' — holding steady.'}
+                </>
+              )}
             </>
           ) : (
             'No COD outcomes yet this month. Once orders deliver (or bounce), your savings meter fills in.'
@@ -93,21 +105,16 @@ export default function InsightsPage() {
 
         <InsightCard
           icon={<AlertTriangle className="size-5" />}
-          tone={riskCustomers && riskCustomers.length > 0 ? 'danger' : 'jade'}
+          tone={riskBuyers.length > 0 ? 'danger' : 'jade'}
           title="Buyers to watch"
           action={{ to: '/app/customers', label: 'Open ledger' }}
         >
-          {riskCustomers && riskCustomers.length > 0 ? (
+          {riskBuyers.length > 0 ? (
             <>
-              <span className="font-medium text-hi">{riskCustomers.length}</span> buyer
-              {riskCustomers.length !== 1 && 's'} carry a COD-risk flag
-              {riskCustomers[0] && (
-                <>
-                  {' '}
-                  — {riskCustomers[0].name} has {riskCustomers[0].codRefusals} refusal
-                  {riskCustomers[0].codRefusals !== 1 && 's'}
-                </>
-              )}
+              <span className="font-medium text-hi">{riskBuyers.length}</span> buyer
+              {riskBuyers.length !== 1 && 's'} carry a COD-risk flag — {riskBuyers[0].name} has{' '}
+              {riskBuyers[0].codRefusals} refusal{riskBuyers[0].codRefusals !== 1 && 's'}
+              {riskBuyers[0].openCodOrders > 0 && ` and ${riskBuyers[0].openCodOrders} COD order${riskBuyers[0].openCodOrders !== 1 ? 's' : ''} still open`}
               . Ask for a token payment before shipping them COD.
             </>
           ) : (
@@ -120,6 +127,11 @@ export default function InsightsPage() {
             <>
               <span className="font-medium text-hi">{dash.repeatRatePercent}%</span> of your {dash.totalCustomers} buyers
               have ordered more than once.{' '}
+              {repeat && (repeat.thisMonth > 0 || repeat.lastMonth > 0) && (
+                <>
+                  {repeat.thisMonth} came back this month against {repeat.lastMonth} last month.{' '}
+                </>
+              )}
               {dash.repeatRatePercent >= 30
                 ? 'That is strong — a reseller tier could compound it.'
                 : 'A broadcast to past buyers is the cheapest revenue you can get this week.'}
@@ -130,9 +142,15 @@ export default function InsightsPage() {
         </InsightCard>
 
         <InsightCard icon={<Clock3 className="size-5" />} tone="gold" title="Best time to drop" action={{ to: '/app/broadcasts', label: 'Compose a drop' }}>
-          Indian social-commerce buyers are most responsive{' '}
-          <span className="font-medium text-hi">8–10 pm on weekdays</span>. Schedule your next collection broadcast
-          in that window and pin the matching product as trending first.
+          {window ? (
+            <>
+              Your buyers order most between <span className="font-medium text-hi">{window.label}</span> —{' '}
+              {window.orders} order{window.orders !== 1 && 's'} in the last 90 days landed in that hour. Schedule
+              your next collection broadcast just before it.
+            </>
+          ) : (
+            'Once you have a few months of orders, the hour your own buyers actually order in shows up here.'
+          )}
         </InsightCard>
 
         <InsightCard icon={<TrendingUp className="size-5" />} tone="jade" title="Pending money" action={{ to: '/app/orders', label: 'Clear the queue' }}>

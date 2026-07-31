@@ -47,14 +47,16 @@ type Plan struct {
 }
 
 type Subscription struct {
-	PlanCode     string `json:"planCode"`
-	PlanName     string `json:"planName"`
-	Status       string `json:"status"`
-	PriceMonthly int    `json:"priceMonthly"`
-	OrderQuota   int    `json:"orderQuota"`
-	PerOrderFee  int    `json:"perOrderFee"`
-	StartsAt     string `json:"startsAt"`
-	EndsAt       string `json:"endsAt"`
+	PlanCode     string   `json:"planCode"`
+	PlanName     string   `json:"planName"`
+	Status       string   `json:"status"`
+	PriceMonthly int      `json:"priceMonthly"`
+	OrderQuota   int      `json:"orderQuota"`
+	PerOrderFee  int      `json:"perOrderFee"`
+	StartsAt     string   `json:"startsAt"`
+	EndsAt       string   `json:"endsAt"`
+	Capabilities []string `json:"capabilities"` // what the UI may show unlocked
+	OrdersUsed   int      `json:"ordersUsed"`
 }
 
 func (s *Service) List(ctx context.Context) ([]Plan, error) {
@@ -84,11 +86,20 @@ func (s *Service) Current(ctx context.Context, bizID string) (*Subscription, err
 	var sub Subscription
 	var startsAt, endsAt time.Time
 	var customPrice *int
-	err := s.pool.QueryRow(ctx, `select p.code, p.name, s.status, p.price_monthly, s.custom_price, p.order_quota, p.per_order_fee, s.starts_at, s.ends_at
+	var caps []byte
+	err := s.pool.QueryRow(ctx, `select p.code, p.name, s.status, p.price_monthly, s.custom_price, p.order_quota, p.per_order_fee, s.starts_at, s.ends_at,
+		p.capabilities,
+		(select count(*) from orders o where o.business_id = s.business_id
+			and o.created_at >= s.starts_at and o.status <> 'cancelled')
 		from subscriptions s join plans p on p.id = s.plan_id where s.business_id = $1`, bizID).Scan(
-		&sub.PlanCode, &sub.PlanName, &sub.Status, &sub.PriceMonthly, &customPrice, &sub.OrderQuota, &sub.PerOrderFee, &startsAt, &endsAt)
+		&sub.PlanCode, &sub.PlanName, &sub.Status, &sub.PriceMonthly, &customPrice, &sub.OrderQuota, &sub.PerOrderFee, &startsAt, &endsAt,
+		&caps, &sub.OrdersUsed)
 	if err != nil {
 		return nil, err
+	}
+	json.Unmarshal(caps, &sub.Capabilities)
+	if sub.Capabilities == nil {
+		sub.Capabilities = []string{}
 	}
 	if customPrice != nil {
 		sub.PriceMonthly = *customPrice

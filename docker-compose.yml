@@ -1,0 +1,21 @@
+# Local dev dependencies for the Go backend. `docker compose up -d`, then `go run ./cmd/server`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: carthedge
+    ports: ["55432:5432"]
+    volumes: ["carthedge_pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports: ["63790:6379"]
+
+volumes:
+  carthedge_pg:

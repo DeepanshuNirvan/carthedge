@@ -36,6 +36,25 @@ export const useStoreProduct = (code: string, id: string | undefined) =>
     enabled: !!id,
   });
 
+export type Serviceability = {
+  serviceable: boolean;
+  codAvailable: boolean;
+  estimatedDays: number;
+  /** false when no courier aggregator is configured — never block the sale on it */
+  checked: boolean;
+};
+
+/** Courier reach for a pincode, checked before the order exists — undeliverable
+ *  addresses are the top RTO cause. */
+export const useServiceability = (code: string, pincode: string, cod: boolean) =>
+  useQuery({
+    queryKey: ['serviceability', code, pincode, cod],
+    queryFn: () => get<Serviceability>(`/p/${code}/serviceability`, { pincode, cod }, 'none'),
+    enabled: /^[1-9][0-9]{5}$/.test(pincode),
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+
 export const useResolvedLink = (code: string, token: string) =>
   useQuery({
     queryKey: ['link', code, token],

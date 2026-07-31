@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Wordmark } from '@/marketing/Wordmark';
 
 /** Split-screen auth: ambient brand panel + form. */
-export function AuthLayout({ children, aside }: { children: ReactNode; aside: ReactNode }) {
+export function AuthLayout({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden overflow-hidden bg-ink-950 lg:block" data-theme="dark">

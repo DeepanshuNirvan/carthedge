@@ -93,7 +93,7 @@ func (r *Runner) expireSubscriptions(ctx context.Context) (int, error) {
 	}
 	for _, l := range all {
 		r.rdb.Del(ctx, "sub:"+l.id)
-		body := fmt.Sprintf("Hi %s,\n\nYour CartHedge plan has ended, so your store link and dashboard are paused.\nRenew here to switch it back on: %s/billing\n\n— CartHedge", l.owner, r.baseURL)
+		body := fmt.Sprintf("Hi %s,\n\nYour CartHedge plan has ended, so your store link and dashboard are paused.\nRenew here to switch it back on: %s/app/billing\n\n— CartHedge", l.owner, r.baseURL)
 		r.notify.Async("subscriptionExpired", func() error {
 			return r.notify.Email(l.email, "Your CartHedge plan has ended", body)
 		})
@@ -133,7 +133,7 @@ func (r *Runner) remindExpiring(ctx context.Context) (int, error) {
 		if d.status == "trial" {
 			what = "free trial"
 		}
-		body := fmt.Sprintf("Hi %s,\n\nYour CartHedge %s ends on %s. Renew to keep your store link and order desk running: %s/billing\n\n— CartHedge",
+		body := fmt.Sprintf("Hi %s,\n\nYour CartHedge %s ends on %s. Renew to keep your store link and order desk running: %s/app/billing\n\n— CartHedge",
 			d.owner, what, d.endsAt.Format("2 Jan 2006"), r.baseURL)
 		r.notify.Async("subscriptionReminder", func() error {
 			return r.notify.Email(d.email, "Your CartHedge "+what+" ends soon", body)

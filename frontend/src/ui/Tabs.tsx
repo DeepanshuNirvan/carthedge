@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/cn';
 
@@ -12,6 +13,9 @@ type TabsProps<T extends string> = {
 
 /** Glass segmented control with a shared animated pill behind the active tab. */
 export function Tabs<T extends string>({ tabs, value, onChange, className }: TabsProps<T>) {
+  // the pill is shared across the tabs of ONE control; two controls on a page
+  // must not animate into each other
+  const pillId = useId();
   return (
     <div
       role="tablist"
@@ -32,7 +36,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: Tab
           >
             {active && (
               <motion.span
-                layoutId="tab-pill"
+                layoutId={pillId}
                 className="absolute inset-0 rounded-[10px] panel"
                 transition={{ type: 'spring', stiffness: 420, damping: 34 }}
               />

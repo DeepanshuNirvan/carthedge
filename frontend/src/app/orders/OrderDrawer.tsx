@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { MapPin, Phone, Truck } from 'lucide-react';
+import { BellRing, Lock, MapPin, Phone, Truck } from 'lucide-react';
 import type { OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
 import { useOrder, useOrderMutations } from '@/api/orders';
 import { useCreateInvoice } from '@/api/invoices';
+import { useCan } from '@/api/plans';
 import { toast } from '@/store/ui';
 import { formatDateTime } from '@/lib/date';
 import { Sheet } from '@/ui/Modal';
@@ -15,8 +16,9 @@ import { SkeletonRows } from '@/ui/Skeleton';
 
 export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId ?? undefined);
-  const { setStatus, ship } = useOrderMutations();
+  const { setStatus, ship, resendCodConfirmation } = useOrderMutations();
   const createInvoice = useCreateInvoice();
+  const canInvoice = useCan('invoices').allowed;
   const [courierName, setCourierName] = useState('Shiprocket');
   const [trackingId, setTrackingId] = useState('');
   const [nextStatus, setNextStatus] = useState<OrderStatus | ''>('');
@@ -146,23 +148,45 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               </div>
             )}
 
-            {order.status === 'delivered' && (
+            {/* the RTO defence: nudge the buyer again before anyone dispatches */}
+            {order.paymentMethod === 'cod' && !['delivered', 'cancelled', 'rto'].includes(order.status) && (
               <Button
                 variant="secondary"
-                loading={createInvoice.isPending}
+                icon={<BellRing className="size-4" />}
+                loading={resendCodConfirmation.isPending}
                 onClick={() =>
-                  createInvoice.mutate(
-                    { orderId: order.id, gstRate: 0 },
-                    {
-                      onSuccess: () => toast('success', 'Invoice created', 'Find it under Invoices.'),
-                      onError: (e) => toast('error', 'Invoice failed', e.message),
-                    },
-                  )
+                  resendCodConfirmation.mutate(order.id, {
+                    onSuccess: () => toast('success', 'Confirmation resent', 'The buyer got the COD confirm link again.'),
+                    onError: (e) => toast('error', 'Could not resend', e.message),
+                  })
                 }
               >
-                Generate invoice
+                {order.codConfirmedAt ? 'Resend COD confirmation' : 'Send COD confirmation'}
               </Button>
             )}
+
+            {order.status === 'delivered' &&
+              (canInvoice ? (
+                <Button
+                  variant="secondary"
+                  loading={createInvoice.isPending}
+                  onClick={() =>
+                    createInvoice.mutate(
+                      { orderId: order.id, gstRate: 0 },
+                      {
+                        onSuccess: () => toast('success', 'Invoice created', 'Find it under Invoices.'),
+                        onError: (e) => toast('error', 'Invoice failed', e.message),
+                      },
+                    )
+                  }
+                >
+                  Generate invoice
+                </Button>
+              ) : (
+                <p className="flex items-center gap-2 text-xs text-low">
+                  <Lock className="size-3.5" /> Invoices need a higher plan.
+                </p>
+              ))}
           </section>
 
           {/* timeline */}

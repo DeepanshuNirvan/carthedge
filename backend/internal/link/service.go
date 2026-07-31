@@ -122,8 +122,10 @@ func (s *Service) Create(ctx context.Context, bizID, bizCode string, in CreateIn
 		Items: in.Items, Amount: in.Amount, Active: true, ExpiresAt: in.ExpiresAt}, nil
 }
 
+// URL is the page the buyer opens, not the API that feeds it — /p/... returns
+// JSON, so a shared link must point at the checkout route the SPA serves.
 func (s *Service) URL(bizCode, token string) string {
-	return fmt.Sprintf("%s/p/%s/%s", s.baseURL, bizCode, token)
+	return fmt.Sprintf("%s/l/%s/%s", s.baseURL, bizCode, token)
 }
 
 func (s *Service) List(ctx context.Context, bizID, bizCode string, limit, offset int) ([]Link, error) {

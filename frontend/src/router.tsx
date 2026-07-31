@@ -9,6 +9,7 @@ const MarketingHome = lazy(() => import('./marketing/pages/HomePage'));
 const ContactPage = lazy(() => import('./marketing/pages/ContactPage'));
 const AppRoot = lazy(() => import('./app/AppRoot'));
 const AdminRoot = lazy(() => import('./admin/AdminRoot'));
+const ResetPasswordPage = lazy(() => import('./app/auth/ResetPasswordPage'));
 const StorePage = lazy(() => import('./store-front/storefront/StorePage'));
 const ProductPage = lazy(() => import('./store-front/product/ProductPage'));
 const LinkCheckoutPage = lazy(() => import('./store-front/checkout/LinkCheckoutPage'));
@@ -26,6 +27,8 @@ const wrap = (node: ReactNode) => (
 export const router = createBrowserRouter([
   { path: '/', element: wrap(<MarketingHome />) },
   { path: '/contact', element: wrap(<ContactPage />) },
+  // the forgot-password email links here, outside the /app guard
+  { path: '/reset-password', element: wrap(<ResetPasswordPage />) },
   { path: '/app/*', element: wrap(<AppRoot />) },
   { path: '/admin/*', element: wrap(<AdminRoot />) },
   { path: '/s/:businessCode', element: wrap(<StorePage />) },

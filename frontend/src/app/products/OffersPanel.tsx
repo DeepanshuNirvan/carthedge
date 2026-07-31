@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { BadgePercent, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { BadgePercent, Lock, Plus } from 'lucide-react';
 import { useOfferMutations, useOffers } from '@/api/products';
+import { useCan } from '@/api/plans';
+import { capabilityLabels } from '@/strings/capabilities';
 import { toast } from '@/store/ui';
 import { rupeesToPaise } from '@/lib/money';
 import { formatDate } from '@/lib/date';
@@ -14,6 +17,25 @@ import { EmptyState } from '@/ui/EmptyState';
 import { SkeletonRows } from '@/ui/Skeleton';
 
 export function OffersPanel() {
+  const canOffers = useCan('offers');
+  if (!canOffers.isLoading && !canOffers.allowed) {
+    return (
+      <Card>
+        <CardHeader title="Offers" subtitle={capabilityLabels.offers.blurb} />
+        <div className="flex flex-wrap items-center gap-3 p-5 pt-4">
+          <Lock className="size-4 shrink-0 text-gold-500" aria-hidden />
+          <p className="flex-1 text-sm text-mid">Discount codes and reseller pricing are not on your plan.</p>
+          <Link to="/app/billing" className="text-sm font-medium text-jade-500 hover:underline">
+            See plans →
+          </Link>
+        </div>
+      </Card>
+    );
+  }
+  return <OffersList />;
+}
+
+function OffersList() {
   const { data: offers, isLoading } = useOffers();
   const { create, setActive } = useOfferMutations();
   const [open, setOpen] = useState(false);

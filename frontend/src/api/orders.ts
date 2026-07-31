@@ -65,5 +65,9 @@ export function useOrderMutations() {
         post<Order>(`/api/v1/orders/${id}/ship`, { courierName, trackingId }),
       onSuccess: invalidate,
     }),
+    resendCodConfirmation: useMutation({
+      mutationFn: (id: string) => post<{ ok: boolean }>(`/api/v1/orders/${id}/resend-confirmation`),
+      onSuccess: invalidate,
+    }),
   };
 }

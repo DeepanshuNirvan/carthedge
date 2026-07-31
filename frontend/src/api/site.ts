@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { get } from './http';
+import { get, post } from './http';
 import type { SiteSettings } from './types';
 import { problem, testimonials, guides } from '@/strings/marketing';
 
@@ -12,6 +12,12 @@ export const siteFallback: SiteSettings = {
   testimonials: testimonials.items,
   faqs: guides.faqs,
 };
+
+export type ContactInput = { name: string; business: string; email: string; phone: string; message: string };
+
+/** Marketing enquiry — stored as a lead and mailed to the platform team. */
+export const sendContactMessage = (input: ContactInput) =>
+  post<{ ok: boolean }>('/api/v1/contact', input, 'none');
 
 export const useSite = () =>
   useQuery({

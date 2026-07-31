@@ -6,6 +6,8 @@ import type {
   AdminOverview,
   AdminPayment,
   AdminSession,
+  Capability,
+  ContactMessage,
   Plan,
   PlanRequest,
   SiteSettings,
@@ -68,11 +70,12 @@ export function useAdminBusinessMutations() {
   };
 }
 
+// the response also carries the capability vocabulary the editor picks from,
+// so the entitlement list stays defined in one place — the Go API
 export const useAdminPlans = () =>
   useQuery({
     queryKey: ['admin', 'plans'],
-    queryFn: () => get<{ plans: Plan[] }>('/api/v1/admin/plans', undefined, 'admin'),
-    select: (d) => d.plans,
+    queryFn: () => get<{ plans: Plan[]; capabilities: Capability[] }>('/api/v1/admin/plans', undefined, 'admin'),
   });
 
 export function useAdminPlanMutations() {
@@ -104,6 +107,22 @@ export function useUpdatePlanRequest() {
     mutationFn: ({ id, status, adminNote }: { id: string; status: string; adminNote: string }) =>
       patch<{ ok: boolean }>(`/api/v1/admin/plan-requests/${id}`, { status, adminNote }, 'admin'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'planRequests'] }),
+  });
+}
+
+export const useAdminEnquiries = (status?: string) =>
+  useQuery({
+    queryKey: ['admin', 'enquiries', status],
+    queryFn: () => get<{ messages: ContactMessage[] }>('/api/v1/admin/enquiries', { status }, 'admin'),
+    select: (d) => d.messages ?? [],
+  });
+
+export function useUpdateEnquiry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, adminNote }: { id: string; status: string; adminNote: string }) =>
+      patch<{ ok: boolean }>(`/api/v1/admin/enquiries/${id}`, { status, adminNote }, 'admin'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'enquiries'] }),
   });
 }
 

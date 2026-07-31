@@ -117,12 +117,16 @@ func parseWebhook(body []byte) []Inbound {
 				} `json:"value"`
 			} `json:"changes"`
 			Messaging []struct {
-				Sender    struct{ ID string `json:"id"` } `json:"sender"`
-				Recipient struct{ ID string `json:"id"` } `json:"recipient"`
-				Message   struct {
-					MID     string `json:"mid"`
-					Text    string `json:"text"`
-					IsEcho  bool   `json:"is_echo"`
+				Sender struct {
+					ID string `json:"id"`
+				} `json:"sender"`
+				Recipient struct {
+					ID string `json:"id"`
+				} `json:"recipient"`
+				Message struct {
+					MID    string `json:"mid"`
+					Text   string `json:"text"`
+					IsEcho bool   `json:"is_echo"`
 				} `json:"message"`
 			} `json:"messaging"`
 		} `json:"entry"`

@@ -36,6 +36,7 @@ import (
 	"carthedge/internal/secure"
 	"carthedge/internal/server"
 	"carthedge/internal/storage"
+	"carthedge/internal/web"
 )
 
 func main() {
@@ -100,6 +101,12 @@ func main() {
 	messagingSvc.Start(ctx)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)
 
+	spa, err := web.New(pool, cfg.FrontendDir, cfg.PublicBaseURL, log)
+	if err != nil {
+		log.Error("frontend init failed", "err", err)
+		os.Exit(1)
+	}
+
 	handler := server.New(server.Deps{
 		Cfg: cfg, Log: log, Rdb: rdb,
 		Auth:       auth.NewHandler(authSvc),
@@ -116,10 +123,19 @@ func main() {
 		AI:         ai.NewHandler(aiSvc),
 		Uploads:    storage.NewHandler(store),
 		Public:     publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc, shiprocket),
-		Admin:      admin.NewHandler(admin.NewService(pool, rdb, cfg)),
-		Messaging:  messaging.NewHandler(messagingSvc, metaClient, cfg.MetaVerifyToken),
-		PaySvc:     paySvc,
-		Events:     bus,
+		Admin:      admin.NewHandler(admin.NewService(pool, rdb, cfg, notifier)),
+		Messaging: messaging.NewHandler(messaging.HandlerDeps{
+			Service: messagingSvc, Client: metaClient, Rdb: rdb,
+			VerifyToken: cfg.MetaVerifyToken, JWTSecret: cfg.JWTSecret, AppBaseURL: cfg.PublicBaseURL,
+			OAuth: messaging.OAuthConfig{
+				AppID: cfg.MetaAppID, AppSecret: cfg.MetaAppSecret,
+				IgAppID: cfg.MetaIgAppID, IgAppSecret: cfg.MetaIgAppSecret,
+				RedirectURL: cfg.MetaOAuthRedirect, Version: cfg.MetaGraphVersion,
+			},
+		}),
+		PaySvc: paySvc,
+		Events: bus,
+		Web:    spa,
 	})
 
 	srv := &http.Server{

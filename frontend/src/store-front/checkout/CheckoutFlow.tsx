@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BadgeCheck, Banknote, CreditCard, PartyPopper, ShieldCheck, Smartphone } from 'lucide-react';
+import { BadgeCheck, Banknote, CreditCard, Loader2, MapPinOff, PartyPopper, ShieldCheck, Smartphone, Truck } from 'lucide-react';
 import type { Address, OrderRef, PlacedOrder } from '@/api/types';
 import {
   buyerPay,
@@ -9,6 +9,7 @@ import {
   placeLinkOrder,
   placeStoreOrder,
   sendOtp,
+  useServiceability,
   verifyOtp,
   type BuyerOrderInput,
 } from '@/api/storefront';
@@ -56,6 +57,15 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
 
   const openRazorpay = useRazorpay();
   const total = ctx.subtotal + ctx.shippingFee;
+
+  const { data: reach, isFetching: checkingPincode } = useServiceability(ctx.businessCode, address.pincode, ctx.codEnabled);
+  const undeliverable = reach?.checked === true && !reach.serviceable;
+  // COD is only offered where the courier actually collects it
+  const codAvailable = ctx.codEnabled && (reach?.checked !== true || reach.codAvailable);
+
+  useEffect(() => {
+    if (!codAvailable && method === 'cod') setMethod('prepaid');
+  }, [codAvailable, method]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -106,7 +116,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
         if (res.prefill.address?.line && !address.line) setAddress(res.prefill.address);
       }
       setStep('payment');
-      if (!ctx.codEnabled) setMethod('prepaid');
+      if (!codAvailable) setMethod('prepaid');
     } catch (e) {
       toast('error', 'Wrong or expired code', e instanceof Error ? e.message : undefined);
     } finally {
@@ -225,12 +235,32 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                 maxLength={6}
                 value={address.pincode}
                 onChange={(e) => setAddress({ ...address, pincode: e.target.value.replace(/\D/g, '') })}
+                aria-describedby="pincodeReach"
               />
             </Field>
+            <p id="pincodeReach" aria-live="polite" className="-mt-2 flex items-start gap-1.5 text-xs">
+              {checkingPincode ? (
+                <span className="flex items-center gap-1.5 text-low">
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden /> Checking delivery to this pincode…
+                </span>
+              ) : undeliverable ? (
+                <span className="flex items-start gap-1.5 text-danger">
+                  <MapPinOff className="mt-px size-3.5 shrink-0" aria-hidden />
+                  Couriers do not deliver to {address.pincode}. Check the pincode, or message the seller for options.
+                </span>
+              ) : reach?.checked ? (
+                <span className="flex items-start gap-1.5 text-jade-500">
+                  <Truck className="mt-px size-3.5 shrink-0" aria-hidden />
+                  Delivers to {address.pincode}
+                  {reach.estimatedDays > 0 && ` in about ${reach.estimatedDays} days`}
+                  {ctx.codEnabled && !reach.codAvailable && ' · cash on delivery not available here'}
+                </span>
+              ) : null}
+            </p>
             <Field label="Note for the seller" optional>
               <Input placeholder="Gift wrap, delivery time…" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
-            <Button size="lg" loading={busy} onClick={requestOtp}>
+            <Button size="lg" loading={busy} disabled={undeliverable} onClick={requestOtp}>
               Continue
             </Button>
           </motion.div>
@@ -310,7 +340,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   {method === 'prepaid' && <BadgeCheck className="size-5 text-jade-500" />}
                 </button>
 
-                {ctx.codEnabled && (
+                {codAvailable && (
                   <button
                     onClick={() => setMethod('cod')}
                     className={cn(

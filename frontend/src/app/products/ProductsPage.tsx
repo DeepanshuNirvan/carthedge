@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { FileUp, Flame, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, FileUp, Flame, Package, Pencil, Plus, Search, Share2, Trash2 } from 'lucide-react';
 import type { Product } from '@/api/types';
-import { useProductMutations, useProducts } from '@/api/products';
+import { useLowStock, useProductMutations, useProducts } from '@/api/products';
+import { useBusiness } from '@/api/business';
 import { toast } from '@/store/ui';
 import { PageHeader } from '../shell/PageHeader';
+import { ShareActions, productUrl } from '../shell/ShareActions';
 import { ProductForm } from './ProductForm';
 import { BulkImportModal } from './BulkImportModal';
 import { OffersPanel } from './OffersPanel';
@@ -17,8 +19,19 @@ import { EmptyState } from '@/ui/EmptyState';
 import { Modal } from '@/ui/Modal';
 import { cn } from '@/lib/cn';
 
-function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: () => void; onDelete: () => void }) {
+function ProductCard({
+  product,
+  businessCode,
+  onEdit,
+  onDelete,
+}: {
+  product: Product;
+  businessCode?: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const { setStock, setTrending } = useProductMutations();
+  const [shareOpen, setShareOpen] = useState(false);
   return (
     <article className="panel group overflow-hidden rounded-lg transition-transform duration-std ease-enter hover:-translate-y-0.5 hover:shadow-raised">
       <div className="relative aspect-[4/3] bg-surface-2">
@@ -41,6 +54,11 @@ function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: 
         )}
         {/* always reachable on touch; reveals on hover only where a cursor exists */}
         <div className="absolute right-2 top-2 flex gap-1 transition-opacity duration-micro [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
+          {businessCode && (
+            <IconButton label={`Share ${product.name}`} className="glass" onClick={() => setShareOpen((v) => !v)}>
+              <Share2 className="size-4" />
+            </IconButton>
+          )}
           <IconButton label="Edit product" className="glass" onClick={onEdit}>
             <Pencil className="size-4" />
           </IconButton>
@@ -82,8 +100,44 @@ function ProductCard({ product, onEdit, onDelete }: { product: Product; onEdit: 
             Trend
           </span>
         </div>
+        {shareOpen && businessCode && (
+          <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3">
+            <p className="hidden min-w-0 flex-1 truncate font-mono text-[11px] text-low sm:block">
+              {productUrl(businessCode, product.id)}
+            </p>
+            <ShareActions url={productUrl(businessCode, product.id)} title={product.name} />
+          </div>
+        )}
       </div>
     </article>
+  );
+}
+
+/** Counted stock running out — the seller's cue to restock before the storefront
+ *  starts turning buyers away. */
+function LowStockStrip({ onEdit }: { onEdit: (product: Product) => void }) {
+  const { data: low } = useLowStock();
+  if (!low || low.length === 0) return null;
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-gold-400/10 p-4">
+      <span className="flex items-center gap-2 text-sm font-medium text-gold-500">
+        <AlertTriangle className="size-4 shrink-0" aria-hidden />
+        Running low
+      </span>
+      <ul className="flex min-w-0 flex-1 basis-48 flex-wrap gap-x-2 gap-y-1">
+        {low.slice(0, 6).map((p) => (
+          <li key={p.id}>
+            <button
+              onClick={() => onEdit(p)}
+              className="rounded-full bg-surface px-2.5 py-1 text-xs text-hi shadow-soft transition-colors hover:bg-surface-2"
+            >
+              {p.name} · <span className="tnum text-gold-500">{p.stockQty} left</span>
+            </button>
+          </li>
+        ))}
+        {low.length > 6 && <li className="self-center text-xs text-mid">+{low.length - 6} more</li>}
+      </ul>
+    </div>
   );
 }
 
@@ -97,6 +151,7 @@ export default function ProductsPage() {
   const [deleting, setDeleting] = useState<Product | null>(null);
 
   const { data: products, isLoading } = useProducts({ search, category, trending: trendingOnly });
+  const { data: business } = useBusiness();
   const { remove } = useProductMutations();
 
   const categories = [...new Set((products ?? []).map((p) => p.category).filter(Boolean))];
@@ -156,6 +211,8 @@ export default function ProductsPage() {
         </span>
       </div>
 
+      <LowStockStrip onEdit={(p) => { setEditing(p); setFormOpen(true); }} />
+
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }, (_, i) => (
@@ -168,6 +225,7 @@ export default function ProductsPage() {
             <ProductCard
               key={p.id}
               product={p}
+              businessCode={business?.code}
               onEdit={() => { setEditing(p); setFormOpen(true); }}
               onDelete={() => setDeleting(p)}
             />

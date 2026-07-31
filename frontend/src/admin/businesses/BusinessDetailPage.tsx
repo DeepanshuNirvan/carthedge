@@ -17,7 +17,7 @@ import { Modal } from '@/ui/Modal';
 export default function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useAdminBusiness(id);
-  const { data: plans } = useAdminPlans();
+  const plans = useAdminPlans().data?.plans;
   const { setStatus, assignPlan } = useAdminBusinessMutations();
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [planCode, setPlanCode] = useState('');

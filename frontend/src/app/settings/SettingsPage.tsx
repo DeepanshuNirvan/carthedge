@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, Instagram, Landmark, MessageCircle, ShieldCheck, Store } from 'lucide-react';
 import { useBusiness, useUpdateBusiness, useUpdatePayments } from '@/api/business';
-import { useChannels, useChannelMutations } from '@/api/messaging';
+import { getChannelConnectUrl, useChannelsInfo, useChannelMutations } from '@/api/messaging';
 import { uploadFile } from '@/api/uploads';
 import { toast } from '@/store/ui';
 import { pincodeSchema } from '@/lib/validators';
 import { rupeesToPaise, paiseToRupees } from '@/lib/money';
 import { PageHeader } from '../shell/PageHeader';
+import { ShareActions, storeUrl } from '../shell/ShareActions';
 import { Card, CardHeader } from '@/ui/Card';
 import { Field, Input, Textarea } from '@/ui/Input';
 import { Button } from '@/ui/Button';
@@ -24,14 +26,28 @@ const channelMeta = {
 } as const;
 
 function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
-  const { data: channels } = useChannels();
+  const { data } = useChannelsInfo();
   const { connect, disconnect } = useChannelMutations();
-  const existing = channels?.find((c) => c.channel === channel);
+  const existing = data?.channels?.find((c) => c.channel === channel);
+  const oauthReady = !!data?.oauth?.[channel];
   const [open, setOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [externalId, setExternalId] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const meta = channelMeta[channel];
   const Icon = meta.Icon;
+
+  // full-page redirect: Meta refuses to render its consent screen in an iframe
+  const startOauth = async () => {
+    setStarting(true);
+    try {
+      const { url } = await getChannelConnectUrl(channel);
+      window.location.href = url;
+    } catch (e) {
+      setStarting(false);
+      toast('error', 'Could not start', e instanceof Error ? e.message : undefined);
+    }
+  };
 
   const doConnect = () => {
     if (!externalId.trim() || !accessToken.trim()) {
@@ -71,12 +87,24 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
               Disconnect
             </Button>
           </>
+        ) : oauthReady ? (
+          <Button size="sm" loading={starting} onClick={startOauth}>
+            Connect {meta.label}
+          </Button>
         ) : (
           <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
             {open ? 'Cancel' : 'Connect'}
           </Button>
         )}
       </div>
+      {!existing && oauthReady && (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="mt-2 text-xs text-low underline underline-offset-2 transition-colors hover:text-mid"
+        >
+          {open ? 'Hide manual setup' : 'Enter account details manually instead'}
+        </button>
+      )}
       {open && !existing && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label={meta.idLabel} hint={meta.hint}>
@@ -95,6 +123,19 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
 }
 
 function ChannelsSection() {
+  // the OAuth callback redirects back here with the outcome in the query string
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const connected = params.get('connected');
+    const failure = params.get('connectError');
+    if (!connected && !failure) return;
+    if (connected) toast('success', `${channelMeta[connected as 'whatsapp' | 'instagram']?.label ?? connected} connected`, 'DMs now become order drafts automatically.');
+    else toast('error', 'Could not connect', failure ?? undefined);
+    params.delete('connected');
+    params.delete('connectError');
+    setParams(params, { replace: true });
+  }, [params, setParams]);
+
   return (
     <Card>
       <CardHeader title="Connected channels" subtitle="Auto-capture orders from Instagram & WhatsApp DMs — no copy-paste" />
@@ -159,7 +200,11 @@ function ProfileSection() {
 
   return (
     <Card>
-      <CardHeader title="Business profile" subtitle={`Storefront: /s/${business.code}`} />
+      <CardHeader
+        title="Business profile"
+        subtitle="Your name, contact and address — buyers see this on every link"
+        action={<ShareActions url={storeUrl(business.code)} title={`${business.name} — shop the full collection`} />}
+      />
       <form
         onSubmit={handleSubmit((data) =>
           update.mutate(data, {

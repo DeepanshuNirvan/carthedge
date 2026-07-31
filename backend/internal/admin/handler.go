@@ -168,6 +168,44 @@ func (h *Handler) UpdatePlanRequest(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
+// Contact is the public marketing enquiry form.
+func (h *Handler) Contact(w http.ResponseWriter, r *http.Request) {
+	var in ContactInput
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := h.svc.CreateContactMessage(r.Context(), in); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.Created(w, httpx.M{"ok": true})
+}
+
+func (h *Handler) ContactMessages(w http.ResponseWriter, r *http.Request) {
+	limit, offset := httpx.Page(r)
+	rows, err := h.svc.ContactMessages(r.Context(), r.URL.Query().Get("status"), limit, offset)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not load enquiries")
+		return
+	}
+	httpx.OK(w, httpx.M{"messages": rows})
+}
+
+func (h *Handler) UpdateContactMessage(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Status    string `json:"status"`
+		AdminNote string `json:"adminNote"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := h.svc.UpdateContactMessage(r.Context(), r.PathValue("id"), in.Status, in.AdminNote); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
 func (h *Handler) Payments(w http.ResponseWriter, r *http.Request) {
 	limit, offset := httpx.Page(r)
 	rows, err := h.svc.Payments(r.Context(), limit, offset)
