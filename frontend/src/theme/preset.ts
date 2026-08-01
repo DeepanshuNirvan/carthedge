@@ -12,14 +12,17 @@ export const carthedgePreset = {
       current: 'currentColor',
       white: '#ffffff',
       black: '#000000',
+      // `ink` is the text/icon-safe step of each brand hue; the numbered steps
+      // are fills. Both themes define ink, so text-jade-ink reads everywhere.
       jade: {
         300: v('jade-300'),
         400: v('jade-400'),
         500: v('jade-500'),
         600: v('jade-600'),
         700: v('jade-700'),
+        ink: v('jade-ink'),
       },
-      gold: { 300: v('gold-300'), 400: v('gold-400'), 500: v('gold-500'), 600: v('gold-600') },
+      gold: { 300: v('gold-300'), 400: v('gold-400'), 500: v('gold-500'), 600: v('gold-600'), ink: v('gold-ink') },
       ink: { 700: v('ink-700'), 800: v('ink-800'), 850: v('ink-850'), 900: v('ink-900'), 950: v('ink-950') },
       paper: { 50: v('paper-50'), 100: v('paper-100'), 200: v('paper-200') },
       bg: { DEFAULT: v('bg'), 2: v('bg-2') },
@@ -32,7 +35,9 @@ export const carthedgePreset = {
       success: v('success'),
       warning: v('warning'),
       danger: v('danger'),
+      'danger-ink': v('danger-ink'),
       info: v('info'),
+      'info-ink': v('info-ink'),
     },
     fontFamily: {
       display: ['"Clash Display"', 'system-ui', 'sans-serif'],
@@ -40,10 +45,14 @@ export const carthedgePreset = {
       mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
     },
     extend: {
-      // env() through the spacing scale so pb-safe / h-safe work anywhere
+      // env() through the spacing scale so pb-safe / h-safe work anywhere.
+      // 4.5/5.5 fill the gap Tailwind's default scale stops at (3.5) — size-4.5
+      // is the icon size this UI uses, and without it the class emits nothing.
       spacing: {
         safe: 'env(safe-area-inset-bottom)',
         'safe-t': 'env(safe-area-inset-top)',
+        4.5: '1.125rem',
+        5.5: '1.375rem',
       },
       fontSize: {
         d0: ['clamp(3.25rem, 2.2rem + 5.4vw, 7.5rem)', { lineHeight: '0.96', letterSpacing: '-0.035em' }],

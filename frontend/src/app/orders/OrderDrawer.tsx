@@ -93,7 +93,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                 <dd><MoneyText paise={order.subtotal} /></dd>
               </div>
               {order.discount > 0 && (
-                <div className="flex justify-between text-jade-500">
+                <div className="flex justify-between text-jade-ink">
                   <dt>Discount {order.offerCode && `(${order.offerCode})`}</dt>
                   <dd>-<MoneyText paise={order.discount} /></dd>
                 </div>
@@ -109,7 +109,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               {order.tokenAmount > 0 && (
                 // never claim the token is in hand until the payment says so —
                 // a seller reads this before dispatching
-                <div className={cn('flex justify-between', order.paymentStatus === 'paid' ? 'text-gold-500' : 'text-mid')}>
+                <div className={cn('flex justify-between', order.paymentStatus === 'paid' ? 'text-gold-ink' : 'text-mid')}>
                   <dt>{order.paymentStatus === 'paid' ? 'COD token collected' : 'COD token pending'}</dt>
                   <dd><MoneyText paise={order.tokenAmount} /></dd>
                 </div>

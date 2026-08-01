@@ -49,7 +49,7 @@ export function CartSheet({
           title="Your cart is empty"
           message="Add something you love — checkout takes under a minute."
           action={
-            <Link to={`/s/${businessCode}`} onClick={close} className="text-sm font-medium text-jade-500 hover:underline">
+            <Link to={`/s/${businessCode}`} onClick={close} className="text-sm font-medium text-jade-ink hover:underline">
               Browse products →
             </Link>
           }

@@ -91,7 +91,7 @@ export function AiDemo() {
           <div className="glass sheen relative flex h-full flex-col rounded-2xl p-5 shadow-float sm:p-6">
             <div className="mb-4 flex items-center justify-between border-b pb-3.5">
               <p className="flex items-center gap-2 text-sm font-semibold text-hi">
-                <span className="grid size-7 place-items-center rounded-full bg-jade-500/15 text-jade-400">
+                <span className="grid size-7 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
                   <Sparkles className="size-4" />
                 </span>
                 AI-drafted order

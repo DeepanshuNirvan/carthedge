@@ -47,11 +47,11 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
               <p className="text-xs text-low">orders</p>
             </div>
             <div className="rounded-lg bg-surface-2 p-3">
-              <MoneyText paise={customer.totalSpent} compact className="font-display text-xl font-semibold text-jade-500" />
+              <MoneyText paise={customer.totalSpent} compact className="font-display text-xl font-semibold text-jade-ink" />
               <p className="text-xs text-low">lifetime value</p>
             </div>
             <div className="rounded-lg bg-surface-2 p-3">
-              <p className="font-display text-xl font-semibold tnum text-danger">{customer.codRefusals}</p>
+              <p className="font-display text-xl font-semibold tnum text-danger-ink">{customer.codRefusals}</p>
               <p className="text-xs text-low">COD refusals</p>
             </div>
           </div>
@@ -185,7 +185,7 @@ export default function CustomersPage() {
                   <MoneyText paise={c.totalSpent} compact />
                 </Td>
                 <Td className="hidden text-right tnum sm:table-cell">{c.codRefusals}</Td>
-                <Td>{c.riskFlagged && <AlertTriangle className="size-4 text-danger" aria-label="Risk flagged" />}</Td>
+                <Td>{c.riskFlagged && <AlertTriangle className="size-4 text-danger-ink" aria-label="Risk flagged" />}</Td>
                 <Td className="hidden text-xs text-low sm:table-cell">{c.lastOrderAt ? timeAgo(c.lastOrderAt) : '—'}</Td>
               </Tr>
             ))}

@@ -20,7 +20,7 @@ export function StorefrontPreview() {
             <ul className="-mt-6 flex flex-col gap-3">
               {storefrontPreview.bullets.map((b) => (
                 <li key={b} className="flex items-center gap-2.5 text-sm text-mid">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-jade-500/14 text-jade-400">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-jade-500/14 text-jade-ink">
                     <CheckCircle2 className="size-4" aria-hidden />
                   </span>
                   {b}
@@ -46,7 +46,7 @@ export function StorefrontPreview() {
                     <p className="truncate text-xs font-semibold text-hi">Ritika&apos;s Closet</p>
                     <p className="font-mono text-[10px] text-low">/s/ritikas-closet</p>
                   </div>
-                  <span className="ml-auto flex items-center gap-1 rounded-full bg-jade-500/14 px-2 py-0.5 text-[10px] font-semibold text-jade-400">
+                  <span className="ml-auto flex items-center gap-1 rounded-full bg-jade-500/14 px-2 py-0.5 text-[10px] font-semibold text-jade-ink">
                     <ShieldCheck className="size-3" /> Verified
                   </span>
                 </div>
@@ -74,7 +74,7 @@ export function StorefrontPreview() {
                       <div className="p-2">
                         <p className="truncate text-[11px] font-medium text-hi">{p.name}</p>
                         <div className="flex items-baseline gap-1.5">
-                          <MoneyText paise={p.price} className="text-[11px] text-jade-400" />
+                          <MoneyText paise={p.price} className="text-[11px] text-jade-ink" />
                           {p.compareAt && <MoneyText paise={p.compareAt} strike className="text-[9px]" />}
                         </div>
                       </div>

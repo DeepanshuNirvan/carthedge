@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles } from 'lucide-react';
@@ -29,7 +29,20 @@ const proof = [
 export function Hero() {
   const reduced = usePrefersReducedMotion();
   const mobile = useIsMobile();
-  const show3d = !reduced && !mobile && WEBGL_OK; // 3D depth on capable devices only
+  // three.js is ~820kB and this canvas is decorative depth sitting behind the
+  // hero at -z-10. Waiting for idle keeps it off the critical path so it can
+  // never delay the hero's first paint — it just fades in a moment later.
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    const ric = window.requestIdleCallback;
+    if (!ric) {
+      const t = setTimeout(() => setIdle(true), 1200);
+      return () => clearTimeout(t);
+    }
+    const id = ric(() => setIdle(true), { timeout: 3000 });
+    return () => window.cancelIdleCallback?.(id);
+  }, []);
+  const show3d = idle && !reduced && !mobile && WEBGL_OK; // 3D depth on capable devices only
 
   return (
     <section id="product" className="relative flex min-h-[100dvh] items-center overflow-hidden pb-16 pt-[calc(7rem+env(safe-area-inset-top))]">
@@ -41,7 +54,7 @@ export function Hero() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-xl"
         >
-          <span className="glass inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
+          <span className="glass inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
             <Sparkles className="size-3.5" />
             {hero.eyebrow}
           </span>

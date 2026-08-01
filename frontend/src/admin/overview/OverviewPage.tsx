@@ -32,7 +32,7 @@ export default function OverviewPage() {
         <CardHeader
           title="Recent signups"
           action={
-            <Link to="/admin/businesses" className="text-sm font-medium text-jade-500 hover:underline">
+            <Link to="/admin/businesses" className="text-sm font-medium text-jade-ink hover:underline">
               All businesses →
             </Link>
           }
@@ -45,7 +45,7 @@ export default function OverviewPage() {
               {recent.businesses.slice(0, 8).map((b) => (
                 <li key={b.id} className="flex items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
-                    <Link to={`/admin/businesses/${b.id}`} className="truncate text-sm font-medium text-hi hover:text-jade-500">
+                    <Link to={`/admin/businesses/${b.id}`} className="truncate text-sm font-medium text-hi hover:text-jade-ink">
                       {b.name} <span className="font-mono text-xs text-low">/{b.code}</span>
                     </Link>
                     <p className="text-xs text-low">

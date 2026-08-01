@@ -11,7 +11,9 @@
 }
 
 /* ---------- glass: frosted panel with luminous edge + inner highlight ----------
-   Layered: translucent fill + backdrop blur + thin border + top inner light. */
+   Two tiers: glass (cards) and glass-nav (floating chrome). Light comes from
+   above, so each carries a bright top edge and a dark bottom edge — that
+   asymmetry is what reads as real thickness rather than a flat rectangle. */
 .glass {
   position: relative;
   background:
@@ -22,6 +24,7 @@
   box-shadow:
     inset 0 0 0 1px rgb(var(--line) / var(--glass-border-a)),
     inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
+    inset 0 -1px 0 0 rgb(var(--glass-lo) / var(--glass-lo-a)),
     inset 0 -24px 40px -28px rgb(0 0 0 / 0.3),
     var(--shadow-soft);
 }
@@ -36,7 +39,20 @@
   box-shadow:
     inset 0 0 0 1px rgb(var(--line) / var(--glass-border-a)),
     inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
+    inset 0 -1px 0 0 rgb(var(--glass-lo) / var(--glass-lo-a)),
     var(--shadow-raised);
+}
+
+/* ---------- scroll edge: soften where content passes under floating chrome ----
+   Apple fades the meeting point instead of drawing a 1px rule. Put on the
+   sticky header itself; the gradient hangs just below its bottom edge. */
+.scroll-edge::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -18px 0;
+  height: 18px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(var(--bg) / 0.55), transparent);
 }
 
 /* panel = solid card with a glass sheen; the workhorse card surface (no blur = cheap) */
@@ -260,9 +276,10 @@
 .slider {
   -webkit-appearance: none;
   appearance: none;
-  /* the visible track stays 10px; padding grows the hit area to a thumb-friendly 28px */
-  height: 28px;
-  padding: 9px 0;
+  /* the visible track stays 10px; padding grows the hit area to a full 44px so
+     a thumb can grab the rail anywhere, not just on the knob */
+  height: 44px;
+  padding: 17px 0;
   background-clip: content-box;
   border-radius: 999px;
   outline: none;
@@ -295,6 +312,25 @@
   box-shadow: 0 3px 8px -1px rgb(var(--jade-700) / 0.6), 0 0 0 4px rgb(var(--jade-500) / 0.14);
 }
 
+/* ---------- performance: cap the blur radius on phones ----------
+   Buyers open these pages inside the Instagram and WhatsApp in-app browsers,
+   where backdrop-filter is the single most expensive thing on screen and its
+   cost scales with radius. Half the radius is visually near-identical at phone
+   size and stops the sticky header + tab bar from dropping frames on scroll. */
+@media (max-width: 900px) {
+  :root {
+    --blur-sm: 6px;
+    --blur-md: 10px;
+    --blur-lg: 16px;
+  }
+  /* saturation/brightness passes are a second full-surface filter for very
+     little gain once the radius is small — drop them, keep the frost */
+  .glass {
+    backdrop-filter: blur(var(--blur-md));
+    -webkit-backdrop-filter: blur(var(--blur-md));
+  }
+}
+
 /* reduced transparency: kill blur, fall back to solid so contrast holds */
 @media (prefers-reduced-transparency: reduce) {
   .glass,
@@ -303,6 +339,23 @@
     background: rgb(var(--surface));
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+}
+
+/* high contrast: near-solid surfaces with an edge you can actually see */
+@media (prefers-contrast: more) {
+  .glass,
+  .glass-nav,
+  .panel {
+    background: rgb(var(--surface));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.85), var(--shadow-soft);
+  }
+  .sheen::before,
+  .spotlight::after,
+  .scroll-edge::after {
+    display: none;
   }
 }
 

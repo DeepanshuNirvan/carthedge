@@ -244,7 +244,7 @@ func (h *Handler) head(m meta, path string) string {
 	url := h.baseURL + path
 	image := m.Image
 	if image == "" {
-		image = h.baseURL + "/og.png"
+		image = h.baseURL + "/og.jpg"
 	}
 	kind := m.Type
 	if kind == "" {

@@ -91,7 +91,7 @@ export default function TrackPage() {
             onSubmit={lookup}
             className="rounded-xl bg-surface p-6 shadow-soft hairline"
           >
-            <span className="flex size-12 items-center justify-center rounded-full bg-jade-500/12 text-jade-500">
+            <span className="flex size-12 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink">
               <PackageSearch className="size-6" />
             </span>
             <h1 className="mt-4 font-display text-xl font-semibold text-hi">Track your order</h1>
@@ -132,7 +132,7 @@ export default function TrackPage() {
 
               {/* journey */}
               {derailed ? (
-                <p className="mt-5 rounded-md bg-danger/10 p-4 text-sm text-danger">
+                <p className="mt-5 rounded-md bg-danger/10 p-4 text-sm text-danger-ink">
                   This order was {order.status === 'rto' ? 'returned to the seller' : 'cancelled'}. Contact the seller
                   if you think this is a mistake.
                 </p>
@@ -145,7 +145,7 @@ export default function TrackPage() {
                       <li key={stage} className="flex gap-3">
                         <div className="flex flex-col items-center">
                           {done ? (
-                            <CheckCircle2 className={cn('size-5', active ? 'text-jade-500' : 'text-jade-500/70')} />
+                            <CheckCircle2 className={cn('size-5', active ? 'text-jade-ink' : 'text-jade-ink/70')} />
                           ) : (
                             <Circle className="size-5 text-surface-3" />
                           )}
@@ -164,7 +164,7 @@ export default function TrackPage() {
 
               {order.courierTrackingId && (
                 <p className="mt-4 flex items-center gap-2 rounded-md bg-surface-2 p-3 text-xs text-mid">
-                  <Truck className="size-4 shrink-0 text-jade-500" />
+                  <Truck className="size-4 shrink-0 text-jade-ink" />
                   {order.courierName} · <span className="font-mono">{order.courierTrackingId}</span>
                 </p>
               )}

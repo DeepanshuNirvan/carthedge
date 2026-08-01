@@ -54,7 +54,7 @@ export function Pricing() {
                     <ul className="mt-6 flex flex-col gap-2.5">
                       {plan.features.map((f) => (
                         <li key={f} className="flex items-start gap-2 text-sm text-mid">
-                          <Check className="mt-0.5 size-4 shrink-0 text-jade-500" aria-hidden />
+                          <Check className="mt-0.5 size-4 shrink-0 text-jade-ink" aria-hidden />
                           {f}
                         </li>
                       ))}
@@ -76,7 +76,7 @@ export function Pricing() {
               aria-hidden
               className="absolute inset-0 bg-[radial-gradient(120%_100%_at_100%_0%,rgb(var(--gold-400)/0.14),transparent_55%)]"
             />
-            <h3 className="relative font-display text-lg font-semibold text-gold-500">{pricing.custom.title}</h3>
+            <h3 className="relative font-display text-lg font-semibold text-gold-ink">{pricing.custom.title}</h3>
             <p className="relative mt-3 text-sm leading-relaxed text-mid">{pricing.custom.copy}</p>
             <Link to="/contact" className={cn('relative mt-8', buttonLink('gold'), 'w-full')}>
               {pricing.custom.cta}

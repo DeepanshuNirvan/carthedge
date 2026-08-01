@@ -92,7 +92,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <dt className="text-xs text-low">RTO saved</dt>
-                  <dd className="mt-0.5 font-display text-xl font-semibold text-jade-500">
+                  <dd className="mt-0.5 font-display text-xl font-semibold text-jade-ink">
                     <MoneyText paise={report.rtoMeter?.savedThisMonth ?? 0} compact />
                   </dd>
                 </div>

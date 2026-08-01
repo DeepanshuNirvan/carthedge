@@ -61,7 +61,7 @@ export function DropdownItem({
       onClick={onClick}
       className={cn(
         'flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors duration-micro',
-        danger ? 'text-danger hover:bg-danger/12' : 'text-hi hover:bg-surface-2',
+        danger ? 'text-danger-ink hover:bg-danger/12' : 'text-hi hover:bg-surface-2',
       )}
     >
       {children}

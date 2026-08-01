@@ -93,7 +93,7 @@ export default function LinkCheckoutPage() {
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-base font-semibold text-hi">{link.business.name}</p>
             {link.business.verified && (
-              <span className="flex items-center gap-1 text-xs text-jade-500">
+              <span className="flex items-center gap-1 text-xs text-jade-ink">
                 <ShieldCheck className="size-3.5" /> Verified seller
               </span>
             )}
@@ -220,7 +220,7 @@ export default function LinkCheckoutPage() {
         </motion.div>
 
         <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-low">
-          <ShieldCheck className="size-3.5 text-jade-500" /> Payments secured by Razorpay · Powered by CartHedge
+          <ShieldCheck className="size-3.5 text-jade-ink" /> Payments secured by Razorpay · Powered by CartHedge
         </p>
       </main>
     </div>

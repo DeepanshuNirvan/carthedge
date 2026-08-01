@@ -24,7 +24,7 @@ function AsidePitch() {
       </p>
       <div className="mt-8 w-fit rounded-lg bg-white/[0.06] p-5 backdrop-blur hairline">
         <p className="text-xs uppercase tracking-wider text-[#A9A6A0]">Saved from RTO this month</p>
-        <p className="mt-1 font-display text-3xl font-semibold text-jade-500">
+        <p className="mt-1 font-display text-3xl font-semibold text-jade-ink">
           <MoneyText paise={3124000} />
         </p>
       </div>
@@ -84,7 +84,7 @@ export default function LoginPage() {
         <button onClick={onForgot} className="text-mid transition-colors hover:text-hi">
           Forgot password?
         </button>
-        <Link to="/app/register" className="font-medium text-jade-500 hover:underline">
+        <Link to="/app/register" className="font-medium text-jade-ink hover:underline">
           Start free trial
         </Link>
       </div>

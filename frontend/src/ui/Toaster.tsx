@@ -4,9 +4,9 @@ import { useUi } from '@/store/ui';
 import { cn } from '@/lib/cn';
 
 const icons = {
-  success: <CheckCircle2 className="size-5 text-jade-400" />,
-  error: <AlertCircle className="size-5 text-danger" />,
-  info: <Info className="size-5 text-info" />,
+  success: <CheckCircle2 className="size-5 text-jade-ink" />,
+  error: <AlertCircle className="size-5 text-danger-ink" />,
+  info: <Info className="size-5 text-info-ink" />,
 };
 
 const accent = {

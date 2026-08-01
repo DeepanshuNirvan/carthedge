@@ -66,7 +66,7 @@ function BottomTabs({ onMore }: { onMore: () => void }) {
           className={({ isActive }) =>
             cn(
               'flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-micro',
-              isActive ? 'text-jade-400' : 'text-low',
+              isActive ? 'text-jade-ink' : 'text-low',
             )
           }
         >
@@ -104,7 +104,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
             cn(
               'group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-micro',
               isActive
-                ? 'panel text-jade-400 shadow-soft'
+                ? 'panel text-jade-ink shadow-soft'
                 : 'text-mid hover:bg-surface-2 hover:text-hi',
             )
           }
@@ -133,9 +133,9 @@ function TrialBanner() {
   const left = daysLeft(sub.endsAt);
   if (sub.status === 'trial') {
     return (
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-gold-400/12 px-4 py-2 text-center text-xs font-medium text-gold-500">
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-gold-400/12 px-4 py-2 text-center text-xs font-medium text-gold-ink">
         Trial — {left} {left === 1 ? 'day' : 'days'} left.
-        <Link to="/app/billing" className="underline underline-offset-2 hover:text-gold-400">
+        <Link to="/app/billing" className="underline underline-offset-2 hover:text-gold-ink">
           Pick a plan
         </Link>
       </div>
@@ -143,7 +143,7 @@ function TrialBanner() {
   }
   if (sub.status === 'expired' || left === 0) {
     return (
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-danger/12 px-4 py-2 text-center text-xs font-medium text-danger">
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-danger/12 px-4 py-2 text-center text-xs font-medium text-danger-ink">
         Your subscription has expired — your store is paused.
         <Link to="/app/billing" className="underline underline-offset-2">
           Renew now
@@ -264,7 +264,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TrialBanner />
-        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6">
+        <header className="glass-nav scroll-edge sticky top-0 z-30 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-hi">{businessName}</p>
             <p className="font-mono text-xs text-low">/{businessCode}</p>

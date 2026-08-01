@@ -86,7 +86,7 @@ export default function BillingPage() {
                 {sub.status === 'active' && (
                   <Button
                     variant="ghost"
-                    className="text-danger sm:ml-auto"
+                    className="text-danger-ink sm:ml-auto"
                     loading={cancel.isPending}
                     onClick={() =>
                       cancel.mutate(undefined, {
@@ -125,7 +125,7 @@ export default function BillingPage() {
                   <ul className="mt-3 flex flex-1 flex-col gap-1.5">
                     {plan.features.slice(0, 4).map((f) => (
                       <li key={f} className="flex items-start gap-1.5 text-xs text-mid">
-                        <Check className="mt-0.5 size-3.5 shrink-0 text-jade-500" /> {f}
+                        <Check className="mt-0.5 size-3.5 shrink-0 text-jade-ink" /> {f}
                       </li>
                     ))}
                   </ul>
@@ -147,7 +147,7 @@ export default function BillingPage() {
           onClick={() => setCustomOpen(true)}
           className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-gold-400/40 p-4 text-left transition-colors hover:bg-gold-400/5"
         >
-          <MessageSquarePlus className="size-5 text-gold-400" />
+          <MessageSquarePlus className="size-5 text-gold-ink" />
           <span>
             <span className="block text-sm font-medium text-hi">Need a custom plan?</span>
             <span className="text-xs text-mid">High volume, special quotas, negotiated pricing — tell us your numbers.</span>

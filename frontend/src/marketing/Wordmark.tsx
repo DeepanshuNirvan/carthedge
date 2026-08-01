@@ -13,7 +13,7 @@ export function Wordmark({ className }: { className?: string }) {
         <circle cx="46" cy="46" r="5" fill="rgb(var(--gold-400))" />
       </svg>
       <span className="font-display text-lg font-semibold tracking-tight text-hi">
-        Cart<span className="text-jade-500">Hedge</span>
+        Cart<span className="text-jade-ink">Hedge</span>
       </span>
     </span>
   );

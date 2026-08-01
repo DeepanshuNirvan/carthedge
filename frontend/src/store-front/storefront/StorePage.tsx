@@ -126,7 +126,7 @@ export default function StorePage() {
             {store.offers.map((o) => (
               <span
                 key={o.id}
-                className="flex shrink-0 items-center gap-2 rounded-lg bg-gold-400/10 px-3.5 py-2.5 text-xs text-gold-500"
+                className="flex shrink-0 items-center gap-2 rounded-lg bg-gold-400/10 px-3.5 py-2.5 text-xs text-gold-ink"
               >
                 <Ticket className="size-4" aria-hidden />
                 <span>
@@ -171,7 +171,7 @@ export default function StorePage() {
             <button
               onClick={() => setCategory('')}
               className={cn(
-                'shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
+                'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95 sm:min-h-8',
                 category === ''
                   ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
                   : 'neu text-mid hover:text-hi',
@@ -184,7 +184,7 @@ export default function StorePage() {
                 key={c}
                 onClick={() => setCategory(c === category ? '' : c)}
                 className={cn(
-                  'shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95',
+                  'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95 sm:min-h-8',
                   category === c
                     ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
                     : 'neu text-mid hover:text-hi',
@@ -291,7 +291,7 @@ export default function StorePage() {
                 }%, rgb(var(--surface-3)) ${priceCeiling > 0 ? ((maxPrice ?? priceCeiling) / priceCeiling) * 100 : 100}%)`,
               }}
             />
-            <p className="mt-2 font-mono text-sm text-jade-500 tnum">
+            <p className="mt-2 font-mono text-sm text-jade-ink tnum">
               Up to {formatPaise(maxPrice ?? priceCeiling)}
             </p>
           </div>
@@ -315,7 +315,7 @@ export default function StorePage() {
                     key={c}
                     onClick={() => setCategory(c === category ? '' : c)}
                     className={cn(
-                      'min-h-10 rounded-full px-4 py-2 text-xs font-medium transition-colors active:scale-95',
+                      'inline-flex min-h-10 items-center justify-center rounded-full px-4 py-2 text-xs font-medium transition-colors active:scale-95',
                       category === c
                     ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
                     : 'neu text-mid hover:text-hi',

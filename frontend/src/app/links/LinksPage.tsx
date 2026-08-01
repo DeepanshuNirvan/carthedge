@@ -25,7 +25,7 @@ function StorefrontCard() {
   const url = storeUrl(business.code);
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-surface p-5 shadow-soft hairline">
-      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-jade-500/12 text-jade-500">
+      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-jade-500/12 text-jade-ink">
         <Store className="size-5" aria-hidden />
       </span>
       <div className="min-w-0 flex-1 basis-52">

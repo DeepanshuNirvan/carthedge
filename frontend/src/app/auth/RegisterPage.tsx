@@ -170,7 +170,7 @@ export default function RegisterPage() {
               className="flex flex-col items-center gap-4 py-10 text-center"
             >
               <span className="flex size-16 items-center justify-center rounded-full bg-jade-500/15">
-                <PartyPopper className="size-8 text-jade-500" />
+                <PartyPopper className="size-8 text-jade-ink" />
               </span>
               <h2 className="font-display text-d3 font-semibold text-hi">You're in!</h2>
               <p className="text-sm text-mid">Trial started — taking you to your dashboard…</p>
@@ -182,7 +182,7 @@ export default function RegisterPage() {
       {step < 2 && (
         <p className="mt-6 text-sm text-mid">
           Already selling with us?{' '}
-          <Link to="/app/login" className="font-medium text-jade-500 hover:underline">
+          <Link to="/app/login" className="font-medium text-jade-ink hover:underline">
             Log in
           </Link>
         </p>

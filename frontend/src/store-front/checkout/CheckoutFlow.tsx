@@ -244,12 +244,12 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   <Loader2 className="size-3.5 animate-spin" aria-hidden /> Checking delivery to this pincode…
                 </span>
               ) : undeliverable ? (
-                <span className="flex items-start gap-1.5 text-danger">
+                <span className="flex items-start gap-1.5 text-danger-ink">
                   <MapPinOff className="mt-px size-3.5 shrink-0" aria-hidden />
                   Couriers do not deliver to {address.pincode}. Check the pincode, or message the seller for options.
                 </span>
               ) : reach?.checked ? (
-                <span className="flex items-start gap-1.5 text-jade-500">
+                <span className="flex items-start gap-1.5 text-jade-ink">
                   <Truck className="mt-px size-3.5 shrink-0" aria-hidden />
                   Delivers to {address.pincode}
                   {reach.estimatedDays > 0 && ` in about ${reach.estimatedDays} days`}
@@ -269,13 +269,13 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
         {step === 'otp' && (
           <motion.div key="otp" {...slide} className="flex flex-col gap-4">
             <div className="flex flex-col items-center gap-2 py-2 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-jade-500/12 text-jade-500">
+              <span className="flex size-12 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink">
                 <Smartphone className="size-6" />
               </span>
               <p className="text-sm text-mid">
                 Code sent to <span className="font-mono font-medium text-hi">+91 {phone}</span>
               </p>
-              <button onClick={() => setStep('details')} className="text-xs text-jade-500 hover:underline">
+              <button onClick={() => setStep('details')} className="text-xs text-jade-ink hover:underline">
                 Change number
               </button>
             </div>
@@ -332,12 +332,12 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                     method === 'prepaid' ? 'bg-jade-500/10 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))]' : 'bg-surface-2 hairline',
                   )}
                 >
-                  <CreditCard className={cn('size-5', method === 'prepaid' ? 'text-jade-500' : 'text-mid')} />
+                  <CreditCard className={cn('size-5', method === 'prepaid' ? 'text-jade-ink' : 'text-mid')} />
                   <span className="flex-1">
                     <span className="block text-sm font-medium text-hi">Pay now — UPI or card</span>
                     <span className="block text-xs text-low">Fastest dispatch · secured by Razorpay</span>
                   </span>
-                  {method === 'prepaid' && <BadgeCheck className="size-5 text-jade-500" />}
+                  {method === 'prepaid' && <BadgeCheck className="size-5 text-jade-ink" />}
                 </button>
 
                 {codAvailable && (
@@ -348,12 +348,12 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                       method === 'cod' ? 'bg-gold-400/10 shadow-[inset_0_0_0_1.5px_rgb(var(--gold-400))]' : 'bg-surface-2 hairline',
                     )}
                   >
-                    <Banknote className={cn('size-5', method === 'cod' ? 'text-gold-500' : 'text-mid')} />
+                    <Banknote className={cn('size-5', method === 'cod' ? 'text-gold-ink' : 'text-mid')} />
                     <span className="flex-1">
                       <span className="block text-sm font-medium text-hi">Cash on delivery</span>
                       <span className="block text-xs text-low">Confirm the order after placing it</span>
                     </span>
-                    {method === 'cod' && <BadgeCheck className="size-5 text-gold-500" />}
+                    {method === 'cod' && <BadgeCheck className="size-5 text-gold-ink" />}
                   </button>
                 )}
               </div>
@@ -377,7 +377,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             className="flex flex-col items-center gap-4 py-6 text-center"
           >
             <span className="flex size-16 items-center justify-center rounded-full bg-jade-500/15">
-              <PartyPopper className="size-8 text-jade-500" />
+              <PartyPopper className="size-8 text-jade-ink" />
             </span>
             <div>
               <h3 className="font-display text-xl font-semibold text-hi">Order placed!</h3>
@@ -389,7 +389,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
 
             {placed.next === 'codPending' && (
               <div className="w-full rounded-lg bg-gold-400/10 p-4 text-left">
-                <p className="text-sm font-medium text-gold-500">One last step</p>
+                <p className="text-sm font-medium text-gold-ink">One last step</p>
                 <p className="mt-1 text-xs leading-relaxed text-mid">
                   {ctx.businessName} will message you on WhatsApp to confirm this COD order before dispatch.
                   {placed.tokenAmount > 0 && (
@@ -410,7 +410,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
 
             <Link
               to={`/o/${placed.orderCode}`}
-              className="text-sm font-medium text-jade-500 hover:underline"
+              className="text-sm font-medium text-jade-ink hover:underline"
             >
               Track this order →
             </Link>

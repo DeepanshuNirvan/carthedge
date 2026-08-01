@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Instagram, MessageCircle, ShieldCheck, ShoppingBag } from 'lucide-react';
+import { Instagram, MessageCircle, ShieldCheck, ShoppingBag, Share2 } from 'lucide-react';
 import type { StoreBusiness } from '@/api/types';
 import { cartCount, useCart } from '@/store/cart';
 import { Avatar } from '@/ui/Avatar';
@@ -9,9 +10,20 @@ import { ThemeToggle } from '@/ui/ThemeToggle';
 export function StoreHeader({ business, onCart }: { business: StoreBusiness; onCart?: () => void }) {
   const items = useCart((s) => s.items);
   const count = cartCount(items);
+  // buyers pass these pages around in the same DMs they arrived from — the OS
+  // sheet is the whole feature. Desktop has the URL bar, so no fallback UI.
+  const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share);
+
+  const share = async () => {
+    try {
+      await navigator.share({ title: document.title, url: window.location.href });
+    } catch {
+      // dismissing the sheet rejects too — nothing to report
+    }
+  };
 
   return (
-    <header className="glass-nav sticky top-0 z-30">
+    <header className="glass-nav scroll-edge sticky top-0 z-30">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <Link to={`/s/${business.code}`} className="flex min-w-0 items-center gap-2.5">
           <Avatar name={business.name} src={business.logoUrl || undefined} className="size-10" />
@@ -48,6 +60,15 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
               <MessageCircle className="size-4.5" />
             </a>
           )}
+          {canShare && (
+            <button
+              onClick={share}
+              aria-label="Share this page"
+              className="flex size-11 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi sm:size-10"
+            >
+              <Share2 className="size-4.5" />
+            </button>
+          )}
           <ThemeToggle />
           {onCart && (
             <button
@@ -73,7 +94,7 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
       </div>
 
       <p className="flex items-center justify-center gap-1.5 border-t bg-surface-2/40 py-1.5 text-[11px] font-medium text-mid">
-        <ShieldCheck className="size-3.5 text-jade-400" />
+        <ShieldCheck className="size-3.5 text-jade-ink" />
         Payments secured by Razorpay · Seller verified
       </p>
     </header>

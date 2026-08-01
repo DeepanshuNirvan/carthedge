@@ -61,21 +61,21 @@ export default function CodConfirmPage() {
           {confirmed ? (
             <>
               <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-jade-500/15">
-                <BadgeCheck className="size-8 text-jade-500" />
+                <BadgeCheck className="size-8 text-jade-ink" />
               </span>
               <h1 className="mt-4 font-display text-xl font-semibold text-hi">Order confirmed</h1>
               <p className="mt-2 text-sm leading-relaxed text-mid">
                 Thanks! Your order <span className="font-mono text-hi">{orderCode}</span> is being packed. Keep the
                 cash ready at delivery.
               </p>
-              <Link to={`/o/${orderCode}`} className="mt-5 inline-block text-sm font-medium text-jade-500 hover:underline">
+              <Link to={`/o/${orderCode}`} className="mt-5 inline-block text-sm font-medium text-jade-ink hover:underline">
                 Track your order →
               </Link>
             </>
           ) : (
             <>
               <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-gold-400/15">
-                <PackageCheck className="size-8 text-gold-500" />
+                <PackageCheck className="size-8 text-gold-ink" />
               </span>
               <h1 className="mt-4 font-display text-xl font-semibold text-hi">Confirm your COD order</h1>
               <p className="mt-2 text-sm leading-relaxed text-mid">

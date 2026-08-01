@@ -8,7 +8,7 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 text-center">
         <Link
           to="/track"
-          className="inline-flex items-center gap-2 text-sm font-medium text-jade-500 hover:underline"
+          className="inline-flex items-center gap-2 text-sm font-medium text-jade-ink hover:underline"
         >
           <PackageSearch className="size-4" />
           Track your order

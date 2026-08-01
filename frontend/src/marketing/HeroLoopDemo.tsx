@@ -78,7 +78,7 @@ export function HeroLoopDemo() {
         {/* header row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-hi">
-            <span className="grid size-7 place-items-center rounded-full bg-jade-500/15 text-jade-400">
+            <span className="grid size-7 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
               <Sparkles className="size-4" />
             </span>
             AI order desk
@@ -127,7 +127,7 @@ export function HeroLoopDemo() {
           <span className="h-px flex-1 bg-line/10" />
           <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-low">
             {parsing ? 'reading thread…' : 'drafted order'}
-            <span className="tnum text-jade-400">{conf}%</span>
+            <span className="tnum text-jade-ink">{conf}%</span>
           </span>
           <span className="h-px flex-1 bg-line/10" />
         </div>
@@ -168,7 +168,7 @@ export function HeroLoopDemo() {
                   className={
                     'mt-2 flex h-11 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors duration-std ' +
                     (confirmed
-                      ? 'bg-jade-500/15 text-jade-400 shadow-[inset_0_0_0_1px_rgb(var(--jade-500)/0.3)]'
+                      ? 'bg-jade-500/15 text-jade-ink shadow-[inset_0_0_0_1px_rgb(var(--jade-500)/0.3)]'
                       : 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay')
                   }
                   animate={confirmed || reduced ? {} : { scale: [1, 1.02, 1] }}
@@ -192,7 +192,7 @@ export function HeroLoopDemo() {
 
       {/* floating trust chip */}
       <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-low">
-        <ShieldCheck className="size-3.5 text-jade-400" />
+        <ShieldCheck className="size-3.5 text-jade-ink" />
         No signup for buyers · phone OTP only
       </div>
     </div>

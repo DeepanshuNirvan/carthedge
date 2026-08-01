@@ -120,7 +120,7 @@ function LowStockStrip({ onEdit }: { onEdit: (product: Product) => void }) {
   if (!low || low.length === 0) return null;
   return (
     <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-gold-400/10 p-4">
-      <span className="flex items-center gap-2 text-sm font-medium text-gold-500">
+      <span className="flex items-center gap-2 text-sm font-medium text-gold-ink">
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
         Running low
       </span>
@@ -131,7 +131,7 @@ function LowStockStrip({ onEdit }: { onEdit: (product: Product) => void }) {
               onClick={() => onEdit(p)}
               className="rounded-full bg-surface px-2.5 py-1 text-xs text-hi shadow-soft transition-colors hover:bg-surface-2"
             >
-              {p.name} · <span className="tnum text-gold-500">{p.stockQty} left</span>
+              {p.name} · <span className="tnum text-gold-ink">{p.stockQty} left</span>
             </button>
           </li>
         ))}
@@ -187,7 +187,7 @@ export default function ProductsPage() {
         <button
           onClick={() => setCategory('')}
           className={cn(
-            'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro',
+            'inline-flex min-h-10 items-center justify-center rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro sm:min-h-8',
             category === '' ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid hover:text-hi',
           )}
         >
@@ -198,7 +198,7 @@ export default function ProductsPage() {
             key={c}
             onClick={() => setCategory(c === category ? '' : c)}
             className={cn(
-              'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro',
+              'inline-flex min-h-10 items-center justify-center rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro sm:min-h-8',
               category === c ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid hover:text-hi',
             )}
           >

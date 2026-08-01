@@ -75,7 +75,7 @@ export function Field({ label, error, hint, optional, children }: FieldProps) {
       </label>
       {control}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-xs font-medium text-danger-ink">
           {error}
         </p>
       ) : hint ? (

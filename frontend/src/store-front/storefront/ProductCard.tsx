@@ -75,7 +75,7 @@ export function ProductCard({
               <Link
                 to={`/s/${businessCode}/p/${product.id}`}
                 aria-label={`Choose options for ${product.name}`}
-                className="flex size-9 items-center justify-center rounded-md neu text-jade-400 transition-all duration-micro ease-spring hover:bg-gradient-to-b hover:from-jade-400 hover:to-jade-500 hover:text-[rgb(var(--text-on-accent))] active:scale-90"
+                className="flex size-10 items-center justify-center rounded-md neu text-jade-ink sm:size-9 transition-all duration-micro ease-spring hover:bg-gradient-to-b hover:from-jade-400 hover:to-jade-500 hover:text-[rgb(var(--text-on-accent))] active:scale-90"
               >
                 <Plus className="size-4" strokeWidth={2.5} />
               </Link>
@@ -86,7 +86,7 @@ export function ProductCard({
                   add(businessCode, product);
                   toast('success', 'Added to cart', product.name);
                 }}
-                className="flex size-9 items-center justify-center rounded-md neu text-jade-400 transition-all duration-micro ease-spring hover:bg-gradient-to-b hover:from-jade-400 hover:to-jade-500 hover:text-[rgb(var(--text-on-accent))] active:scale-90"
+                className="flex size-10 items-center justify-center rounded-md neu text-jade-ink sm:size-9 transition-all duration-micro ease-spring hover:bg-gradient-to-b hover:from-jade-400 hover:to-jade-500 hover:text-[rgb(var(--text-on-accent))] active:scale-90"
               >
                 <Plus className="size-4" strokeWidth={2.5} />
               </button>

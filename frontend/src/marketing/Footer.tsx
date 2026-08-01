@@ -23,12 +23,14 @@ export function Footer() {
           <Wordmark />
           <p className="max-w-xs text-sm text-mid">{site?.site.tagline || footer.tagline}</p>
           {site?.contact.email && (
-            <a href={`mailto:${site.contact.email}`} className="text-sm text-jade-500 hover:underline">
+            <a href={`mailto:${site.contact.email}`} className="inline-flex min-h-9 items-center text-sm text-jade-ink hover:underline">
               {site.contact.email}
             </a>
           )}
+          {/* -ml-2.5 keeps the row optically flush with the text above it
+              while each icon still carries a 40px touch target */}
           {socials.length > 0 && (
-            <div className="flex gap-3">
+            <div className="-ml-2.5 flex gap-1">
               {socials.map((s) => (
                 <a
                   key={s.label}
@@ -36,7 +38,7 @@ export function Footer() {
                   aria-label={s.label}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-low transition-colors hover:text-hi"
+                  className="inline-flex size-10 items-center justify-center rounded-md text-low transition-colors hover:bg-surface-2 hover:text-hi"
                 >
                   <s.icon className="size-4.5" />
                 </a>
@@ -47,15 +49,17 @@ export function Footer() {
         {columns.map((col) => (
           <nav key={col.title} aria-label={col.title}>
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-low">{col.title}</p>
-            <ul className="flex flex-col gap-2">
+            {/* the row height IS the spacing here — a 36px link is both
+                comfortably tappable and visually the same rhythm as gap-2 */}
+            <ul className="flex flex-col">
               {col.links.map((l) => (
-                <li key={l.href}>
+                <li key={l.href} className="flex">
                   {l.href.startsWith('#') ? (
-                    <a href={l.href} className="text-sm text-mid transition-colors hover:text-hi">
+                    <a href={l.href} className="inline-flex min-h-9 items-center text-sm text-mid transition-colors hover:text-hi">
                       {l.label}
                     </a>
                   ) : (
-                    <Link to={l.href} className="text-sm text-mid transition-colors hover:text-hi">
+                    <Link to={l.href} className="inline-flex min-h-9 items-center text-sm text-mid transition-colors hover:text-hi">
                       {l.label}
                     </Link>
                   )}

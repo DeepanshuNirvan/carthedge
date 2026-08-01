@@ -44,7 +44,7 @@ function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
                     <p className="flex items-center gap-2 text-sm font-medium text-hi">
                       {c.contactName || c.contactId}
                       {c.unread > 0 && (
-                        <span className="rounded-full bg-jade-500/20 px-1.5 text-[10px] font-semibold text-jade-400">
+                        <span className="rounded-full bg-jade-500/20 px-1.5 text-[10px] font-semibold text-jade-ink">
                           {c.unread} new
                         </span>
                       )}
@@ -287,7 +287,7 @@ export default function AiDeskPage() {
             title="Parse a DM thread"
             subtitle="Hinglish works — item, size, address, payment"
             action={
-              <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-400">
+              <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
                 <Sparkles className="size-4.5" />
               </span>
             }
@@ -334,7 +334,7 @@ export default function AiDeskPage() {
             ) : (
               <p className="flex flex-wrap items-center gap-2 text-xs text-low">
                 <Lock className="size-3.5" /> The reply assistant needs a higher plan.
-                <Link to="/app/billing" className="font-medium text-jade-500 hover:underline">
+                <Link to="/app/billing" className="font-medium text-jade-ink hover:underline">
                   See plans →
                 </Link>
               </p>

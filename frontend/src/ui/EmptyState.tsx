@@ -18,7 +18,7 @@ export function EmptyState({ icon, title, message, action, className }: EmptySta
       )}
     >
       {icon && (
-        <div className="relative flex size-14 items-center justify-center rounded-2xl neu text-jade-400">
+        <div className="relative flex size-14 items-center justify-center rounded-2xl neu text-jade-ink">
           <span aria-hidden className="absolute inset-0 rounded-2xl bg-jade-500/10 blur-lg" />
           <span className="relative">{icon}</span>
         </div>

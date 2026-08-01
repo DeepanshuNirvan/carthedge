@@ -66,7 +66,7 @@ export default function BusinessesPage() {
               {data.businesses.map((b) => (
                 <Tr key={b.id}>
                   <Td>
-                    <Link to={`/admin/businesses/${b.id}`} className="font-medium text-hi hover:text-jade-500">
+                    <Link to={`/admin/businesses/${b.id}`} className="font-medium text-hi hover:text-jade-ink">
                       {b.name}
                     </Link>
                     <p className="font-mono text-xs text-low">/{b.code}</p>

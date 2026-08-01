@@ -30,7 +30,7 @@ function Slider({
     <div>
       <p className="flex items-baseline justify-between text-sm">
         <span className="font-medium text-hi">{label}</span>
-        <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-jade-400 tnum">{format(value)}</span>
+        <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-jade-ink tnum">{format(value)}</span>
       </p>
       <input
         type="range"
@@ -117,7 +117,7 @@ export function RtoCalculator() {
               className="absolute -right-16 -top-16 size-48 rounded-full bg-jade-500/15 blur-3xl"
             />
             <div className="relative">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
                 <PiggyBank className="size-4" /> {calculator.savedLabel}
               </p>
               <p className="mt-2 break-all font-display text-[2.5rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[3.25rem] md:text-[4.25rem]">
@@ -129,7 +129,7 @@ export function RtoCalculator() {
               <div>
                 <div className="flex justify-between text-xs">
                   <span className="flex items-center gap-1 text-mid">{calculator.lossNow}</span>
-                  <span className="font-mono tnum text-danger">{formatPaise(lossNow)}</span>
+                  <span className="font-mono tnum text-danger-ink">{formatPaise(lossNow)}</span>
                 </div>
                 <div className="mt-1.5 h-3 overflow-hidden rounded-full neu-inset">
                   <motion.div
@@ -142,9 +142,9 @@ export function RtoCalculator() {
               <div>
                 <div className="flex justify-between text-xs">
                   <span className="flex items-center gap-1 text-mid">
-                    <TrendingDown className="size-3.5 text-jade-400" /> {calculator.withUs}
+                    <TrendingDown className="size-3.5 text-jade-ink" /> {calculator.withUs}
                   </span>
-                  <span className="font-mono tnum text-jade-400">{formatPaise(lossWith)}</span>
+                  <span className="font-mono tnum text-jade-ink">{formatPaise(lossWith)}</span>
                 </div>
                 <div className="mt-1.5 h-3 overflow-hidden rounded-full neu-inset">
                   <motion.div
@@ -156,7 +156,7 @@ export function RtoCalculator() {
               </div>
             </div>
 
-            <p className="relative rounded-md bg-gold-400/12 px-4 py-3 text-sm font-semibold text-gold-500 shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)]">
+            <p className="relative rounded-md bg-gold-400/12 px-4 py-3 text-sm font-semibold text-gold-ink shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)]">
               {calculator.paysFor(paysFor)}
             </p>
           </div>

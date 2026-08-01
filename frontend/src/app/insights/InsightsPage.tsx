@@ -21,10 +21,10 @@ function InsightCard({
   action?: { to: string; label: string };
 }) {
   const tones = {
-    jade: 'bg-jade-500/12 text-jade-500',
-    gold: 'bg-gold-400/14 text-gold-500',
-    danger: 'bg-danger/12 text-danger',
-    info: 'bg-info/12 text-info',
+    jade: 'bg-jade-500/12 text-jade-ink',
+    gold: 'bg-gold-400/14 text-gold-ink',
+    danger: 'bg-danger/12 text-danger-ink',
+    info: 'bg-info/12 text-info-ink',
   };
   return (
     <Card className="flex h-full flex-col p-6">
@@ -32,7 +32,7 @@ function InsightCard({
       <h2 className="mt-4 font-display text-base font-semibold text-hi">{title}</h2>
       <div className="mt-2 flex-1 text-sm leading-relaxed text-mid">{children}</div>
       {action && (
-        <Link to={action.to} className="mt-4 text-sm font-medium text-jade-500 hover:underline">
+        <Link to={action.to} className="mt-4 text-sm font-medium text-jade-ink hover:underline">
           {action.label} →
         </Link>
       )}

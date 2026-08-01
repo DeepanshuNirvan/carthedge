@@ -112,7 +112,7 @@ export default function RequestsPage() {
             {working?.businessId && (
               <Link
                 to={`/admin/businesses/${working.businessId}`}
-                className="text-sm font-medium text-jade-500 hover:underline"
+                className="text-sm font-medium text-jade-ink hover:underline"
               >
                 Assign a plan →
               </Link>
@@ -134,7 +134,7 @@ function PlanRequestList({ requests, onWork }: { requests: PlanRequest[]; onWork
         <Card key={r.id} className="flex flex-wrap items-start gap-4 p-5">
           <div className="min-w-0 flex-1 basis-64">
             <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-hi">
-              <Link to={`/admin/businesses/${r.businessId}`} className="hover:text-jade-500">
+              <Link to={`/admin/businesses/${r.businessId}`} className="hover:text-jade-ink">
                 {r.businessName}
               </Link>
               <StatusChip status={r.status} />
@@ -144,7 +144,7 @@ function PlanRequestList({ requests, onWork }: { requests: PlanRequest[]; onWork
             </p>
             <p className="mt-2.5 text-sm leading-relaxed text-mid">{r.message}</p>
             {r.adminNote && (
-              <p className="mt-2 rounded-md bg-gold-400/8 px-3 py-2 text-xs text-gold-500">Note: {r.adminNote}</p>
+              <p className="mt-2 rounded-md bg-gold-400/8 px-3 py-2 text-xs text-gold-ink">Note: {r.adminNote}</p>
             )}
           </div>
           <Button
@@ -177,14 +177,14 @@ function EnquiryList({ messages, onWork }: { messages: ContactMessage[]; onWork:
               <StatusChip status={m.status} />
             </p>
             <p className="mt-0.5 break-words text-xs text-low">
-              <a href={`mailto:${m.email}`} className="hover:text-jade-500">
+              <a href={`mailto:${m.email}`} className="hover:text-jade-ink">
                 {m.email}
               </a>
               {m.phone && ` · ${m.phone}`} · {timeAgo(m.createdAt)}
             </p>
             <p className="mt-2.5 text-sm leading-relaxed text-mid">{m.message}</p>
             {m.adminNote && (
-              <p className="mt-2 rounded-md bg-gold-400/8 px-3 py-2 text-xs text-gold-500">Note: {m.adminNote}</p>
+              <p className="mt-2 rounded-md bg-gold-400/8 px-3 py-2 text-xs text-gold-ink">Note: {m.adminNote}</p>
             )}
           </div>
           <Button

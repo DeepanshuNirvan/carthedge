@@ -35,7 +35,7 @@ export function StatTile({ label, value, delta, hint, icon, accent, loading }: S
       <div className="flex items-center justify-between gap-2">
         <p className="text-[13px] font-medium text-mid">{label}</p>
         {icon && (
-          <span className={cn('text-low', accent === 'jade' && 'text-jade-400', accent === 'gold' && 'text-gold-500')}>
+          <span className={cn('text-low', accent === 'jade' && 'text-jade-ink', accent === 'gold' && 'text-gold-ink')}>
             {icon}
           </span>
         )}
@@ -53,7 +53,7 @@ export function StatTile({ label, value, delta, hint, icon, accent, loading }: S
             <span
               className={cn(
                 'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold',
-                delta >= 0 ? 'bg-jade-500/12 text-jade-400' : 'bg-danger/12 text-danger',
+                delta >= 0 ? 'bg-jade-500/12 text-jade-ink' : 'bg-danger/12 text-danger-ink',
               )}
             >
               {delta >= 0 ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}

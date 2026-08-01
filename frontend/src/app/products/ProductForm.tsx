@@ -201,7 +201,7 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
               ))}
             </div>
           )}
-          {errors.variants && <p className="mt-1 text-xs text-danger">Check variant names and prices.</p>}
+          {errors.variants && <p className="mt-1 text-xs text-danger-ink">Check variant names and prices.</p>}
         </div>
 
         <div className="flex items-center gap-6 sm:col-span-2">

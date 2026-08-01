@@ -49,7 +49,7 @@ export default function ProductPage() {
         title="Product unavailable"
         message="This item may have been removed by the seller."
         action={
-          <Link to={`/s/${businessCode}`} className="text-sm font-medium text-jade-500 hover:underline">
+          <Link to={`/s/${businessCode}`} className="text-sm font-medium text-jade-ink hover:underline">
             Back to store →
           </Link>
         }
@@ -228,10 +228,10 @@ export default function ProductPage() {
 
             <ul className="mt-6 flex flex-col gap-2 border-t pt-5 text-xs text-mid">
               <li className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-jade-500" aria-hidden /> Secure payment via Razorpay
+                <ShieldCheck className="size-4 text-jade-ink" aria-hidden /> Secure payment via Razorpay
               </li>
               <li className="flex items-center gap-2">
-                <Truck className="size-4 text-jade-500" aria-hidden />
+                <Truck className="size-4 text-jade-ink" aria-hidden />
                 {store.business.shippingFee > 0 ? (
                   <>
                     Shipping <MoneyText paise={store.business.shippingFee} className="text-xs" /> · delivered by courier
@@ -242,7 +242,7 @@ export default function ProductPage() {
               </li>
               {store.business.codEnabled && (
                 <li className="flex items-center gap-2">
-                  <Check className="size-4 text-jade-500" aria-hidden /> Cash on delivery available
+                  <Check className="size-4 text-jade-ink" aria-hidden /> Cash on delivery available
                 </li>
               )}
             </ul>

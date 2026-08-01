@@ -12,7 +12,7 @@ export function Avatar({ name, src, className }: { name: string; src?: string; c
   ) : (
     <span
       className={cn(
-        'flex size-9 items-center justify-center rounded-full bg-jade-500/15 text-sm font-semibold text-jade-500',
+        'flex size-9 items-center justify-center rounded-full bg-jade-500/15 text-sm font-semibold text-jade-ink',
         className,
       )}
     >

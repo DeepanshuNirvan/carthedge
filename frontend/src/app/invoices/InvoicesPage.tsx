@@ -30,7 +30,7 @@ function InvoiceView({ invoice, onClose }: { invoice: Invoice | null; onClose: (
                 </p>
               </div>
               <div className="sm:text-right">
-                <p className="font-mono text-sm font-semibold text-jade-500">{invoice.invoiceNumber}</p>
+                <p className="font-mono text-sm font-semibold text-jade-ink">{invoice.invoiceNumber}</p>
                 <p className="mt-1 text-xs text-low">{formatDate(invoice.createdAt)}</p>
                 <p className="mt-1 font-mono text-xs text-low">Order #{invoice.orderCode}</p>
               </div>
@@ -101,7 +101,7 @@ export default function InvoicesPage() {
           <tbody>
             {invoices.map((inv) => (
               <Tr key={inv.id} onClick={() => setViewing(inv)} className="cursor-pointer">
-                <Td className="font-mono text-xs font-medium text-jade-500">{inv.invoiceNumber}</Td>
+                <Td className="font-mono text-xs font-medium text-jade-ink">{inv.invoiceNumber}</Td>
                 <Td className="hidden font-mono text-xs sm:table-cell">{inv.orderCode}</Td>
                 <Td className="font-medium text-hi">{inv.customerName}</Td>
                 <Td className="hidden text-xs text-low sm:table-cell">{formatDate(inv.createdAt)}</Td>

@@ -25,7 +25,7 @@ export function SectionHead({
   tone?: 'jade' | 'gold' | 'danger';
 }) {
   const toneCls =
-    tone === 'gold' ? 'text-gold-500' : tone === 'danger' ? 'text-danger' : 'text-jade-400';
+    tone === 'gold' ? 'text-gold-ink' : tone === 'danger' ? 'text-danger-ink' : 'text-jade-ink';
   return (
     <Reveal
       className={cn(

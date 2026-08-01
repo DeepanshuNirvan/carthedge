@@ -72,7 +72,7 @@ export function BulkImportModal({ open, onClose }: { open: boolean; onClose: () 
 
   return (
     <Modal open={open} onClose={onClose} title="Bulk import" wide>
-      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center text-sm text-mid transition-colors hover:border-jade-500 hover:text-jade-500">
+      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center text-sm text-mid transition-colors hover:border-jade-500 hover:text-jade-ink">
         <FileUp className="size-6" />
         Drop a CSV or JSON file, or click to choose
         <span className="text-xs text-low">CSV columns: name, category, price₹, resellerPrice₹, comparePrice₹, sku, description, inStock</span>
@@ -100,9 +100,9 @@ export function BulkImportModal({ open, onClose }: { open: boolean; onClose: () 
                     <Td className="max-w-96 truncate font-mono text-xs">{r.raw}</Td>
                     <Td>
                       {r.error ? (
-                        <span className="text-xs font-medium text-danger">{r.error}</span>
+                        <span className="text-xs font-medium text-danger-ink">{r.error}</span>
                       ) : (
-                        <span className="text-xs font-medium text-jade-500">Ready</span>
+                        <span className="text-xs font-medium text-jade-ink">Ready</span>
                       )}
                     </Td>
                   </Tr>
@@ -115,7 +115,7 @@ export function BulkImportModal({ open, onClose }: { open: boolean; onClose: () 
               Import {valid.length} product{valid.length !== 1 && 's'}
             </Button>
             {rows.length !== valid.length && (
-              <p className="text-xs text-danger">{rows.length - valid.length} rows have errors and will be skipped.</p>
+              <p className="text-xs text-danger-ink">{rows.length - valid.length} rows have errors and will be skipped.</p>
             )}
           </div>
         </>

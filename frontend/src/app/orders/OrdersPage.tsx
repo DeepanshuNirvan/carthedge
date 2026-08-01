@@ -52,13 +52,13 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
         <span
           className={cn(
             'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-            order.paymentMethod === 'cod' ? 'bg-gold-400/14 text-gold-500' : 'bg-jade-500/12 text-jade-500',
+            order.paymentMethod === 'cod' ? 'bg-gold-400/14 text-gold-ink' : 'bg-jade-500/12 text-jade-ink',
           )}
         >
           {order.paymentMethod === 'cod' ? (order.codConfirmedAt ? 'COD ✓' : 'COD') : 'Prepaid'}
         </span>
         {order.riskFlagged && (
-          <span className="inline-flex items-center gap-0.5 rounded-full bg-danger/12 px-2 py-0.5 text-[10px] font-semibold text-danger">
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-danger/12 px-2 py-0.5 text-[10px] font-semibold text-danger-ink">
             <AlertTriangle className="size-3" /> Risk
           </span>
         )}
@@ -270,7 +270,7 @@ export default function OrdersPage() {
       <Modal open={!!pendingMove} onClose={() => setPendingMove(null)} title="Confirm move">
         <p className="text-sm text-mid">
           Move <span className="font-medium text-hi">{pendingMove?.name}</span>&apos;s order to{' '}
-          <span className="font-medium text-danger">{pendingMove && columnTitles[pendingMove.status]}</span>?
+          <span className="font-medium text-danger-ink">{pendingMove && columnTitles[pendingMove.status]}</span>?
           This affects your RTO stats.
         </p>
         <div className="mt-5 flex gap-3">

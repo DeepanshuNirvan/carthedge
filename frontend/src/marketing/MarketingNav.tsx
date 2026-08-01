@@ -39,7 +39,7 @@ export function MarketingNav() {
     <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
       {/* set by CartHedge staff in the admin console; empty hides it */}
       {announcement && (
-        <p className="line-clamp-2 max-w-6xl rounded-xl bg-gold-400/14 px-4 py-1.5 text-center text-xs font-medium leading-snug text-gold-500 backdrop-blur">
+        <p className="line-clamp-2 max-w-6xl rounded-xl bg-gold-400/14 px-4 py-1.5 text-center text-xs font-medium leading-snug text-gold-ink backdrop-blur">
           {announcement}
         </p>
       )}

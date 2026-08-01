@@ -18,7 +18,7 @@ export function Trust() {
           return (
             <Reveal key={point.title} delay={i * 0.07}>
               <article className="glass sheen h-full rounded-2xl p-6 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
-                <span className="flex size-11 items-center justify-center rounded-md neu text-gold-500">
+                <span className="flex size-11 items-center justify-center rounded-md neu text-gold-ink">
                   <Icon className="size-5" aria-hidden />
                 </span>
                 <h3 className="mt-4 font-display text-base font-semibold text-hi">{point.title}</h3>

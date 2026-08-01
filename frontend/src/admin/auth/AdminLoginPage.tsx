@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
       >
         <div className="flex items-center justify-between">
           <Wordmark />
-          <span className="flex items-center gap-1 rounded-full bg-gold-400/12 px-2.5 py-1 text-xs font-semibold text-gold-500">
+          <span className="flex items-center gap-1 rounded-full bg-gold-400/12 px-2.5 py-1 text-xs font-semibold text-gold-ink">
             <ShieldCheck className="size-3.5" /> Staff
           </span>
         </div>

@@ -14,7 +14,7 @@ type SeoProps = {
 
 export function Seo({ title, description, path = '/', image, noIndex, jsonLd }: SeoProps) {
   const url = siteUrl + path;
-  const og = image || `${siteUrl}/og.png`;
+  const og = image || `${siteUrl}/og.jpg`;
   const blocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
   return (
     <Helmet>

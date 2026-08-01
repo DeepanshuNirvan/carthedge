@@ -217,7 +217,7 @@ function ProfileSection() {
       >
         <div className="flex items-center gap-4 sm:col-span-2">
           <Avatar name={business.name} src={business.logoUrl || undefined} className="size-14" />
-          <label className="cursor-pointer text-sm font-medium text-jade-500 hover:underline">
+          <label className="cursor-pointer text-sm font-medium text-jade-ink hover:underline">
             Change logo
             <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onLogo(e.target.files[0])} />
           </label>
@@ -287,7 +287,7 @@ function PaymentsSection() {
         subtitle="Buyer payments settle directly in your accounts"
         action={
           business.razorpayConfigured ? (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-jade-500">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-jade-ink">
               <ShieldCheck className="size-4" /> Razorpay connected
             </span>
           ) : undefined

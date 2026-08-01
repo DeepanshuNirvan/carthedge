@@ -15,7 +15,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
                 className={cn(
                   'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-std ease-spring',
                   done && 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay',
-                  active && 'neu text-jade-400 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400)),0_0_0_4px_rgb(var(--jade-500)/0.14)]',
+                  active && 'neu text-jade-ink shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400)),0_0_0_4px_rgb(var(--jade-500)/0.14)]',
                   !done && !active && 'neu-inset text-dim',
                 )}
               >

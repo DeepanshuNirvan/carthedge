@@ -63,8 +63,8 @@ export function FileDropzone({ images, onChange, max = 6 }: FileDropzoneProps) {
             upload(e.dataTransfer.files);
           }}
           className={cn(
-            'flex size-24 flex-col items-center justify-center gap-1 rounded-md border border-dashed text-xs text-mid transition-colors duration-micro hover:border-jade-500 hover:text-jade-500',
-            dragging && 'border-jade-500 bg-jade-500/5 text-jade-500',
+            'flex size-24 flex-col items-center justify-center gap-1 rounded-md border border-dashed text-xs text-mid transition-colors duration-micro hover:border-jade-500 hover:text-jade-ink',
+            dragging && 'border-jade-500 bg-jade-500/5 text-jade-ink',
           )}
         >
           {uploading ? <Spinner className="size-5" /> : <ImagePlus className="size-5" />}

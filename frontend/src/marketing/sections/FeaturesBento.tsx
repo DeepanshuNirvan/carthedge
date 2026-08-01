@@ -57,7 +57,7 @@ export function FeaturesBento() {
                   <span
                     className={cn(
                       'flex size-11 items-center justify-center rounded-md transition-colors duration-std',
-                      isWide ? 'bg-jade-500/18 text-jade-300' : 'neu text-jade-400 group-hover:text-jade-300',
+                      isWide ? 'bg-jade-500/18 text-jade-ink' : 'neu text-jade-ink group-hover:text-jade-ink',
                     )}
                   >
                     <Icon className="size-5" aria-hidden />

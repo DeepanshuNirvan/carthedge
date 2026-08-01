@@ -23,9 +23,9 @@ export function OffersPanel() {
       <Card>
         <CardHeader title="Offers" subtitle={capabilityLabels.offers.blurb} />
         <div className="flex flex-wrap items-center gap-3 p-5 pt-4">
-          <Lock className="size-4 shrink-0 text-gold-500" aria-hidden />
+          <Lock className="size-4 shrink-0 text-gold-ink" aria-hidden />
           <p className="flex-1 text-sm text-mid">Discount codes and reseller pricing are not on your plan.</p>
-          <Link to="/app/billing" className="text-sm font-medium text-jade-500 hover:underline">
+          <Link to="/app/billing" className="text-sm font-medium text-jade-ink hover:underline">
             See plans →
           </Link>
         </div>

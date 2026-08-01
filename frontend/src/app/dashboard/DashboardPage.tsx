@@ -45,7 +45,7 @@ function RtoMeterHero() {
       <div aria-hidden className="absolute -left-16 bottom-[-6rem] size-52 rounded-full bg-gold-400/12 blur-[80px]" />
       <div className="relative grid items-center gap-6 sm:gap-8 md:grid-cols-[1.35fr_1fr]">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-jade-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
             <ShieldCheck className="size-3.5" /> RTO shield · this month
           </span>
           {isLoading ? (
@@ -59,16 +59,16 @@ function RtoMeterHero() {
             <p className="mt-3 text-sm text-mid">
               You kept this from refused deliveries. RTO is{' '}
               {improved ? 'down to ' : 'running at '}
-              <span className={cn('font-semibold', improved ? 'text-jade-400' : 'text-danger')}>{actual}%</span>{' '}
+              <span className={cn('font-semibold', improved ? 'text-jade-ink' : 'text-danger-ink')}>{actual}%</span>{' '}
               {improved ? 'from a ' : 'against a '}
-              <span className="font-semibold text-danger">{baseline}%</span> baseline
+              <span className="font-semibold text-danger-ink">{baseline}%</span> baseline
               {meter ? ` · ${outcomes} COD outcomes` : ''}.
             </p>
           ) : (
             <p className="mt-3 text-sm text-mid">
               Still measuring — {outcomes} of {minCodOutcomes} COD deliveries settled this month. Your rate lands
               here once there is enough to trust, against a{' '}
-              <span className="font-semibold text-danger">{baseline}%</span> baseline.
+              <span className="font-semibold text-danger-ink">{baseline}%</span> baseline.
             </p>
           )}
         </div>
@@ -77,13 +77,13 @@ function RtoMeterHero() {
         <div className="rounded-xl neu p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-sm font-semibold text-hi">
-              <TrendingDown className={cn('size-4', improved ? 'text-jade-400' : 'text-danger')} />
+              <TrendingDown className={cn('size-4', improved ? 'text-jade-ink' : 'text-danger-ink')} />
               {improved ? 'RTO cut' : 'Above baseline'}
             </span>
             <span
               className={cn(
                 'font-display text-2xl font-semibold tnum',
-                improved ? 'text-jade-400' : 'text-danger',
+                improved ? 'text-jade-ink' : 'text-danger-ink',
               )}
             >
               {enoughData ? `${Math.abs(reduction)}%` : '—'}
@@ -93,7 +93,7 @@ function RtoMeterHero() {
             <div>
               <div className="flex justify-between text-xs text-mid">
                 <span>Baseline</span>
-                <span className="tnum text-danger">{baseline}%</span>
+                <span className="tnum text-danger-ink">{baseline}%</span>
               </div>
               <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
                 <div className="h-full rounded-full bg-gradient-to-r from-danger to-[rgb(210_78_66)]" style={{ width: '100%' }} />
@@ -102,7 +102,7 @@ function RtoMeterHero() {
             <div>
               <div className="flex justify-between text-xs text-mid">
                 <span>With CartHedge</span>
-                <span className={cn('tnum', improved ? 'text-jade-400' : 'text-danger')}>{actual}%</span>
+                <span className={cn('tnum', improved ? 'text-jade-ink' : 'text-danger-ink')}>{actual}%</span>
               </div>
               <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
                 <motion.div
@@ -186,7 +186,7 @@ export default function DashboardPage() {
             <p className="text-xs text-mid tnum">
               {dash.quota.used}/{dash.quota.included} orders
               {dash.quota.overageOrders > 0 && (
-                <span className="text-gold-500">
+                <span className="text-gold-ink">
                   {' '}
                   · {dash.quota.overageOrders} over · <MoneyText paise={dash.quota.overageFee} /> fee
                 </span>
@@ -227,7 +227,7 @@ export default function DashboardPage() {
         <CardHeader
           title="Recent orders"
           action={
-            <Link to="/app/orders" className="text-sm font-medium text-jade-500 hover:underline">
+            <Link to="/app/orders" className="text-sm font-medium text-jade-ink hover:underline">
               View board →
             </Link>
           }
@@ -257,7 +257,7 @@ export default function DashboardPage() {
               title="No orders yet"
               message="Share your storefront link or paste a DM into the AI desk to create your first order."
               action={
-                <Link to="/app/links" className="text-sm font-medium text-jade-500 hover:underline">
+                <Link to="/app/links" className="text-sm font-medium text-jade-ink hover:underline">
                   Create a share link →
                 </Link>
               }

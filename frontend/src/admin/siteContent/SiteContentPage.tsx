@@ -51,7 +51,7 @@ function ListEditor({
             size="sm"
             icon={<Trash2 className="size-4" />}
             onClick={() => onChange(items.filter((_, j) => j !== i))}
-            className="justify-self-start text-danger sm:col-span-2"
+            className="justify-self-start text-danger-ink sm:col-span-2"
           >
             Remove
           </Button>

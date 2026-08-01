@@ -71,6 +71,15 @@
   --text-dim: 108 113 124;
   --text-on-accent: 8 16 11;
 
+  /* ink = the brand hue tuned for TEXT/ICONS on a surface, as opposed to the
+     ramp above which is tuned for fills. On dark these match the ramp step the
+     UI already used, so dark is unchanged; light needs far darker values to
+     clear 4.5:1 — a jade-400 label on white paper is 2.15:1 and unreadable. */
+  --jade-ink: 34 201 133;
+  --gold-ink: 214 158 62;
+  --danger-ink: 233 96 84;
+  --info-ink: 96 156 226;
+
   --line: 255 255 255;
   --line-a: 0.09;
   --line-strong-a: 0.16;
@@ -80,6 +89,8 @@
   --glass-a: 0.48;
   --glass-hi: 255 255 255; /* inner top highlight */
   --glass-hi-a: 0.14;
+  --glass-lo: 0 0 0; /* bottom edge — the shadowed side of the pane */
+  --glass-lo-a: 0.34;
   --glass-border-a: 0.2;
   --glass-tint: 255 255 255; /* refraction sheen colour */
 
@@ -118,6 +129,12 @@
   --text-dim: 150 147 138;
   --text-on-accent: 8 16 11;
 
+  /* all four clear 4.5:1 on --surface, --surface-3 and --bg */
+  --jade-ink: 9 112 68;
+  --gold-ink: 138 94 28;
+  --danger-ink: 178 48 38;
+  --info-ink: 38 92 166;
+
   --line: 32 27 22;
   --line-a: 0.1;
   --line-strong-a: 0.17;
@@ -127,6 +144,9 @@
   --glass-a: 0.5;
   --glass-hi: 255 255 255;
   --glass-hi-a: 0.9;
+  /* light theme: the underside picks up warm paper bounce, not black */
+  --glass-lo: 96 82 62;
+  --glass-lo-a: 0.1;
   --glass-border-a: 0.66;
   --glass-tint: 255 255 255;
 

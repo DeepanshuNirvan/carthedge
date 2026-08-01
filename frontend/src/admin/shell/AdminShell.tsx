@@ -47,7 +47,7 @@ export function AdminShell() {
           className={({ isActive }) =>
             cn(
               'relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-micro',
-              isActive ? 'panel text-gold-500 shadow-soft' : 'text-mid hover:bg-surface-2 hover:text-hi',
+              isActive ? 'panel text-gold-ink shadow-soft' : 'text-mid hover:bg-surface-2 hover:text-hi',
             )
           }
         >
@@ -95,7 +95,7 @@ export function AdminShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass-nav sticky top-0 z-30 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6">
+        <header className="glass-nav scroll-edge sticky top-0 z-30 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-6">
           <IconButton label="Open menu" className="lg:hidden" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </IconButton>

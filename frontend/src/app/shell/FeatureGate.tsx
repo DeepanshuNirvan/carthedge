@@ -22,7 +22,7 @@ export function FeatureGate({ capability, children }: { capability: Capability; 
   const meta = capabilityLabels[capability];
   return (
     <Card className="mx-auto flex max-w-lg flex-col items-center p-6 text-center sm:p-8">
-      <span className="grid size-12 place-items-center rounded-full bg-gold-400/14 text-gold-500">
+      <span className="grid size-12 place-items-center rounded-full bg-gold-400/14 text-gold-ink">
         <Lock className="size-5" aria-hidden />
       </span>
       <h2 className="mt-4 font-display text-lg font-semibold text-hi">{meta.label} is not on your plan</h2>
