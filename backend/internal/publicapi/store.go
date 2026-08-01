@@ -30,40 +30,9 @@ type storeBusiness struct {
 	ShippingFee int    `json:"shippingFee"`
 }
 
-// publicProduct hides seller-internal fields (reseller price, SKU).
-type publicProduct struct {
-	ID           string          `json:"id"`
-	Name         string          `json:"name"`
-	Description  string          `json:"description"`
-	Category     string          `json:"category"`
-	Price        int             `json:"price"`
-	ComparePrice int             `json:"comparePrice"`
-	Images       []string        `json:"images"`
-	InStock      bool            `json:"inStock"`
-	Trending     bool            `json:"trending"`
-	Variants     []publicVariant `json:"variants"`
-}
-
-type publicVariant struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Price   int    `json:"price"`
-	InStock bool   `json:"inStock"`
-}
-
-func toPublic(products []product.Product) []publicProduct {
-	out := make([]publicProduct, len(products))
-	for i, p := range products {
-		variants := make([]publicVariant, len(p.Variants))
-		for j, v := range p.Variants {
-			variants[j] = publicVariant{ID: v.ID, Name: v.Name, Price: v.Price, InStock: v.Stocked()}
-		}
-		out[i] = publicProduct{ID: p.ID, Name: p.Name, Description: p.Description, Category: p.Category,
-			Price: p.Price, ComparePrice: p.ComparePrice, Images: p.Images, InStock: p.InStock,
-			Trending: p.Trending, Variants: variants}
-	}
-	return out
-}
+// toPublic is product.ToPublic — the one buyer-facing projection, shared with
+// link checkout so both surfaces hide the same seller-internal fields.
+var toPublic = product.ToPublic
 
 func (h *Handler) storeBusiness(ctx context.Context, code string) (*storeBusiness, error) {
 	var b storeBusiness
@@ -92,7 +61,7 @@ func (h *Handler) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var categories []string
+	categories := []string{}
 	rows, err := h.pool.Query(r.Context(), `select distinct category from products
 		where business_id=$1 and active and category <> '' order by category`, biz.ID)
 	if err == nil {
@@ -105,7 +74,7 @@ func (h *Handler) Store(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var offers []httpx.M
+	offers := []httpx.M{}
 	oRows, err := h.pool.Query(r.Context(), `select code, kind, value, min_amount from offers
 		where business_id=$1 and active and (expires_at is null or expires_at > now())`, biz.ID)
 	if err == nil {

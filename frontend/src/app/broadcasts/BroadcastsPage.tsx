@@ -148,17 +148,21 @@ export default function BroadcastsPage() {
                       Send
                     </Button>
                   )}
-                  <IconButton
-                    label="Delete broadcast"
-                    onClick={() =>
-                      remove.mutate(b.id, {
-                        onSuccess: () => toast('info', 'Broadcast deleted'),
-                        onError: (e) => toast('error', 'Delete failed', e.message),
-                      })
-                    }
-                  >
-                    <Trash2 className="size-4" />
-                  </IconButton>
+                  {/* a sent drop is a record, not a draft — the API refuses to
+                      delete it, so do not offer a button that always fails */}
+                  {(b.status === 'draft' || b.status === 'scheduled') && (
+                    <IconButton
+                      label="Delete broadcast"
+                      onClick={() =>
+                        remove.mutate(b.id, {
+                          onSuccess: () => toast('info', 'Broadcast deleted'),
+                          onError: (e) => toast('error', 'Delete failed', e.message),
+                        })
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                    </IconButton>
+                  )}
                 </li>
               ))}
             </ul>

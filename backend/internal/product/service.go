@@ -68,6 +68,43 @@ type Product struct {
 // seller manages it with the in-stock toggle alone.
 const Untracked = -1
 
+// Public is what a buyer is allowed to see: no reseller price, no SKU, no
+// counted stock. Every buyer surface (storefront and link checkout) projects
+// through ToPublic, so a new field is private until it is added here.
+type Public struct {
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Description  string          `json:"description"`
+	Category     string          `json:"category"`
+	Price        int             `json:"price"`
+	ComparePrice int             `json:"comparePrice"`
+	Images       []string        `json:"images"`
+	InStock      bool            `json:"inStock"`
+	Trending     bool            `json:"trending"`
+	Variants     []PublicVariant `json:"variants"`
+}
+
+type PublicVariant struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Price   int    `json:"price"`
+	InStock bool   `json:"inStock"`
+}
+
+func ToPublic(products []Product) []Public {
+	out := make([]Public, len(products))
+	for i, p := range products {
+		variants := make([]PublicVariant, len(p.Variants))
+		for j, v := range p.Variants {
+			variants[j] = PublicVariant{ID: v.ID, Name: v.Name, Price: v.Price, InStock: v.Stocked()}
+		}
+		out[i] = Public{ID: p.ID, Name: p.Name, Description: p.Description, Category: p.Category,
+			Price: p.Price, ComparePrice: p.ComparePrice, Images: orEmpty(p.Images), InStock: p.InStock,
+			Trending: p.Trending, Variants: variants}
+	}
+	return out
+}
+
 // Line is a priced order line resolved from the live catalog. VariantID is
 // kept so stock can be put back if the order is cancelled or comes back RTO.
 type Line struct {
@@ -187,10 +224,36 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `delete from product_variants where product_id=$1`, id); err != nil {
+	// Variant ids have to survive an edit: share links and order lines already
+	// point at them, so a delete-and-reinsert would dangle every one. Ids the
+	// payload claims but this product does not own are treated as new rows.
+	owned := map[string]bool{}
+	rows, err := tx.Query(ctx, `select id from product_variants where product_id=$1`, id)
+	if err != nil {
 		return nil, err
 	}
-	if err := insertVariants(ctx, tx, id, in.Variants); err != nil {
+	for rows.Next() {
+		var vid string
+		if rows.Scan(&vid) == nil {
+			owned[vid] = true
+		}
+	}
+	rows.Close()
+
+	variants := make([]Variant, len(in.Variants))
+	copy(variants, in.Variants)
+	keep := []string{}
+	for i := range variants {
+		if owned[variants[i].ID] {
+			keep = append(keep, variants[i].ID)
+		} else {
+			variants[i].ID = ""
+		}
+	}
+	if _, err := tx.Exec(ctx, `delete from product_variants where product_id=$1 and id <> all($2::uuid[])`, id, keep); err != nil {
+		return nil, err
+	}
+	if err := insertVariants(ctx, tx, id, variants); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -398,6 +461,18 @@ type BulkResult struct {
 // inventory sheet a stock update rather than a mess.
 func (s *Service) Bulk(ctx context.Context, bizID string, inputs []Input) (BulkResult, error) {
 	var res BulkResult
+	// every row is validated before any row is written: a 200-row sheet with a
+	// typo on row 150 must be rejected whole, not half-imported
+	for i, in := range inputs {
+		if err := in.validate(); err != nil {
+			return res, fmt.Errorf("row %d: %w", i+1, err)
+		}
+		for _, v := range in.Variants {
+			if strings.TrimSpace(v.Name) == "" {
+				return res, fmt.Errorf("row %d: variant name is required", i+1)
+			}
+		}
+	}
 	for i, in := range inputs {
 		if in.Sku != "" {
 			var id string
@@ -654,8 +729,11 @@ func insertVariants(ctx context.Context, tx pgx.Tx, productID string, variants [
 		if strings.TrimSpace(v.Name) == "" {
 			return errors.New("variant name is required")
 		}
-		if _, err := tx.Exec(ctx, `insert into product_variants (product_id, name, price, sku, in_stock, stock_qty)
-			values ($1,$2,$3,$4,$5,$6)`, productID, v.Name, v.Price, v.Sku, v.Stocked(), v.Qty()); err != nil {
+		if _, err := tx.Exec(ctx, `insert into product_variants (id, product_id, name, price, sku, in_stock, stock_qty)
+			values (coalesce(nullif($1,'')::uuid, gen_random_uuid()),$2,$3,$4,$5,$6,$7)
+			on conflict (id) do update set name=excluded.name, price=excluded.price, sku=excluded.sku,
+				in_stock=excluded.in_stock, stock_qty=excluded.stock_qty`,
+			v.ID, productID, v.Name, v.Price, v.Sku, v.Stocked(), v.Qty()); err != nil {
 			return err
 		}
 	}

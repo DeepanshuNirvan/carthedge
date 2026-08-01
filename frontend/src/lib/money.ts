@@ -4,9 +4,19 @@ const inr = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 });
 
+// paise that do not land on a whole rupee keep both digits — a ₹2.50/order fee
+// rounded to ₹3 misquotes the price list
+const inrPaise = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 /** Backend money is always paise (int). Format at the edge, never do float math. */
 export function formatPaise(paise: number) {
-  return inr.format(Math.round(paise) / 100);
+  const p = Math.round(paise);
+  return (p % 100 === 0 ? inr : inrPaise).format(p / 100);
 }
 
 /** ₹1.2L / ₹3.4Cr for dense dashboards. */

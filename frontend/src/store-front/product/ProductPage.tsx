@@ -184,6 +184,8 @@ export default function ProductPage() {
                   {product.variants.map((v) => (
                     <button
                       key={v.id}
+                      type="button"
+                      aria-pressed={variant?.id === v.id}
                       disabled={!v.inStock}
                       onClick={() => setVariant(v)}
                       className={cn(

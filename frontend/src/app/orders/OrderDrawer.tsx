@@ -7,6 +7,7 @@ import { useCreateInvoice } from '@/api/invoices';
 import { useCan } from '@/api/plans';
 import { toast } from '@/store/ui';
 import { formatDateTime } from '@/lib/date';
+import { cn } from '@/lib/cn';
 import { Sheet } from '@/ui/Modal';
 import { Button } from '@/ui/Button';
 import { Field, Input, Select } from '@/ui/Input';
@@ -106,8 +107,10 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                 <dd><MoneyText paise={order.total} /></dd>
               </div>
               {order.tokenAmount > 0 && (
-                <div className="flex justify-between text-gold-500">
-                  <dt>COD token collected</dt>
+                // never claim the token is in hand until the payment says so —
+                // a seller reads this before dispatching
+                <div className={cn('flex justify-between', order.paymentStatus === 'paid' ? 'text-gold-500' : 'text-mid')}>
+                  <dt>{order.paymentStatus === 'paid' ? 'COD token collected' : 'COD token pending'}</dt>
                   <dd><MoneyText paise={order.tokenAmount} /></dd>
                 </div>
               )}

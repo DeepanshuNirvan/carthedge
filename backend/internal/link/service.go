@@ -50,13 +50,13 @@ type Resolved struct {
 		ShippingFee int    `json:"shippingFee"`
 		Verified    bool   `json:"verified"` // trust strip
 	} `json:"business"`
-	LinkID string            `json:"-"`
-	Kind   string            `json:"kind"`
-	Title  string            `json:"title"`
-	Amount int               `json:"amount,omitempty"`
-	Items  []product.Product `json:"items,omitempty"`
-	Refs   []ItemRef         `json:"-"`
-	Paused bool              `json:"paused"`
+	LinkID string           `json:"-"`
+	Kind   string           `json:"kind"`
+	Title  string           `json:"title"`
+	Amount int              `json:"amount,omitempty"`
+	Items  []product.Public `json:"items,omitempty"`
+	Refs   []ItemRef        `json:"-"`
+	Paused bool             `json:"paused"`
 }
 
 type Service struct {
@@ -190,7 +190,7 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 		if err != nil {
 			continue // product deleted since link was made
 		}
-		res.Items = append(res.Items, *p)
+		res.Items = append(res.Items, product.ToPublic([]product.Product{*p})[0])
 	}
 	if res.Kind != "custom" && len(res.Items) == 0 {
 		return nil, ErrNotFound

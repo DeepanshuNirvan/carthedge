@@ -63,6 +63,7 @@ type meta struct {
 	Image       string
 	Type        string
 	NoIndex     bool
+	NotFound    bool // serve the shell, but with a 404 so crawlers do not index it
 	JSONLD      any
 }
 
@@ -89,7 +90,30 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// crawlers and previews revalidate often; the shell itself is tiny
 	w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+	// the SPA still renders its own NotFound screen — the status is what stops a
+	// crawler treating every junk URL as another copy of the homepage
+	if m.NotFound {
+		w.WriteHeader(http.StatusNotFound)
+	}
 	w.Write([]byte(strings.Replace(h.index, "</head>", h.head(m, clean)+"</head>", 1)))
+}
+
+// spaRoutes are the paths react-router actually renders; anything else is a 404
+// no matter how well-formed it looks.
+func knownRoute(seg []string) bool {
+	switch {
+	case len(seg) == 1 && (seg[0] == "" || seg[0] == "contact" || seg[0] == "reset-password" || seg[0] == "track"):
+		return true
+	case seg[0] == "app" || seg[0] == "admin":
+		return true
+	case seg[0] == "s" && (len(seg) == 2 || (len(seg) == 4 && seg[2] == "p")):
+		return true
+	case seg[0] == "l" && len(seg) == 3:
+		return true
+	case seg[0] == "o" && (len(seg) == 2 || (len(seg) == 3 && seg[2] == "confirm")):
+		return true
+	}
+	return false
 }
 
 const (
@@ -122,6 +146,9 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 		return meta{Title: "Contact CartHedge — Talk to a human",
 			Description: "Questions about CartHedge plans, migrations or custom volume pricing? We reply within a working day."}
 	}
+	if !knownRoute(seg) {
+		return meta{Title: "Page not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
+	}
 	return meta{Title: defaultTitle, Description: defaultDesc, JSONLD: map[string]any{
 		"@context": "https://schema.org", "@type": "Organization", "name": siteName,
 		"url": h.baseURL, "logo": h.baseURL + "/favicon.svg", "description": defaultDesc,
@@ -133,7 +160,7 @@ func (h *Handler) storeMeta(ctx context.Context, code string) meta {
 	err := h.pool.QueryRow(ctx, `select name, logo_url, city, state from businesses
 		where code=$1 and status='active'`, code).Scan(&name, &logo, &city, &state)
 	if err != nil {
-		return meta{Title: "Store not found — " + siteName, NoIndex: true}
+		return meta{Title: "Store not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
 	}
 	where := strings.TrimSpace(strings.Trim(city+", "+state, ", "))
 	desc := "Shop the full " + name + " collection"
@@ -161,7 +188,7 @@ func (h *Handler) productMeta(ctx context.Context, code, productID string) meta 
 		where b.code=$1 and p.id=$2 and p.active and b.status='active'`, code, productID).Scan(
 		&bizName, &name, &description, &price, &inStock, &images)
 	if err != nil {
-		return meta{Title: "Product not found — " + siteName, NoIndex: true}
+		return meta{Title: "Product not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
 	}
 	var urls []string
 	json.Unmarshal(images, &urls)

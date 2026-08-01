@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"carthedge/internal/customer"
 	"carthedge/internal/order"
@@ -113,6 +114,7 @@ func (s *Service) parse(ctx context.Context, bizID, conversation, source, conver
 	if data.PaymentMethod != "prepaid" {
 		data.PaymentMethod = "cod"
 	}
+	s.priceFromCatalog(ctx, bizID, data.Items)
 	draftJSON, _ := json.Marshal(data)
 
 	d := &Draft{Conversation: conversation, Data: data, Confidence: data.Confidence, Status: "pending", Source: source, ConversationID: conversationID}
@@ -123,6 +125,28 @@ func (s *Service) parse(ctx context.Context, bizID, conversation, source, conver
 		return nil, err
 	}
 	return d, nil
+}
+
+// priceFromCatalog fills the price a model left at zero for a matched item.
+// The order itself is always priced from the catalog at confirm time, so
+// without this the review card quotes ₹0 for a line that will bill in full.
+func (s *Service) priceFromCatalog(ctx context.Context, bizID string, items []DraftItem) {
+	for i := range items {
+		if items[i].ProductID == "" || items[i].Price > 0 {
+			continue
+		}
+		p, err := s.products.Get(ctx, bizID, items[i].ProductID)
+		if err != nil {
+			continue
+		}
+		items[i].Price = p.Price
+		for _, v := range p.Variants {
+			if v.Price > 0 && strings.EqualFold(v.Name, items[i].Variant) {
+				items[i].Price = v.Price
+				break
+			}
+		}
+	}
 }
 
 // ConfirmDraft turns a draft into a real order. The seller can override any

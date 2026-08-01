@@ -260,7 +260,10 @@ func (s *Service) Reply(ctx context.Context, bizID, convID, text string) error {
 		return errors.New("channel token unavailable")
 	}
 	if err := s.client.Send(ctx, channel, externalID, token, contactID, text); err != nil {
-		return err
+		// the raw error carries graph URLs and transport detail — useless to the
+		// seller and not theirs to see
+		s.log.Error("channel send failed", "channel", channel, "businessId", bizID, "err", err)
+		return errors.New("could not send on " + channel + " right now — reconnect the account or try again")
 	}
 	s.pool.Exec(ctx, `insert into conversation_messages (conversation_id, direction, body) values ($1,'out',$2)`, convID, text)
 	s.pool.Exec(ctx, `update conversations set last_message_at=now() where id=$1`, convID)

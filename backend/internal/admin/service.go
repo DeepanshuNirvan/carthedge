@@ -435,7 +435,7 @@ func (s *Service) Payments(ctx context.Context, limit, offset int) ([]httpx.M, e
 		return nil, err
 	}
 	defer rows.Close()
-	var out []httpx.M
+	out := []httpx.M{}
 	for rows.Next() {
 		var id, name, code, status, rzpID, planCode string
 		var amount int

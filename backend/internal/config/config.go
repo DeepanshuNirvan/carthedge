@@ -38,6 +38,7 @@ type Config struct {
 	AIProvider  string
 	OpenAIKey   string
 	OpenAIModel string
+	OpenAIBase  string
 	GeminiKey   string
 	GeminiModel string
 
@@ -96,6 +97,7 @@ func Load() (*Config, error) {
 		AIProvider:  env("AI_PROVIDER", "openai"),
 		OpenAIKey:   os.Getenv("OPENAI_API_KEY"),
 		OpenAIModel: env("OPENAI_MODEL", "gpt-4o-mini"),
+		OpenAIBase:  strings.TrimSuffix(env("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
 		GeminiKey:   os.Getenv("GEMINI_API_KEY"),
 		GeminiModel: env("GEMINI_MODEL", "gemini-2.0-flash"),
 

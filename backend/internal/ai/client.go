@@ -19,6 +19,7 @@ type Client struct {
 	provider string
 	key      string
 	model    string
+	baseURL  string
 	hc       *http.Client
 }
 
@@ -28,7 +29,8 @@ func NewClient(cfg *config.Config) *Client {
 		c.key, c.model = cfg.GeminiKey, cfg.GeminiModel
 	} else {
 		c.provider = "openai"
-		c.key, c.model = cfg.OpenAIKey, cfg.OpenAIModel
+		// any OpenAI-compatible endpoint works (Azure, OpenRouter, a local model)
+		c.key, c.model, c.baseURL = cfg.OpenAIKey, cfg.OpenAIModel, cfg.OpenAIBase
 	}
 	return c
 }
@@ -58,7 +60,7 @@ func (c *Client) openai(ctx context.Context, system, user string, jsonMode bool)
 		payload["response_format"] = map[string]string{"type": "json_object"}
 	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}

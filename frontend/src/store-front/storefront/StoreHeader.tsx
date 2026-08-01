@@ -52,7 +52,7 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
           {onCart && (
             <button
               onClick={onCart}
-              aria-label={`Cart, ${count} items`}
+              aria-label={`Cart, ${count} ${count === 1 ? 'item' : 'items'}`}
               className="relative flex size-11 items-center justify-center rounded-md text-hi transition-colors hover:bg-surface-2"
             >
               <ShoppingBag className="size-5" />

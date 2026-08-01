@@ -5,6 +5,7 @@ import { useDashboard, useSales, useTopProducts } from '@/api/analytics';
 import { useOrders } from '@/api/orders';
 import { formatPaise } from '@/lib/money';
 import { timeAgo } from '@/lib/date';
+import { cn } from '@/lib/cn';
 import { PageHeader } from '../shell/PageHeader';
 import { SalesAreaChart, TopProductsChart } from '../analytics/charts';
 import { StatTile } from '@/ui/StatTile';
@@ -22,13 +23,21 @@ function SavedAmount({ paise }: { paise: number }) {
   return <motion.span className="font-display tnum">{text}</motion.span>;
 }
 
+/** Below this many settled COD orders the rate is noise, not a trend. */
+const minCodOutcomes = 5;
+
 /** The emotional hero of the whole app — money the seller kept, in rupees. */
 function RtoMeterHero() {
   const { data, isLoading } = useDashboard();
   const meter = data?.rtoMeter;
   const baseline = meter?.baselinePercent ?? 30;
   const actual = meter?.actualPercent ?? 8;
+  // one refusal swings the rate by a hundred points, so a handful of COD
+  // outcomes is noise, not a trend — say so instead of quoting it as fact
+  const outcomes = meter?.codOutcomes ?? 0;
+  const enoughData = !meter || outcomes >= minCodOutcomes;
   const reduction = baseline > 0 ? Math.round(((baseline - actual) / baseline) * 100) : 0;
+  const improved = actual <= baseline;
 
   return (
     <Card glass className="relative overflow-hidden rounded-2xl p-5 shadow-float sm:p-8">
@@ -46,21 +55,39 @@ function RtoMeterHero() {
               <SavedAmount paise={meter?.savedThisMonth ?? 0} />
             </p>
           )}
-          <p className="mt-3 text-sm text-mid">
-            You kept this from refused deliveries. RTO is down to{' '}
-            <span className="font-semibold text-jade-400">{actual}%</span> from a{' '}
-            <span className="font-semibold text-danger">{baseline}%</span> baseline
-            {meter ? ` · ${meter.codOutcomes} COD outcomes` : ''}.
-          </p>
+          {enoughData ? (
+            <p className="mt-3 text-sm text-mid">
+              You kept this from refused deliveries. RTO is{' '}
+              {improved ? 'down to ' : 'running at '}
+              <span className={cn('font-semibold', improved ? 'text-jade-400' : 'text-danger')}>{actual}%</span>{' '}
+              {improved ? 'from a ' : 'against a '}
+              <span className="font-semibold text-danger">{baseline}%</span> baseline
+              {meter ? ` · ${outcomes} COD outcomes` : ''}.
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-mid">
+              Still measuring — {outcomes} of {minCodOutcomes} COD deliveries settled this month. Your rate lands
+              here once there is enough to trust, against a{' '}
+              <span className="font-semibold text-danger">{baseline}%</span> baseline.
+            </p>
+          )}
         </div>
 
         {/* the reduction, visualised */}
         <div className="rounded-xl neu p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-sm font-semibold text-hi">
-              <TrendingDown className="size-4 text-jade-400" /> RTO cut
+              <TrendingDown className={cn('size-4', improved ? 'text-jade-400' : 'text-danger')} />
+              {improved ? 'RTO cut' : 'Above baseline'}
             </span>
-            <span className="font-display text-2xl font-semibold tnum text-jade-400">{reduction}%</span>
+            <span
+              className={cn(
+                'font-display text-2xl font-semibold tnum',
+                improved ? 'text-jade-400' : 'text-danger',
+              )}
+            >
+              {enoughData ? `${Math.abs(reduction)}%` : '—'}
+            </span>
           </div>
           <div className="mt-4 space-y-3">
             <div>
@@ -75,13 +102,18 @@ function RtoMeterHero() {
             <div>
               <div className="flex justify-between text-xs text-mid">
                 <span>With CartHedge</span>
-                <span className="tnum text-jade-400">{actual}%</span>
+                <span className={cn('tnum', improved ? 'text-jade-400' : 'text-danger')}>{actual}%</span>
               </div>
               <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
                 <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-jade-400 to-jade-500 shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]"
+                  className={cn(
+                    'h-full rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]',
+                    improved
+                      ? 'bg-gradient-to-r from-jade-400 to-jade-500'
+                      : 'bg-gradient-to-r from-danger to-[rgb(210_78_66)]',
+                  )}
                   initial={{ width: 0 }}
-                  animate={{ width: `${baseline > 0 ? (actual / baseline) * 100 : 0}%` }}
+                  animate={{ width: `${baseline > 0 ? Math.min((actual / baseline) * 100, 100) : 0}%` }}
                   transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 />
               </div>

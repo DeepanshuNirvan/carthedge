@@ -51,11 +51,18 @@ var emailRe = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 func ValidEmail(s string) bool { return emailRe.MatchString(s) }
 
 // NormalizePhone strips +91/0 prefixes and validates a 10-digit Indian mobile.
+// A prefix is only stripped when what remains is a full 10-digit number —
+// 91xxxxxxxx is itself a live mobile series, so trimming it unconditionally
+// rejects real buyers.
 func NormalizePhone(s string) (string, bool) {
 	s = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(s)
-	s = strings.TrimPrefix(s, "+91")
-	s = strings.TrimPrefix(s, "91")
-	s = strings.TrimPrefix(s, "0")
+	s = strings.TrimPrefix(s, "+")
+	for _, p := range []string{"91", "0"} {
+		if len(s) == 10+len(p) && strings.HasPrefix(s, p) {
+			s = s[len(p):]
+			break
+		}
+	}
 	if len(s) != 10 || s[0] < '6' {
 		return "", false
 	}
