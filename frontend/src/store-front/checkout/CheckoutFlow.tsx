@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BadgeCheck, Banknote, CreditCard, Loader2, MapPinOff, PartyPopper, ShieldCheck, Smartphone, Truck } from 'lucide-react';
-import type { Address, OrderRef, PlacedOrder } from '@/api/types';
+import type { Address, CheckoutInfo, OnlinePayment, OrderRef, PlacedOrder } from '@/api/types';
 import {
   buyerPay,
   buyerVerifyPayment,
@@ -21,6 +21,7 @@ import { MoneyText } from '@/ui/MoneyText';
 import { Button } from '@/ui/Button';
 import { Field, Input, Textarea } from '@/ui/Input';
 import { Stepper } from '@/ui/Stepper';
+import { UpiPayPanel } from './UpiPayPanel';
 
 type Step = 'details' | 'otp' | 'payment' | 'done';
 
@@ -32,6 +33,9 @@ export type CheckoutContext = {
   subtotal: number;
   shippingFee: number;
   codEnabled: boolean;
+  /** 'gateway' = Razorpay checkout, 'upi' = direct transfer to the seller's VPA,
+   *  'none' = the seller can only take COD. */
+  onlinePayment: OnlinePayment;
 };
 
 const steps = ['Details', 'Verify', 'Pay'];
@@ -51,8 +55,9 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
   const [otp, setOtp] = useState('');
   const [resendIn, setResendIn] = useState(0);
   const [orderToken, setOrderToken] = useState('');
-  const [method, setMethod] = useState<'prepaid' | 'cod'>('prepaid');
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
+  // set when the seller collects on UPI instead of a gateway
+  const [upiInfo, setUpiInfo] = useState<CheckoutInfo | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
 
   const openRazorpay = useRazorpay();
@@ -62,10 +67,14 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
   const undeliverable = reach?.checked === true && !reach.serviceable;
   // COD is only offered where the courier actually collects it
   const codAvailable = ctx.codEnabled && (reach?.checked !== true || reach.codAvailable);
+  const prepaidAvailable = ctx.onlinePayment !== 'none';
+  const [method, setMethod] = useState<'prepaid' | 'cod'>(prepaidAvailable ? 'prepaid' : 'cod');
 
+  // never leave a method selected that this seller cannot actually accept
   useEffect(() => {
-    if (!codAvailable && method === 'cod') setMethod('prepaid');
-  }, [codAvailable, method]);
+    if (!codAvailable && method === 'cod' && prepaidAvailable) setMethod('prepaid');
+    if (!prepaidAvailable && method === 'prepaid') setMethod('cod');
+  }, [codAvailable, prepaidAvailable, method]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -116,7 +125,6 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
         if (res.prefill.address?.line && !address.line) setAddress(res.prefill.address);
       }
       setStep('payment');
-      if (!codAvailable) setMethod('prepaid');
     } catch (e) {
       toast('error', 'Wrong or expired code', e instanceof Error ? e.message : undefined);
     } finally {
@@ -144,6 +152,13 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
 
       if (order.next === 'pay') {
         const info = await buyerPay(order.orderCode, 'order');
+        if (info.mode === 'upi') {
+          // no gateway on this seller — buyer transfers to their VPA and reports it
+          setUpiInfo(info);
+          setStep('done');
+          onDone();
+          return;
+        }
         const res = await openRazorpay(info, { name, contact: phone, email });
         await buyerVerifyPayment({
           razorpayOrderId: res.razorpay_order_id,
@@ -167,6 +182,10 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
     setBusy(true);
     try {
       const info = await buyerPay(placed.orderCode, 'token');
+      if (info.mode === 'upi') {
+        setUpiInfo(info);
+        return;
+      }
       const res = await openRazorpay(info, { name, contact: phone });
       await buyerVerifyPayment({
         razorpayOrderId: res.razorpay_order_id,
@@ -325,20 +344,28 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             <fieldset>
               <legend className="mb-2 text-sm font-medium text-hi">Payment method</legend>
               <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => setMethod('prepaid')}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md p-4 text-left transition-all duration-micro',
-                    method === 'prepaid' ? 'bg-jade-500/10 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))]' : 'bg-surface-2 hairline',
-                  )}
-                >
-                  <CreditCard className={cn('size-5', method === 'prepaid' ? 'text-jade-ink' : 'text-mid')} />
-                  <span className="flex-1">
-                    <span className="block text-sm font-medium text-hi">Pay now — UPI or card</span>
-                    <span className="block text-xs text-low">Fastest dispatch · secured by Razorpay</span>
-                  </span>
-                  {method === 'prepaid' && <BadgeCheck className="size-5 text-jade-ink" />}
-                </button>
+                {prepaidAvailable && (
+                  <button
+                    onClick={() => setMethod('prepaid')}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md p-4 text-left transition-all duration-micro',
+                      method === 'prepaid' ? 'bg-jade-500/10 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))]' : 'bg-surface-2 hairline',
+                    )}
+                  >
+                    <CreditCard className={cn('size-5', method === 'prepaid' ? 'text-jade-ink' : 'text-mid')} />
+                    <span className="flex-1">
+                      <span className="block text-sm font-medium text-hi">
+                        {ctx.onlinePayment === 'upi' ? 'Pay now by UPI' : 'Pay now — UPI or card'}
+                      </span>
+                      <span className="block text-xs text-low">
+                        {ctx.onlinePayment === 'upi'
+                          ? `GPay · PhonePe · Paytm — straight to ${ctx.businessName}`
+                          : 'Fastest dispatch · secured by Razorpay'}
+                      </span>
+                    </span>
+                    {method === 'prepaid' && <BadgeCheck className="size-5 text-jade-ink" />}
+                  </button>
+                )}
 
                 {codAvailable && (
                   <button
@@ -365,6 +392,11 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             <p className="flex items-center justify-center gap-1.5 text-xs text-low">
               <ShieldCheck className="size-3.5" /> Your payment goes directly to {ctx.businessName}
             </p>
+            {!prepaidAvailable && (
+              <p className="text-center text-xs text-low">
+                {ctx.businessName} accepts cash on delivery only right now.
+              </p>
+            )}
           </motion.div>
         )}
 
@@ -386,6 +418,12 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                 <MoneyText paise={placed.total} />
               </p>
             </div>
+
+            {upiInfo && (
+              <div className="w-full">
+                <UpiPayPanel info={upiInfo} />
+              </div>
+            )}
 
             {placed.next === 'codPending' && (
               <div className="w-full rounded-lg bg-gold-400/10 p-4 text-left">

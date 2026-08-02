@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AnimatePresence, motion } from 'framer-motion';
-import { PartyPopper } from 'lucide-react';
+import { Check, Loader2, PartyPopper, Smartphone, X } from 'lucide-react';
+import type { StoreCodeStatus } from '@/api/types';
 import { Seo } from '@/lib/seo';
-import { emailSchema, phoneSchema, pincodeSchema } from '@/lib/validators';
-import { register as apiRegister } from '@/api/auth';
+import { emailSchema, phoneSchema, pincodeSchema, storeCodeSchema, storeCodeSlug } from '@/lib/validators';
+import { checkStoreCode, register as apiRegister, sendSignupOtp, verifySignupOtp } from '@/api/auth';
 import { ApiError } from '@/api/http';
 import { toast } from '@/store/ui';
 import { AuthLayout } from './AuthLayout';
@@ -17,6 +18,7 @@ import { Stepper } from '@/ui/Stepper';
 
 const registerSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
+  storeCode: storeCodeSchema,
   ownerName: z.string().min(2, 'Your name is required'),
   email: emailSchema,
   phone: phoneSchema,
@@ -30,11 +32,94 @@ const registerSchema = z.object({
 });
 type RegisterForm = z.infer<typeof registerSchema>;
 
-const steps = ['Business', 'Reach', 'Done'];
-const stepFields: Array<Array<keyof RegisterForm>> = [
-  ['businessName', 'ownerName', 'email', 'phone', 'password'],
-  ['whatsapp', 'instagram', 'city', 'state', 'pincode', 'upiId'],
-];
+// Verify sits between details and the rest because the trial is issued against
+// a mobile number that answered an OTP — an unverified signup gets no trial.
+const steps = ['Business', 'Verify', 'Reach', 'Done'];
+const detailFields: Array<keyof RegisterForm> = ['businessName', 'storeCode', 'ownerName', 'email', 'phone', 'password'];
+
+/**
+ * The store link is the seller's public identity — it goes in every buyer URL,
+ * QR and Instagram bio, and it cannot be changed later without breaking every
+ * link already shared. So the seller picks it here, sees the result live, and
+ * gets readable alternatives when it is taken. The old behaviour silently
+ * appended four random characters on a name collision, which put
+ * /s/ritika-closet-k7m2 on someone's packaging.
+ */
+function StoreLinkField({
+  value,
+  onChange,
+  error,
+  status,
+  checking,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+  status: StoreCodeStatus | null;
+  checking: boolean;
+}) {
+  const taken = !!status && !status.available;
+  const hint = error || (taken ? status.reason : '');
+
+  return (
+    <div>
+      <Field label="Your store link" error={error}>
+        <Input
+          value={value}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-describedby="storeCodeState"
+          placeholder="ritika-closet"
+          onChange={(e) => onChange(storeCodeSlug(e.target.value))}
+          className="font-mono"
+        />
+      </Field>
+
+      <p id="storeCodeState" aria-live="polite" className="mt-1.5 flex items-start gap-1.5 text-xs">
+        {checking ? (
+          <>
+            <Loader2 className="mt-px size-3.5 shrink-0 animate-spin text-low" aria-hidden />
+            <span className="text-low">Checking…</span>
+          </>
+        ) : status?.available ? (
+          <>
+            <Check className="mt-px size-3.5 shrink-0 text-jade-ink" aria-hidden />
+            <span className="text-jade-ink">
+              <span className="font-mono">
+                {window.location.host}/s/{status.code}
+              </span>{' '}
+              is yours
+            </span>
+          </>
+        ) : hint ? (
+          <>
+            <X className="mt-px size-3.5 shrink-0 text-danger-ink" aria-hidden />
+            <span className="text-danger-ink">{hint === 'already taken' ? 'That link is already taken' : hint}</span>
+          </>
+        ) : (
+          <span className="text-low">Buyers see this in every link you share — it cannot be changed later.</span>
+        )}
+      </p>
+
+      {!!status?.suggestions?.length && !status.available && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-low">Available:</span>
+          {status.suggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onChange(s)}
+              className="rounded-full bg-jade-500/12 px-2.5 py-1 font-mono text-xs text-jade-ink transition-colors hover:bg-jade-500/20"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AsidePitch() {
   return (
@@ -55,25 +140,115 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [phoneToken, setPhoneToken] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  const otpRef = useRef<HTMLInputElement>(null);
+  const [codeStatus, setCodeStatus] = useState<StoreCodeStatus | null>(null);
+  const [checkingCode, setCheckingCode] = useState(false);
+  // once the seller edits the link themselves, the business name stops driving it
+  const codeTouched = useRef(false);
   const {
     register,
     handleSubmit,
     trigger,
+    getValues,
+    setValue,
+    watch,
     formState: { errors },
-  } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema), mode: 'onTouched' });
+  } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    mode: 'onTouched',
+    defaultValues: { storeCode: '' },
+  });
+
+  const storeCode = watch('storeCode');
+  const businessName = watch('businessName');
+
+  // derive the link from the business name until the seller takes it over
+  useEffect(() => {
+    if (codeTouched.current) return;
+    setValue('storeCode', storeCodeSlug(businessName ?? ''), { shouldValidate: false });
+  }, [businessName, setValue]);
+
+  // debounced availability lookup; the API is still the authority at submit
+  useEffect(() => {
+    if (!storeCode || !storeCodeSchema.safeParse(storeCode).success) {
+      setCodeStatus(null);
+      setCheckingCode(false);
+      return;
+    }
+    setCheckingCode(true);
+    const t = setTimeout(async () => {
+      try {
+        setCodeStatus(await checkStoreCode(storeCode, getValues('city')));
+      } catch {
+        setCodeStatus(null); // a failed lookup must not block signup; the API re-checks
+      } finally {
+        setCheckingCode(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [storeCode, getValues]);
+
+  // phoneSchema normalises 10-digit / +91 / 0-prefixed input to the same string
+  // the API stores, so the OTP and the registration agree on one number.
+  const cleanPhone = () => phoneSchema.safeParse(getValues('phone') ?? '');
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn(resendIn - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  const requestOtp = async () => {
+    const parsed = cleanPhone();
+    if (!parsed.success) return;
+    setBusy(true);
+    try {
+      await sendSignupOtp(parsed.data);
+      setStep(1);
+      setResendIn(30);
+      setTimeout(() => otpRef.current?.focus(), 320);
+    } catch (e) {
+      toast('error', 'Could not send the code', e instanceof ApiError ? e.message : 'Please retry.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const next = async () => {
-    if (await trigger(stepFields[0])) setStep(1);
+    if (!(await trigger(detailFields))) return;
+    // block on a link we know is taken; if the lookup never answered, let the
+    // API decide rather than stranding the seller on a network hiccup
+    if (codeStatus && !codeStatus.available) return;
+    await requestOtp();
+  };
+
+  const confirmOtp = async () => {
+    const parsed = cleanPhone();
+    if (!parsed.success || otp.length < 4) return;
+    setBusy(true);
+    try {
+      const { phoneToken: token } = await verifySignupOtp(parsed.data, otp);
+      setPhoneToken(token);
+      setStep(2);
+    } catch (e) {
+      toast('error', 'Wrong or expired code', e instanceof ApiError ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onSubmit = async (data: RegisterForm) => {
     setBusy(true);
     try {
-      await apiRegister({ ...data, pincode: data.pincode || undefined });
-      setStep(2);
+      await apiRegister({ ...data, pincode: data.pincode || undefined, phoneToken });
+      setStep(3);
       setTimeout(() => navigate('/app'), 1800);
     } catch (e) {
       toast('error', 'Registration failed', e instanceof ApiError ? e.message : 'Please retry.');
+      // 409 = an email / mobile / handle already on another business
       if (e instanceof ApiError && e.status === 409) setStep(0);
     } finally {
       setBusy(false);
@@ -103,6 +278,16 @@ export default function RegisterPage() {
               <Field label="Business name" error={errors.businessName?.message}>
                 <Input placeholder="Ritika's Closet" {...register('businessName')} />
               </Field>
+              <StoreLinkField
+                value={storeCode ?? ''}
+                error={errors.storeCode?.message}
+                status={codeStatus}
+                checking={checkingCode}
+                onChange={(v) => {
+                  codeTouched.current = true;
+                  setValue('storeCode', v, { shouldValidate: true });
+                }}
+              />
               <Field label="Your name" error={errors.ownerName?.message}>
                 <Input autoComplete="name" {...register('ownerName')} />
               </Field>
@@ -115,13 +300,58 @@ export default function RegisterPage() {
               <Field label="Password" error={errors.password?.message} hint="8+ characters">
                 <Input type="password" autoComplete="new-password" {...register('password')} />
               </Field>
-              <Button type="button" size="lg" onClick={next}>
+              <Button type="button" size="lg" loading={busy} onClick={next}>
                 Continue
               </Button>
             </motion.div>
           )}
 
           {step === 1 && (
+            <motion.div
+              key="verify"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-col gap-4"
+            >
+              <div className="flex flex-col items-center gap-2 py-2 text-center">
+                <span className="flex size-12 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink">
+                  <Smartphone className="size-6" aria-hidden />
+                </span>
+                <p className="text-sm text-mid">
+                  Code sent to <span className="font-mono font-medium text-hi">+91 {cleanPhone().data ?? ''}</span>
+                </p>
+                <button type="button" onClick={() => setStep(0)} className="text-xs text-jade-ink hover:underline">
+                  Change number
+                </button>
+              </div>
+              <Field label="Enter the 6-digit code" hint="Verifying your number is what starts the free trial">
+                <Input
+                  ref={otpRef}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  className="text-center font-mono text-xl tracking-[0.5em]"
+                />
+              </Field>
+              <Button type="button" size="lg" loading={busy} disabled={otp.length < 4} onClick={confirmOtp}>
+                Verify
+              </Button>
+              <button
+                type="button"
+                disabled={resendIn > 0 || busy}
+                onClick={requestOtp}
+                className="text-center text-xs text-mid transition-colors hover:text-hi disabled:opacity-50"
+              >
+                {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+              </button>
+            </motion.div>
+          )}
+
+          {step === 2 && (
             <motion.div
               key="s1"
               initial={{ opacity: 0, x: 24 }}
@@ -151,7 +381,7 @@ export default function RegisterPage() {
                 </Field>
               </div>
               <div className="flex gap-3">
-                <Button type="button" variant="secondary" onClick={() => setStep(0)}>
+                <Button type="button" variant="secondary" onClick={() => setStep(1)}>
                   Back
                 </Button>
                 <Button type="submit" size="lg" loading={busy} className="flex-1">
@@ -161,7 +391,7 @@ export default function RegisterPage() {
             </motion.div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <motion.div
               key="s2"
               initial={{ opacity: 0, scale: 0.92 }}
@@ -179,7 +409,7 @@ export default function RegisterPage() {
         </AnimatePresence>
       </form>
 
-      {step < 2 && (
+      {step < 3 && (
         <p className="mt-6 text-sm text-mid">
           Already selling with us?{' '}
           <Link to="/app/login" className="font-medium text-jade-ink hover:underline">

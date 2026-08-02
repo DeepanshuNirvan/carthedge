@@ -76,7 +76,11 @@ func New(d Deps) http.Handler {
 		httpx.OK(w, httpx.M{"status": "ok"})
 	})
 
-	// auth
+	// auth — signup mobile verification gates the free trial, so its OTP routes
+	// are rate-limited at least as hard as the buyer's
+	handle("GET /api/v1/auth/store-code", d.Auth.StoreCode, byIP("storeCode", 60, time.Minute))
+	handle("POST /api/v1/auth/signup/otp", d.Auth.SignupOtp, byIP("signupOtp", 5, 10*time.Minute))
+	handle("POST /api/v1/auth/signup/otp/verify", d.Auth.VerifySignupOtp, byIP("signupOtpVerify", 20, 10*time.Minute))
 	handle("POST /api/v1/auth/register", d.Auth.Register, byIP("register", 10, time.Minute))
 	handle("POST /api/v1/auth/login", d.Auth.Login, byIP("login", 20, time.Minute))
 	handle("POST /api/v1/auth/refresh", d.Auth.Refresh)
@@ -125,6 +129,8 @@ func New(d Deps) http.Handler {
 	handle("PATCH /api/v1/orders/{id}/status", d.Orders.SetStatus, authed, active)
 	handle("POST /api/v1/orders/{id}/ship", d.Orders.Ship, authed, active)
 	handle("POST /api/v1/orders/{id}/resend-confirmation", d.Orders.ResendCodConfirmation, authed, active)
+	// seller's verdict on a UPI transfer a buyer says they made
+	handle("POST /api/v1/orders/{id}/payment/confirm", d.PaySvc.ConfirmUpi, authed, active)
 
 	// live order board (SSE; EventSource passes the JWT as ?accessToken=)
 	handle("GET /api/v1/events", func(w http.ResponseWriter, r *http.Request) {
@@ -218,6 +224,7 @@ func New(d Deps) http.Handler {
 	handle("POST /p/{businessCode}/waitlist", d.Public.Waitlist, byIP("waitlist", 10, time.Minute))
 	handle("GET /p/orders/{code}/track", d.Public.Track)
 	handle("POST /p/orders/{code}/pay", d.Public.Pay, byIP("pay", 20, time.Minute))
+	handle("POST /p/orders/{code}/upi-claim", d.Public.ClaimUpi, byIP("upiClaim", 10, 10*time.Minute))
 	handle("POST /p/orders/{code}/confirm", d.Public.ConfirmCod, byIP("codConfirm", 20, time.Minute))
 	handle("POST /p/payments/verify", d.Public.VerifyPayment, byIP("payVerify", 30, time.Minute))
 
@@ -238,6 +245,7 @@ func New(d Deps) http.Handler {
 
 	return middleware.Chain(mux,
 		middleware.Recover(d.Log),
+		middleware.SecurityHeaders(d.Cfg.Env == "production"),
 		middleware.CORS(d.Cfg.CORSOrigins),
 		middleware.Logging(d.Log),
 	)

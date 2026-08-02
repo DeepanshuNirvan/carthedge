@@ -103,14 +103,14 @@ func (s *Service) ListChannels(ctx context.Context, bizID string) ([]httpx.M, er
 // marks the conversation for the next parse pass.
 func (s *Service) Receive(ctx context.Context, body []byte) {
 	for _, in := range parseWebhook(body) {
-		var bizID string
-		err := s.pool.QueryRow(ctx, `select business_id from channel_connections
-			where channel=$1 and external_id=$2 and status='connected'`, in.Channel, in.ExternalID).Scan(&bizID)
+		var bizID, tokenEnc string
+		err := s.pool.QueryRow(ctx, `select business_id, access_token from channel_connections
+			where channel=$1 and external_id=$2 and status='connected'`, in.Channel, in.ExternalID).Scan(&bizID, &tokenEnc)
 		if err != nil {
 			s.log.Warn("inbound for unknown channel", "channel", in.Channel, "externalId", in.ExternalID)
 			continue
 		}
-		var convID string
+		var convID, name string
 		err = s.pool.QueryRow(ctx, `insert into conversations
 			(business_id, channel, contact_id, contact_name, last_message_at, last_inbound_at, unread, parse_pending)
 			values ($1,$2,$3,$4,now(),now(),1,true)
@@ -118,10 +118,19 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 			  last_message_at=now(), last_inbound_at=now(),
 			  unread=conversations.unread+1, parse_pending=true,
 			  contact_name=case when conversations.contact_name='' then excluded.contact_name else conversations.contact_name end
-			returning id`, bizID, in.Channel, in.ContactID, in.Name).Scan(&convID)
+			returning id, contact_name`, bizID, in.Channel, in.ContactID, in.Name).Scan(&convID, &name)
 		if err != nil {
 			s.log.Error("upsert conversation failed", "err", err)
 			continue
+		}
+		// Instagram webhooks carry only an opaque sender id — resolve the handle
+		// once per conversation so the seller sees a name, not a number
+		if name == "" {
+			if token, err := s.cipher.Decrypt(tokenEnc); err == nil {
+				if name = s.client.Profile(ctx, in.Channel, token, in.ContactID); name != "" {
+					s.pool.Exec(ctx, `update conversations set contact_name=$2 where id=$1 and contact_name=''`, convID, name)
+				}
+			}
 		}
 		if _, err := s.pool.Exec(ctx, `insert into conversation_messages (conversation_id, direction, external_id, body)
 			values ($1,'in',$2,$3)`, convID, in.MessageID, in.Text); err != nil {
@@ -129,7 +138,7 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 			continue
 		}
 		s.bus.Publish(ctx, bizID, "messageReceived", httpx.M{
-			"conversationId": convID, "channel": in.Channel, "contact": in.Name, "preview": preview(in.Text)})
+			"conversationId": convID, "channel": in.Channel, "contact": name, "preview": preview(in.Text)})
 	}
 }
 
@@ -270,10 +279,13 @@ func (s *Service) Reply(ctx context.Context, bizID, convID, text string) error {
 	return nil
 }
 
+// preview truncates by rune, not byte — DMs are Hinglish and Devanagari, and a
+// byte slice through a multi-byte character produces invalid UTF-8 in the JSON.
 func preview(s string) string {
 	s = strings.TrimSpace(s)
-	if len(s) > 120 {
-		return s[:120] + "…"
+	runes := []rune(s)
+	if len(runes) > 120 {
+		return string(runes[:120]) + "…"
 	}
 	return s
 }

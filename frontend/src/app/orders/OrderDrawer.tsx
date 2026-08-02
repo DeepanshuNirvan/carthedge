@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BellRing, Lock, MapPin, Phone, Truck } from 'lucide-react';
+import { BellRing, IndianRupee, Lock, MapPin, Phone, Truck } from 'lucide-react';
 import type { OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
 import { useOrder, useOrderMutations } from '@/api/orders';
@@ -17,7 +17,7 @@ import { SkeletonRows } from '@/ui/Skeleton';
 
 export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId ?? undefined);
-  const { setStatus, ship, resendCodConfirmation } = useOrderMutations();
+  const { setStatus, ship, resendCodConfirmation, confirmPayment } = useOrderMutations();
   const createInvoice = useCreateInvoice();
   const canInvoice = useCan('invoices').allowed;
   const [courierName, setCourierName] = useState('Shiprocket');
@@ -116,6 +116,55 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               )}
             </dl>
           </section>
+
+          {/* A buyer who paid the seller's UPI ID directly reports the UTR here.
+              Only the seller can see their own bank alert, so only they can
+              settle it — CartHedge deliberately cannot. */}
+          {order.paymentStatus === 'claimed' && (
+            <section className="rounded-lg bg-gold-400/10 p-4">
+              <p className="flex items-center gap-2 text-sm font-medium text-gold-ink">
+                <IndianRupee className="size-4" aria-hidden /> Buyer reported a UPI payment
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-mid">
+                Reference <span className="font-mono text-hi">{order.paymentRef}</span> for{' '}
+                <MoneyText paise={order.total} className="text-xs" />. Check your bank or UPI app before you confirm —
+                confirming marks the order paid and messages the buyer.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  loading={confirmPayment.isPending}
+                  onClick={() =>
+                    confirmPayment.mutate(
+                      { id: order.id, approved: true },
+                      {
+                        onSuccess: () => toast('success', 'Payment confirmed', 'The buyer has been notified.'),
+                        onError: (e) => toast('error', 'Could not confirm', e.message),
+                      },
+                    )
+                  }
+                >
+                  Money received
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={confirmPayment.isPending}
+                  onClick={() =>
+                    confirmPayment.mutate(
+                      { id: order.id, approved: false },
+                      {
+                        onSuccess: () => toast('info', 'Marked unpaid', 'The buyer can try the payment again.'),
+                        onError: (e) => toast('error', 'Could not update', e.message),
+                      },
+                    )
+                  }
+                >
+                  Not received
+                </Button>
+              </div>
+            </section>
+          )}
 
           {/* actions */}
           <section className="grid gap-4 rounded-lg bg-surface-2 p-4">

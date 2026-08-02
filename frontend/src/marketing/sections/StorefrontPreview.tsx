@@ -31,7 +31,10 @@ export function StorefrontPreview() {
         </div>
 
         <Reveal delay={0.12}>
-          <div className="relative mx-auto w-full max-w-[310px]">
+          {/* the glow is 48px wider than the phone on each side by design. On a
+              375px screen that is 15px of sideways scroll, so clip it there and
+              let it bleed again once the section has room. */}
+          <div className="relative mx-auto w-full max-w-[310px] overflow-x-clip sm:overflow-x-visible">
             <div aria-hidden className="absolute -inset-12 rounded-full bg-jade-500/10 blur-3xl" />
             {/* phone shell — double-bezel */}
             <div className="relative rounded-[2.6rem] bg-gradient-to-b from-ink-800 to-ink-950 p-2 shadow-float">

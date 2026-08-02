@@ -94,7 +94,9 @@ func Load() (*Config, error) {
 		S3Region:      os.Getenv("S3_REGION"),
 		FrontendDir:   os.Getenv("FRONTEND_DIR"),
 
-		AIProvider:  env("AI_PROVIDER", "openai"),
+		// "auto" (default) uses whichever keys are set, OpenAI first; naming one
+		// promotes it to lead and leaves the other as failover
+		AIProvider:  env("AI_PROVIDER", "auto"),
 		OpenAIKey:   os.Getenv("OPENAI_API_KEY"),
 		OpenAIModel: env("OPENAI_MODEL", "gpt-4o-mini"),
 		OpenAIBase:  strings.TrimSuffix(env("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),

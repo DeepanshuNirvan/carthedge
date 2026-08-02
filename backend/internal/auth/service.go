@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"carthedge/internal/config"
+	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
+	"carthedge/internal/otp"
 	"carthedge/internal/secure"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,21 +26,30 @@ var (
 	ErrBadLogin   = errors.New("invalid email or password")
 	ErrBadRefresh = errors.New("invalid refresh token")
 	ErrBadReset   = errors.New("invalid or expired reset token")
+	ErrTaken      = errors.New("already registered") // wrapped with the field name
+	ErrUnverified = errors.New("verify your mobile number first")
+	ErrTrialLimit = errors.New("too many trials started from this network today — contact sales")
 )
 
-// path segments that a business code must never collide with
-var reservedCodes = map[string]bool{"orders": true, "payments": true, "api": true, "uploads": true, "admin": true, "webhooks": true}
+// signupScope namespaces the seller signup OTP away from the per-store buyer
+// OTPs, which are keyed by business code.
+const signupScope = "signup"
+
+// trialsPerIPPerDay bounds trial farming from one machine. Generous enough for
+// a shared office or a café, tight enough that scripting it is pointless.
+const trialsPerIPPerDay = 3
 
 type Service struct {
 	pool   *pgxpool.Pool
 	rdb    *redis.Client
 	cfg    *config.Config
 	notify *notify.Notifier
+	otp    *otp.Service
 	log    *slog.Logger
 }
 
-func NewService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, n *notify.Notifier, log *slog.Logger) *Service {
-	return &Service{pool: pool, rdb: rdb, cfg: cfg, notify: n, log: log}
+func NewService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, n *notify.Notifier, otpSvc *otp.Service, log *slog.Logger) *Service {
+	return &Service{pool: pool, rdb: rdb, cfg: cfg, notify: n, otp: otpSvc, log: log}
 }
 
 type RegisterInput struct {
@@ -55,6 +66,12 @@ type RegisterInput struct {
 	Pincode      string `json:"pincode"`
 	Gstin        string `json:"gstin"`
 	UpiID        string `json:"upiId"`
+	// StoreCode is the seller's chosen public URL segment (/s/<storeCode>).
+	// Empty falls back to a slug of the business name — but only if that is free.
+	StoreCode string `json:"storeCode"`
+	// PhoneToken is issued by VerifySignupOtp and proves the mobile is reachable
+	// by whoever is claiming the trial.
+	PhoneToken string `json:"phoneToken"`
 }
 
 type Tokens struct {
@@ -70,13 +87,44 @@ type Session struct {
 	TrialEndsAt  string `json:"trialEndsAt,omitempty"`
 }
 
+// SendSignupOtp starts mobile verification for a new seller. Numbers already on
+// a business are rejected here so the SMS is never spent and the seller is told
+// to log in instead.
+func (s *Service) SendSignupOtp(ctx context.Context, phone string) error {
+	var exists bool
+	if err := s.pool.QueryRow(ctx, `select exists(select 1 from businesses where phone = $1)`, phone).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("this mobile number %w — log in instead", ErrTaken)
+	}
+	return s.otp.Send(ctx, signupScope, phone, "")
+}
+
+// VerifySignupOtp exchanges the code for a token that Register consumes.
+func (s *Service) VerifySignupOtp(ctx context.Context, phone, code string) (string, error) {
+	return s.otp.Verify(ctx, signupScope, phone, code)
+}
+
 // Register onboards a business, generates its unique code and starts the trial.
-func (s *Service) Register(ctx context.Context, in RegisterInput) (*Session, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+// Identity is proven (verified mobile) and unique (email/phone/WhatsApp/Instagram)
+// before a trial is issued — see 0012_identity_and_upi.sql.
+func (s *Service) Register(ctx context.Context, in RegisterInput, clientIP string) (*Session, error) {
+	// checked here, burned only once the business exists — a duplicate email
+	// must not cost the seller their verification and force a second SMS
+	if !s.otp.Valid(ctx, signupScope, in.Phone, in.PhoneToken) {
+		return nil, ErrUnverified
+	}
+	if !s.trialSlotAvailable(ctx, clientIP) {
+		return nil, ErrTrialLimit
+	}
+	// the seller's public URL — settled before anything is written, and never
+	// silently altered to dodge a collision
+	code, err := s.resolveStoreCode(ctx, in.StoreCode, in.BusinessName)
 	if err != nil {
 		return nil, err
 	}
-	code, err := s.uniqueCode(ctx, in.BusinessName)
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
@@ -89,13 +137,22 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Session, err
 
 	var bizID string
 	err = tx.QueryRow(ctx, `insert into businesses
-		(code, name, owner_name, email, phone, password_hash, whatsapp, instagram, address, city, state, pincode, gstin, upi_id)
-		values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
-		code, in.BusinessName, in.OwnerName, strings.ToLower(in.Email), in.Phone, string(hash),
-		in.WhatsApp, in.Instagram, in.Address, in.City, in.State, in.Pincode, in.Gstin, in.UpiID).Scan(&bizID)
+		(code, name, owner_name, email, email_normalized, phone, phone_verified_at, password_hash,
+		 whatsapp, instagram, address, city, state, pincode, gstin, upi_id)
+		values ($1,$2,$3,$4,$5,$6,now(),$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
+		code, in.BusinessName, in.OwnerName, strings.ToLower(in.Email), httpx.NormalizeEmail(in.Email),
+		in.Phone, string(hash), in.WhatsApp, in.Instagram, in.Address, in.City, in.State,
+		in.Pincode, in.Gstin, in.UpiID).Scan(&bizID)
 	if err != nil {
-		if strings.Contains(err.Error(), "businesses_email_key") {
-			return nil, ErrEmailTaken
+		// someone claimed the same code between the check and the insert
+		if strings.Contains(err.Error(), "businesses_code_key") {
+			return nil, ErrCodeTaken
+		}
+		if field, dup := httpx.DuplicateField(err); dup {
+			if field == "email" {
+				return nil, ErrEmailTaken
+			}
+			return nil, fmt.Errorf("this %s is %w to another business", field, ErrTaken)
 		}
 		return nil, err
 	}
@@ -109,6 +166,8 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Session, err
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
+	s.otp.Consume(ctx, signupScope, in.Phone, in.PhoneToken)
+	s.recordTrial(ctx, clientIP)
 
 	s.notify.Async("welcome", func() error {
 		return s.notify.Email(in.Email, "Welcome to CartHedge",
@@ -221,24 +280,30 @@ func (s *Service) issueTokens(ctx context.Context, bizID, code string) (*Tokens,
 	return &Tokens{AccessToken: access, RefreshToken: refresh}, nil
 }
 
-func (s *Service) uniqueCode(ctx context.Context, name string) (string, error) {
-	base := secure.Slug(name)
-	if len(base) > 24 {
-		base = base[:24]
+// trialSlotAvailable / recordTrial cap how many free trials one network can open
+// in a day. The unique-identity indexes stop the same person reusing a phone or
+// handle; this stops them cycling through fresh ones from the same machine.
+// Checked before the write and counted after it, so failed attempts (a duplicate
+// email, say) never consume a real seller's allowance.
+func (s *Service) trialSlotAvailable(ctx context.Context, clientIP string) bool {
+	if clientIP == "" {
+		return true
 	}
-	if base == "" || reservedCodes[base] {
-		base = "store"
+	n, err := s.rdb.Get(ctx, trialIPKey(clientIP)).Int()
+	if err != nil {
+		return true // no key yet, or Redis blinked — never fail a real signup
 	}
-	code := base
-	for i := 0; i < 5; i++ {
-		var exists bool
-		if err := s.pool.QueryRow(ctx, `select exists(select 1 from businesses where code = $1)`, code).Scan(&exists); err != nil {
-			return "", err
-		}
-		if !exists && !reservedCodes[code] {
-			return code, nil
-		}
-		code = base + "-" + secure.Token(4)
-	}
-	return "", errors.New("could not generate business code")
+	return n < trialsPerIPPerDay
 }
+
+func (s *Service) recordTrial(ctx context.Context, clientIP string) {
+	if clientIP == "" {
+		return
+	}
+	key := trialIPKey(clientIP)
+	if n, err := s.rdb.Incr(ctx, key).Result(); err == nil && n == 1 {
+		s.rdb.Expire(ctx, key, 24*time.Hour)
+	}
+}
+
+func trialIPKey(clientIP string) string { return "trial:ip:" + clientIP }

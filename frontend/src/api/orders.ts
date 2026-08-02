@@ -69,5 +69,11 @@ export function useOrderMutations() {
       mutationFn: (id: string) => post<{ ok: boolean }>(`/api/v1/orders/${id}/resend-confirmation`),
       onSuccess: invalidate,
     }),
+    // seller's verdict on a UPI transfer the buyer reported
+    confirmPayment: useMutation({
+      mutationFn: ({ id, approved }: { id: string; approved: boolean }) =>
+        post<{ ok: boolean }>(`/api/v1/orders/${id}/payment/confirm`, { approved }),
+      onSuccess: invalidate,
+    }),
   };
 }

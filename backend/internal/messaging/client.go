@@ -88,14 +88,20 @@ type Inbound struct {
 	Text       string
 }
 
-// parseWebhook normalises a Meta webhook body into inbound text messages,
-// dropping statuses, echoes and non-text events.
+// parseWebhook normalises a Meta webhook body into inbound buyer messages,
+// dropping statuses, echoes and events with nothing to read.
+//
+// On Instagram a very large share of orders start as a *story reply* or a
+// photo — "ye wala chahiye" against a story is a complete order intent to a
+// human and was invisible to the parser while only `text` was read. Those now
+// arrive as an annotated line the LLM can use.
 func parseWebhook(body []byte) []Inbound {
 	var wh struct {
 		Object string `json:"object"`
 		Entry  []struct {
 			ID      string `json:"id"`
 			Changes []struct {
+				Field string `json:"field"`
 				Value struct {
 					Metadata struct {
 						PhoneNumberID string `json:"phone_number_id"`
@@ -113,22 +119,27 @@ func parseWebhook(body []byte) []Inbound {
 						Text struct {
 							Body string `json:"body"`
 						} `json:"text"`
+						Image struct {
+							Caption string `json:"caption"`
+						} `json:"image"`
+						Button struct {
+							Text string `json:"text"`
+						} `json:"button"`
+						Interactive struct {
+							ButtonReply struct {
+								Title string `json:"title"`
+							} `json:"button_reply"`
+							ListReply struct {
+								Title string `json:"title"`
+							} `json:"list_reply"`
+						} `json:"interactive"`
 					} `json:"messages"`
+					// Instagram delivers messaging events under `changes` too,
+					// depending on which product the app was subscribed through
+					Messaging []igMessagingEvent `json:"messaging"`
 				} `json:"value"`
 			} `json:"changes"`
-			Messaging []struct {
-				Sender struct {
-					ID string `json:"id"`
-				} `json:"sender"`
-				Recipient struct {
-					ID string `json:"id"`
-				} `json:"recipient"`
-				Message struct {
-					MID    string `json:"mid"`
-					Text   string `json:"text"`
-					IsEcho bool   `json:"is_echo"`
-				} `json:"message"`
-			} `json:"messaging"`
+			Messaging []igMessagingEvent `json:"messaging"`
 		} `json:"entry"`
 	}
 	if json.Unmarshal(body, &wh) != nil {
@@ -137,12 +148,21 @@ func parseWebhook(body []byte) []Inbound {
 	var out []Inbound
 	for _, e := range wh.Entry {
 		if wh.Object == "instagram" {
-			for _, m := range e.Messaging {
-				if m.Message.Text == "" || m.Message.IsEcho || m.Sender.ID == e.ID {
+			events := e.Messaging
+			for _, ch := range e.Changes {
+				events = append(events, ch.Value.Messaging...)
+			}
+			for _, m := range events {
+				// e.ID is the seller's own account: their outbound echoes land here too
+				if m.Message.IsEcho || m.Message.IsDeleted || m.Sender.ID == "" || m.Sender.ID == e.ID {
+					continue
+				}
+				text := igText(m)
+				if text == "" {
 					continue
 				}
 				out = append(out, Inbound{Channel: "instagram", ExternalID: e.ID, ContactID: m.Sender.ID,
-					MessageID: m.Message.MID, Text: m.Message.Text})
+					Name: m.Sender.Username, MessageID: m.Message.MID, Text: text})
 			}
 			continue
 		}
@@ -153,13 +173,103 @@ func parseWebhook(body []byte) []Inbound {
 				name = v.Contacts[0].Profile.Name
 			}
 			for _, m := range v.Messages {
-				if m.Type != "text" || m.Text.Body == "" {
+				text := firstNonEmpty(m.Text.Body, m.Image.Caption, m.Interactive.ButtonReply.Title,
+					m.Interactive.ListReply.Title, m.Button.Text)
+				if text == "" {
 					continue
 				}
+				if m.Type == "image" {
+					text = "[sent a photo] " + text
+				}
 				out = append(out, Inbound{Channel: "whatsapp", ExternalID: v.Metadata.PhoneNumberID,
-					ContactID: m.From, Name: name, MessageID: m.ID, Text: m.Text.Body})
+					ContactID: m.From, Name: name, MessageID: m.ID, Text: text})
 			}
 		}
 	}
 	return out
+}
+
+// igMessagingEvent is one Instagram messaging webhook event.
+type igMessagingEvent struct {
+	Sender struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+	} `json:"sender"`
+	Recipient struct {
+		ID string `json:"id"`
+	} `json:"recipient"`
+	Message struct {
+		MID         string `json:"mid"`
+		Text        string `json:"text"`
+		IsEcho      bool   `json:"is_echo"`
+		IsDeleted   bool   `json:"is_deleted"`
+		Attachments []struct {
+			Type    string `json:"type"` // image | video | share | story_mention | ig_reel
+			Payload struct {
+				Title string `json:"title"`
+			} `json:"payload"`
+		} `json:"attachments"`
+		ReplyTo struct {
+			Story struct {
+				ID string `json:"id"`
+			} `json:"story"`
+		} `json:"reply_to"`
+	} `json:"message"`
+}
+
+// igText renders an Instagram DM as one line of thread context. Attachment and
+// story markers are kept in prose so the parse prompt needs no new fields.
+func igText(m igMessagingEvent) string {
+	var parts []string
+	if m.Message.ReplyTo.Story.ID != "" {
+		parts = append(parts, "[replying to your story]")
+	}
+	for _, a := range m.Message.Attachments {
+		switch a.Type {
+		case "story_mention":
+			parts = append(parts, "[mentioned you in a story]")
+		case "share", "ig_reel":
+			label := "[shared a post]"
+			if a.Payload.Title != "" {
+				label = "[shared a post: " + a.Payload.Title + "]"
+			}
+			parts = append(parts, label)
+		case "image", "video":
+			parts = append(parts, "[sent a "+a.Type+"]")
+		}
+	}
+	if m.Message.Text != "" {
+		parts = append(parts, m.Message.Text)
+	}
+	return strings.TrimSpace(strings.Join(parts, " "))
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// Profile resolves a buyer's display name on Instagram. Webhooks carry only an
+// opaque sender id, so without this every conversation is titled with a number.
+func (c *Client) Profile(ctx context.Context, channel, token, contactID string) string {
+	if channel != "instagram" || token == "" || contactID == "" {
+		return ""
+	}
+	var out struct {
+		Name     string `json:"name"`
+		Username string `json:"username"`
+	}
+	url := fmt.Sprintf("https://graph.instagram.com/%s/%s?fields=name,username&access_token=%s",
+		c.version, contactID, token)
+	if err := c.getJSON(ctx, url, &out); err != nil {
+		return ""
+	}
+	if out.Username != "" {
+		return "@" + out.Username
+	}
+	return out.Name
 }

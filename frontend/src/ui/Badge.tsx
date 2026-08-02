@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import type { OrderStatus } from '@/api/types';
 
 type Tone = 'jade' | 'gold' | 'danger' | 'info' | 'neutral';
 
@@ -49,6 +48,8 @@ const statusTones: Record<string, Tone> = {
   paid: 'jade',
   pending: 'gold',
   token_paid: 'gold',
+  claimed: 'info', // buyer says they sent a UPI transfer; seller has not verified it
+  failed: 'danger',
   open: 'info',
   contacted: 'gold',
   closed: 'neutral',
@@ -58,10 +59,10 @@ const statusTones: Record<string, Tone> = {
   scheduled: 'info',
 };
 
-const statusLabels: Partial<Record<OrderStatus, string>> = { rto: 'RTO' };
+const statusLabels: Record<string, string> = { rto: 'RTO', claimed: 'payment reported' };
 
 export function StatusChip({ status, className }: { status: string; className?: string }) {
-  const label = statusLabels[status as OrderStatus] ?? status.replace(/_/g, ' ');
+  const label = statusLabels[status] ?? status.replace(/_/g, ' ');
   return (
     <Badge tone={statusTones[status] ?? 'neutral'} className={cn('capitalize', className)}>
       <span className="size-1.5 rounded-full bg-current" aria-hidden />

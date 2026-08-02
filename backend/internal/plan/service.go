@@ -150,9 +150,11 @@ func (s *Service) Checkout(ctx context.Context, bizID, planCode string) (httpx.M
 		values ($1, 'subscription', $2, $3, $4::jsonb)`, bizID, rzpOrderID, total, string(notes)); err != nil {
 		return nil, err
 	}
-	return httpx.M{"razorpayOrderId": rzpOrderID, "razorpayKeyId": s.platform.KeyID(),
+	// same shape the buyer checkout returns, so one Razorpay hook drives both
+	return httpx.M{"mode": "gateway", "razorpayOrderId": rzpOrderID, "razorpayKeyId": s.platform.KeyID(),
 		"amount": total, "planAmount": price, "overageAmount": overage, "overageOrders": overageOrders,
-		"currency": "INR", "planCode": planCode}, nil
+		"currency": "INR", "planCode": planCode, "businessName": "CartHedge", "orderCode": "Subscription",
+		"kind": "subscription"}, nil
 }
 
 // Overage prices the orders taken above the plan quota in the current period.

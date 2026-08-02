@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, PackageSearch, Truck } from 'lucide-react';
-import type { TrackedOrder } from '@/api/types';
+import type { CheckoutInfo, TrackedOrder } from '@/api/types';
 import { buyerPay, buyerVerifyPayment, trackOrder } from '@/api/storefront';
+import { UpiPayPanel } from '../checkout/UpiPayPanel';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { Seo } from '@/lib/seo';
 import { phoneSchema } from '@/lib/validators';
@@ -30,6 +31,7 @@ export default function TrackPage() {
   const [code, setCode] = useState(codeFromUrl ?? '');
   const [phone, setPhone] = useState('');
   const [order, setOrder] = useState<TrackedOrder | null>(null);
+  const [upiInfo, setUpiInfo] = useState<CheckoutInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const openRazorpay = useRazorpay();
 
@@ -53,6 +55,10 @@ export default function TrackPage() {
     setBusy(true);
     try {
       const info = await buyerPay(order.orderCode, 'order');
+      if (info.mode === 'upi') {
+        setUpiInfo(info);
+        return;
+      }
       const res = await openRazorpay(info, { contact: phone });
       await buyerVerifyPayment({
         razorpayOrderId: res.razorpay_order_id,
@@ -193,10 +199,25 @@ export default function TrackPage() {
                   <dd><MoneyText paise={order.total} /></dd>
                 </div>
               </dl>
-              {order.paymentMethod === 'prepaid' && order.paymentStatus !== 'paid' && (
+              {order.paymentMethod === 'prepaid' && order.paymentStatus === 'claimed' && !upiInfo && (
+                <p className="mt-4 rounded-md bg-gold-400/10 p-3 text-xs leading-relaxed text-mid">
+                  {order.businessName} is verifying your UPI payment
+                  {order.paymentRef && <> (reference <span className="font-mono text-hi">{order.paymentRef}</span>)</>}.
+                  Your order moves on as soon as it is matched.
+                </p>
+              )}
+              {order.paymentMethod === 'prepaid' && order.paymentStatus !== 'paid' && !upiInfo && (
                 <Button className="mt-4 w-full" loading={busy} onClick={payNow}>
-                  Complete payment
+                  {order.paymentStatus === 'claimed' ? 'Pay again' : 'Complete payment'}
                 </Button>
+              )}
+              {upiInfo && (
+                <div className="mt-4">
+                  <UpiPayPanel
+                    info={upiInfo}
+                    onClaimed={async () => setOrder(await trackOrder(order.orderCode, phone))}
+                  />
+                </div>
               )}
             </div>
 

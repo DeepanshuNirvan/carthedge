@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, MessageSquarePlus, Wallet } from 'lucide-react';
-import { subscriptionCheckout, subscriptionVerify, useCancelSubscription, usePlans, useSubscription, requestCustomPlan } from '@/api/plans';
+import { subscriptionCheckout, subscriptionVerify, useCancelSubscription, usePlans, useSubscriptionInfo, requestCustomPlan } from '@/api/plans';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { toast } from '@/store/ui';
@@ -17,7 +17,8 @@ import { SkeletonRows } from '@/ui/Skeleton';
 import { cn } from '@/lib/cn';
 
 export default function BillingPage() {
-  const { data: sub, isLoading } = useSubscription();
+  const { data: info, isLoading } = useSubscriptionInfo();
+  const sub = info?.subscription;
   const { data: plans } = usePlans();
   const cancel = useCancelSubscription();
   const openRazorpay = useRazorpay();
@@ -82,6 +83,18 @@ export default function BillingPage() {
                     {sub.status === 'trial' ? 'Trial ends' : sub.status === 'cancelled' ? 'Access till' : 'Renews by'}{' '}
                     {formatDate(sub.endsAt)} ({daysLeft(sub.endsAt)} days)
                   </p>
+                  <p className="mt-1 text-xs text-mid">
+                    {sub.ordersUsed} of {sub.orderQuota} included orders used this period
+                  </p>
+                  {/* the per-order fee is charged at renewal, so it has to be
+                      visible before the seller is asked to pay it */}
+                  {!!info?.overageOrders && (
+                    <p className="mt-1.5 rounded-md bg-gold-400/10 px-2.5 py-1.5 text-xs text-gold-ink">
+                      {info.overageOrders} order{info.overageOrders === 1 ? '' : 's'} above your quota ·{' '}
+                      <MoneyText paise={info.overageFee} className="text-xs font-semibold" /> will be added to your next
+                      renewal
+                    </p>
+                  )}
                 </div>
                 {sub.status === 'active' && (
                   <Button
@@ -123,7 +136,7 @@ export default function BillingPage() {
                     {plan.orderQuota} orders · {formatPaise(plan.perOrderFee)}/extra
                   </p>
                   <ul className="mt-3 flex flex-1 flex-col gap-1.5">
-                    {plan.features.slice(0, 4).map((f) => (
+                    {plan.features.map((f) => (
                       <li key={f} className="flex items-start gap-1.5 text-xs text-mid">
                         <Check className="mt-0.5 size-3.5 shrink-0 text-jade-ink" /> {f}
                       </li>

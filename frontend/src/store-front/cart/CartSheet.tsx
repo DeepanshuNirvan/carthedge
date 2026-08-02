@@ -40,6 +40,7 @@ export function CartSheet({
             subtotal,
             shippingFee: business.shippingFee,
             codEnabled: business.codEnabled,
+            onlinePayment: business.onlinePayment,
           }}
           onDone={clear}
         />

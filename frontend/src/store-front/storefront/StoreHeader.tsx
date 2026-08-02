@@ -93,9 +93,14 @@ export function StoreHeader({ business, onCart }: { business: StoreBusiness; onC
         </div>
       </div>
 
+      {/* the trust strip has to be true: a UPI-only seller has no Razorpay */}
       <p className="flex items-center justify-center gap-1.5 border-t bg-surface-2/40 py-1.5 text-[11px] font-medium text-mid">
         <ShieldCheck className="size-3.5 text-jade-ink" />
-        Payments secured by Razorpay · Seller verified
+        {business.onlinePayment === 'gateway'
+          ? 'Payments secured by Razorpay · Seller verified'
+          : business.onlinePayment === 'upi'
+            ? 'Pay by UPI direct to the seller · Seller verified'
+            : 'Cash on delivery · Seller verified'}
       </p>
     </header>
   );

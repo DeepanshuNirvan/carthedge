@@ -184,6 +184,42 @@ func CORS(origins []string) Middleware {
 	}
 }
 
+// SecurityHeaders sets the baseline browser protections a pen test looks for.
+// The CSP is deliberately explicit rather than permissive: the SPA is served
+// from this same origin, Razorpay's checkout is the only third-party script,
+// and buyer images can come from the seller's own storage.
+func SecurityHeaders(production bool) Middleware {
+	csp := strings.Join([]string{
+		"default-src 'self'",
+		// Razorpay's checkout injects its own inline bootstrap
+		"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
+		"style-src 'self' 'unsafe-inline'",
+		"img-src 'self' data: blob: https:",
+		"font-src 'self' data:",
+		"connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com",
+		"frame-src https://api.razorpay.com https://checkout.razorpay.com",
+		"frame-ancestors 'none'",
+		"base-uri 'self'",
+		"form-action 'self'",
+		"object-src 'none'",
+	}, "; ")
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("X-Frame-Options", "DENY")
+			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()")
+			h.Set("Cross-Origin-Opener-Policy", "same-origin")
+			h.Set("Content-Security-Policy", csp)
+			if production {
+				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RateLimit is a fixed-window Redis counter keyed per client.
 func RateLimit(rdb *redis.Client, name string, limit int, window time.Duration, key func(*http.Request) string) Middleware {
 	return func(next http.Handler) http.Handler {

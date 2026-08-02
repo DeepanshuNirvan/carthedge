@@ -208,7 +208,7 @@ func (h *Handler) Track(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.OK(w, httpx.M{
 		"orderCode": o.Code, "businessName": bizName, "status": o.Status,
-		"paymentMethod": o.PaymentMethod, "paymentStatus": o.PaymentStatus,
+		"paymentMethod": o.PaymentMethod, "paymentStatus": o.PaymentStatus, "paymentRef": o.PaymentRef,
 		"items": o.Items, "subtotal": o.Subtotal, "discount": o.Discount, "shipping": o.Shipping,
 		"total": o.Total, "courierName": o.CourierName, "courierTrackingId": o.CourierTracking,
 		"events": o.Events, "createdAt": o.CreatedAt,
@@ -232,6 +232,23 @@ func (h *Handler) Pay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, info)
+}
+
+// ClaimUpi records the UTR a buyer got after paying the seller's UPI ID by
+// hand. The seller verifies it against their bank alert — CartHedge never sees
+// the money, so it can never confirm the transfer itself.
+func (h *Handler) ClaimUpi(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Reference string `json:"reference"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := h.payments.ClaimUpiPayment(r.Context(), r.PathValue("code"), in.Reference); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
 }
 
 func (h *Handler) VerifyPayment(w http.ResponseWriter, r *http.Request) {

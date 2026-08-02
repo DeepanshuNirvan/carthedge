@@ -16,6 +16,10 @@ export type RegisterInput = {
   email: string;
   phone: string;
   password: string;
+  /** The seller's chosen public URL segment: /s/<storeCode>. */
+  storeCode: string;
+  /** From POST /auth/signup/otp/verify — proves the mobile before a trial starts. */
+  phoneToken: string;
   whatsapp?: string;
   instagram?: string;
   address?: string;
@@ -24,6 +28,15 @@ export type RegisterInput = {
   pincode?: string;
   gstin?: string;
   upiId?: string;
+};
+
+/** GET /auth/store-code — advisory; Register re-validates server-side. */
+export type StoreCodeStatus = {
+  /** canonical form of what was typed */
+  code: string;
+  available: boolean;
+  reason?: string;
+  suggestions?: string[];
 };
 
 // business
@@ -80,14 +93,21 @@ export type Subscription = {
   capabilities: Capability[];
   ordersUsed: number;
 };
+/** How the buyer pays: a Razorpay checkout, or a direct UPI transfer to the
+ *  seller's own VPA when they have no gateway. Money never routes via CartHedge
+ *  either way. */
 export type CheckoutInfo = {
-  razorpayOrderId: string;
-  razorpayKeyId: string;
+  mode: 'gateway' | 'upi';
+  razorpayOrderId?: string;
+  razorpayKeyId?: string;
   amount: number;
   currency: string;
   orderCode: string;
   businessName: string;
   kind: string;
+  upiId?: string;
+  /** upi://pay?… — opens GPay/PhonePe/Paytm, and renders as the QR. */
+  upiIntent?: string;
 };
 
 // catalog
@@ -168,7 +188,10 @@ export type Order = {
   code: string;
   status: OrderStatus;
   paymentMethod: 'cod' | 'prepaid';
+  /** pending | claimed (buyer reported a UPI transfer) | paid | token_paid | failed */
   paymentStatus: string;
+  /** UTR the buyer submitted for a direct UPI transfer, awaiting the seller's check. */
+  paymentRef?: string;
   source: string;
   items: OrderLine[];
   subtotal: number;
@@ -463,6 +486,10 @@ export type SiteSettings = {
 };
 
 // public storefront
+
+/** Which prepaid rail the seller can actually collect on. */
+export type OnlinePayment = 'gateway' | 'upi' | 'none';
+
 export type StoreBusiness = {
   code: string;
   name: string;
@@ -473,6 +500,7 @@ export type StoreBusiness = {
   whatsapp: string;
   codEnabled: boolean;
   shippingFee: number;
+  onlinePayment: OnlinePayment;
 };
 export type PublicVariant = { id: string; name: string; price: number; inStock: boolean };
 export type PublicProduct = {
@@ -503,6 +531,7 @@ export type ResolvedLink = {
     codEnabled: boolean;
     shippingFee: number;
     verified: boolean;
+    onlinePayment: OnlinePayment;
   };
   kind: ShareLink['kind'];
   title: string;
@@ -527,6 +556,7 @@ export type TrackedOrder = {
   status: OrderStatus;
   paymentMethod: string;
   paymentStatus: string;
+  paymentRef?: string;
   items: OrderLine[];
   subtotal: number;
   discount: number;

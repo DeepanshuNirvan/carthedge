@@ -8,6 +8,7 @@ import (
 	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
+	"carthedge/internal/link"
 	"carthedge/internal/order"
 	"carthedge/internal/product"
 
@@ -18,16 +19,17 @@ import (
 // Buyers browse the catalog and order directly, no link required.
 
 type storeBusiness struct {
-	ID          string `json:"-"`
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	LogoURL     string `json:"logoUrl"`
-	City        string `json:"city"`
-	State       string `json:"state"`
-	Instagram   string `json:"instagram"`
-	Whatsapp    string `json:"whatsapp"`
-	CodEnabled  bool   `json:"codEnabled"`
-	ShippingFee int    `json:"shippingFee"`
+	ID            string `json:"-"`
+	Code          string `json:"code"`
+	Name          string `json:"name"`
+	LogoURL       string `json:"logoUrl"`
+	City          string `json:"city"`
+	State         string `json:"state"`
+	Instagram     string `json:"instagram"`
+	Whatsapp      string `json:"whatsapp"`
+	CodEnabled    bool   `json:"codEnabled"`
+	ShippingFee   int    `json:"shippingFee"`
+	OnlinePayment string `json:"onlinePayment"` // gateway | upi | none
 }
 
 // toPublic is product.ToPublic — the one buyer-facing projection, shared with
@@ -36,12 +38,16 @@ var toPublic = product.ToPublic
 
 func (h *Handler) storeBusiness(ctx context.Context, code string) (*storeBusiness, error) {
 	var b storeBusiness
-	err := h.pool.QueryRow(ctx, `select id, code, name, logo_url, city, state, instagram, whatsapp, cod_enabled, shipping_fee
+	var razorpayKeyID, upiID string
+	err := h.pool.QueryRow(ctx, `select id, code, name, logo_url, city, state, instagram, whatsapp,
+		cod_enabled, shipping_fee, razorpay_key_id, upi_id
 		from businesses where code=$1 and status='active'`, code).Scan(
-		&b.ID, &b.Code, &b.Name, &b.LogoURL, &b.City, &b.State, &b.Instagram, &b.Whatsapp, &b.CodEnabled, &b.ShippingFee)
+		&b.ID, &b.Code, &b.Name, &b.LogoURL, &b.City, &b.State, &b.Instagram, &b.Whatsapp, &b.CodEnabled,
+		&b.ShippingFee, &razorpayKeyID, &upiID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errors.New("store not found")
 	}
+	b.OnlinePayment = link.OnlinePaymentMode(razorpayKeyID, upiID)
 	return &b, err
 }
 

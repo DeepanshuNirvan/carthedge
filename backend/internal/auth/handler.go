@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"carthedge/internal/httpx"
+	"carthedge/internal/middleware"
 )
 
 type Handler struct {
@@ -40,16 +41,90 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, "invalid pincode")
 		return
 	}
-	session, err := h.svc.Register(r.Context(), in)
+	if in.WhatsApp != "" {
+		whatsapp, ok := httpx.NormalizePhone(in.WhatsApp)
+		if !ok {
+			httpx.Err(w, http.StatusBadRequest, "invalid WhatsApp number")
+			return
+		}
+		in.WhatsApp = whatsapp
+	}
+	in.Instagram = httpx.NormalizeHandle(in.Instagram)
+	session, err := h.svc.Register(r.Context(), in, middleware.ClientIP(r))
+	switch {
+	case err == nil:
+		httpx.Created(w, session)
+	case errors.Is(err, ErrEmailTaken), errors.Is(err, ErrTaken), errors.Is(err, ErrCodeTaken):
+		httpx.Err(w, http.StatusConflict, err.Error())
+	case errors.Is(err, ErrCodeInvalid):
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, ErrUnverified):
+		httpx.Err(w, http.StatusBadRequest, "verify your mobile number to start the trial")
+	case errors.Is(err, ErrTrialLimit):
+		httpx.Err(w, http.StatusTooManyRequests, err.Error())
+	default:
+		h.svc.log.Error("registration failed", "err", err)
+		httpx.Err(w, http.StatusInternalServerError, "registration failed")
+	}
+}
+
+// StoreCode answers the signup form's live availability check for the seller's
+// public URL. Advisory only — Register re-validates and re-checks, so a client
+// that skips this or lies about the result gains nothing.
+func (h *Handler) StoreCode(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	status, err := h.svc.CheckStoreCode(r.Context(), q.Get("code"), q.Get("city"))
 	if err != nil {
-		if errors.Is(err, ErrEmailTaken) {
+		httpx.Err(w, http.StatusInternalServerError, "could not check that store link")
+		return
+	}
+	httpx.OK(w, status)
+}
+
+// SignupOtp sends the seller's mobile verification code. Without it the 15-day
+// trial is issued to an unverified identity, which is how trial farming starts.
+func (h *Handler) SignupOtp(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	phone, ok := httpx.NormalizePhone(in.Phone)
+	if !ok {
+		httpx.Err(w, http.StatusBadRequest, "invalid phone number")
+		return
+	}
+	if err := h.svc.SendSignupOtp(r.Context(), phone); err != nil {
+		if errors.Is(err, ErrTaken) {
 			httpx.Err(w, http.StatusConflict, err.Error())
 			return
 		}
-		httpx.Err(w, http.StatusInternalServerError, "registration failed")
+		httpx.Err(w, http.StatusTooManyRequests, err.Error())
 		return
 	}
-	httpx.Created(w, session)
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
+func (h *Handler) VerifySignupOtp(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	phone, ok := httpx.NormalizePhone(in.Phone)
+	if !ok {
+		httpx.Err(w, http.StatusBadRequest, "invalid phone number")
+		return
+	}
+	token, err := h.svc.VerifySignupOtp(r.Context(), phone, in.Code)
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"phoneToken": token})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {

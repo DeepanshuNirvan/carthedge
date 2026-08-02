@@ -94,6 +94,11 @@ export const trackOrder = (orderCode: string, phone: string) =>
 export const buyerPay = (orderCode: string, kind: 'order' | 'token') =>
   post<CheckoutInfo>(`/p/orders/${orderCode}/pay`, { kind }, 'none');
 
+/** Buyer reports the UTR of a UPI transfer they made straight to the seller's
+ *  VPA. The seller verifies it against their bank alert. */
+export const claimUpiPayment = (orderCode: string, reference: string) =>
+  post<{ ok: boolean }>(`/p/orders/${orderCode}/upi-claim`, { reference }, 'none');
+
 export const buyerVerifyPayment = (payload: {
   razorpayOrderId: string;
   razorpayPaymentId: string;

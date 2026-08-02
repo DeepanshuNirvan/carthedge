@@ -49,6 +49,8 @@ type Resolved struct {
 		CodEnabled  bool   `json:"codEnabled"`
 		ShippingFee int    `json:"shippingFee"`
 		Verified    bool   `json:"verified"` // trust strip
+		// gateway | upi | none — which prepaid rail the checkout may offer
+		OnlinePayment string `json:"onlinePayment"`
 	} `json:"business"`
 	LinkID string           `json:"-"`
 	Kind   string           `json:"kind"`
@@ -166,15 +168,16 @@ func (s *Service) SetActive(ctx context.Context, bizID, id string, active bool) 
 // Resolve loads the checkout payload for a public link and counts the click.
 func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved, error) {
 	var res Resolved
-	var linkBizID string
+	var linkBizID, razorpayKeyID, upiID string
 	var items []byte
 	err := s.pool.QueryRow(ctx, `select l.id, l.kind, l.title, l.items, l.amount, b.id, b.code, b.name,
-		b.logo_url, b.whatsapp, b.cod_enabled, b.shipping_fee
+		b.logo_url, b.whatsapp, b.cod_enabled, b.shipping_fee, b.razorpay_key_id, b.upi_id
 		from order_links l join businesses b on b.id = l.business_id
 		where b.code = $1 and l.token = $2 and l.active and b.status = 'active'
 		and (l.expires_at is null or l.expires_at > now())`, bizCode, token).Scan(
 		&res.LinkID, &res.Kind, &res.Title, &items, &res.Amount, &linkBizID, &res.Business.Code, &res.Business.Name,
-		&res.Business.LogoURL, &res.Business.WhatsApp, &res.Business.CodEnabled, &res.Business.ShippingFee)
+		&res.Business.LogoURL, &res.Business.WhatsApp, &res.Business.CodEnabled, &res.Business.ShippingFee,
+		&razorpayKeyID, &upiID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -183,6 +186,7 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 	}
 	res.Business.ID = linkBizID
 	res.Business.Verified = true
+	res.Business.OnlinePayment = OnlinePaymentMode(razorpayKeyID, upiID)
 	json.Unmarshal(items, &res.Refs)
 
 	for _, ref := range res.Refs {
@@ -197,6 +201,20 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 	}
 	go s.pool.Exec(context.Background(), `update order_links set clicks = clicks + 1 where id=$1`, res.LinkID)
 	return &res, nil
+}
+
+// OnlinePaymentMode names the prepaid rail a seller can actually collect on.
+// A gateway wins when both are set: it confirms itself, UPI needs the seller to
+// eyeball a bank alert. Shared with the storefront so both buyer surfaces agree.
+func OnlinePaymentMode(razorpayKeyID, upiID string) string {
+	switch {
+	case razorpayKeyID != "":
+		return "gateway"
+	case upiID != "":
+		return "upi"
+	default:
+		return "none"
+	}
 }
 
 func orEmptyRefs(refs []ItemRef) []ItemRef {

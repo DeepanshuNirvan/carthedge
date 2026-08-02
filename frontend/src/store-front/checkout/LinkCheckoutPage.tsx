@@ -213,6 +213,7 @@ export default function LinkCheckoutPage() {
                 subtotal,
                 shippingFee: link.business.shippingFee,
                 codEnabled: link.business.codEnabled,
+                onlinePayment: link.business.onlinePayment,
               }}
               onDone={() => {}}
             />
@@ -220,7 +221,13 @@ export default function LinkCheckoutPage() {
         </motion.div>
 
         <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-low">
-          <ShieldCheck className="size-3.5 text-jade-ink" /> Payments secured by Razorpay · Powered by CartHedge
+          <ShieldCheck className="size-3.5 text-jade-ink" />
+          {link.business.onlinePayment === 'gateway'
+            ? 'Payments secured by Razorpay'
+            : link.business.onlinePayment === 'upi'
+              ? 'Pay by UPI direct to the seller'
+              : 'Cash on delivery'}{' '}
+          · Powered by CartHedge
         </p>
       </main>
     </div>

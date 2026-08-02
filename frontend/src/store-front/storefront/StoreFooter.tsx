@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PackageSearch } from 'lucide-react';
+import { Instagram, MessageCircle, PackageSearch } from 'lucide-react';
 import type { StoreBusiness } from '@/api/types';
 
 export function StoreFooter({ business }: { business: StoreBusiness }) {
@@ -13,6 +13,33 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
           <PackageSearch className="size-4" />
           Track your order
         </Link>
+
+        {/* the DM is where these buyers came from and where they ask questions —
+            give both channels a real, thumb-sized target, not just a header icon */}
+        {(business.instagram || business.whatsapp) && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {business.instagram && (
+              <a
+                href={`https://instagram.com/${business.instagram.replace('@', '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm text-mid transition-colors hover:text-hi"
+              >
+                <Instagram className="size-4" aria-hidden /> DM on Instagram
+              </a>
+            )}
+            {business.whatsapp && (
+              <a
+                href={`https://wa.me/91${business.whatsapp.replace(/\D/g, '').slice(-10)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm text-mid transition-colors hover:text-hi"
+              >
+                <MessageCircle className="size-4" aria-hidden /> Chat on WhatsApp
+              </a>
+            )}
+          </div>
+        )}
         <p className="text-xs leading-relaxed text-low">
           {business.name}
           {business.city && ` · ${business.city}`}

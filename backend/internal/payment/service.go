@@ -7,9 +7,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
+	"carthedge/internal/middleware"
 	"carthedge/internal/order"
 	"carthedge/internal/secure"
 
@@ -32,28 +36,50 @@ func NewService(pool *pgxpool.Pool, rdb *redis.Client, orders *order.Service, ci
 	return &Service{pool: pool, rdb: rdb, orders: orders, cipher: cipher, cfg: cfg, log: log}
 }
 
+// CheckoutInfo tells the buyer's page how to pay. Two rails, both settling into
+// the seller's own account: a Razorpay checkout when the seller has a gateway,
+// or a plain UPI collect request when all they have is a VPA — which is the
+// common case for a small Instagram seller.
 type CheckoutInfo struct {
-	RazorpayOrderID string `json:"razorpayOrderId"`
-	RazorpayKeyID   string `json:"razorpayKeyId"`
+	Mode            string `json:"mode"` // gateway | upi
+	RazorpayOrderID string `json:"razorpayOrderId,omitempty"`
+	RazorpayKeyID   string `json:"razorpayKeyId,omitempty"`
 	Amount          int    `json:"amount"`
 	Currency        string `json:"currency"`
 	OrderCode       string `json:"orderCode"`
 	BusinessName    string `json:"businessName"`
 	Kind            string `json:"kind"`
+	UpiID           string `json:"upiId,omitempty"`
+	// UpiIntent opens GPay/PhonePe/Paytm with the amount and reference filled in;
+	// the same string renders as the QR for anyone paying from another device.
+	UpiIntent string `json:"upiIntent,omitempty"`
 }
 
-// BuyerCheckout creates a Razorpay order on the seller's account for either
-// the full amount or the COD token.
+// UpiIntent builds the standard NPCI deep link every Indian UPI app accepts.
+// Amount is in rupees with two decimals — the one place paise are formatted.
+func UpiIntent(vpa, payeeName, orderCode string, paise int) string {
+	q := url.Values{
+		"pa": {vpa},
+		"pn": {payeeName},
+		"am": {strconv.FormatFloat(float64(paise)/100, 'f', 2, 64)},
+		"cu": {"INR"},
+		"tn": {"Order " + orderCode},
+		"tr": {orderCode},
+	}
+	return "upi://pay?" + q.Encode()
+}
+
+// BuyerCheckout starts a payment for either the full amount or the COD token.
 func (s *Service) BuyerCheckout(ctx context.Context, orderCode, kind string) (*CheckoutInfo, error) {
 	if kind != "order" && kind != "token" {
 		return nil, errors.New("kind must be order or token")
 	}
-	var orderID, bizID, bizName, keyID, secretEnc, paymentMethod, paymentStatus string
+	var orderID, bizID, bizName, keyID, secretEnc, upiID, paymentMethod, paymentStatus string
 	var total, tokenAmount int
 	err := s.pool.QueryRow(ctx, `select o.id, o.business_id, b.name, b.razorpay_key_id, b.razorpay_key_secret,
-		o.payment_method, o.payment_status, o.total, o.token_amount
+		b.upi_id, o.payment_method, o.payment_status, o.total, o.token_amount
 		from orders o join businesses b on b.id = o.business_id where o.order_code = $1`, orderCode).Scan(
-		&orderID, &bizID, &bizName, &keyID, &secretEnc, &paymentMethod, &paymentStatus, &total, &tokenAmount)
+		&orderID, &bizID, &bizName, &keyID, &secretEnc, &upiID, &paymentMethod, &paymentStatus, &total, &tokenAmount)
 	if err != nil {
 		return nil, errors.New("order not found")
 	}
@@ -67,10 +93,17 @@ func (s *Service) BuyerCheckout(ctx context.Context, orderCode, kind string) (*C
 		}
 		amount = tokenAmount
 	}
-	secret, err := s.cipher.Decrypt(secretEnc)
-	if err != nil || keyID == "" || secret == "" {
-		return nil, errors.New("seller has not enabled online payments")
+
+	secret, decErr := s.cipher.Decrypt(secretEnc)
+	if decErr != nil || keyID == "" || secret == "" {
+		if upiID == "" {
+			return nil, errors.New("seller has not enabled online payments")
+		}
+		return &CheckoutInfo{Mode: "upi", Amount: amount, Currency: "INR", OrderCode: orderCode,
+			BusinessName: bizName, Kind: kind, UpiID: upiID,
+			UpiIntent: UpiIntent(upiID, bizName, orderCode, amount)}, nil
 	}
+
 	client := NewClient(keyID, secret)
 	rzpOrderID, err := client.CreateOrder(ctx, amount, orderCode, map[string]string{"orderCode": orderCode, "kind": kind})
 	if err != nil {
@@ -82,8 +115,60 @@ func (s *Service) BuyerCheckout(ctx context.Context, orderCode, kind string) (*C
 		values ($1,$2,$3,$4,$5,$6::jsonb)`, bizID, orderID, kind, rzpOrderID, amount, string(notes)); err != nil {
 		return nil, err
 	}
-	return &CheckoutInfo{RazorpayOrderID: rzpOrderID, RazorpayKeyID: keyID, Amount: amount, Currency: "INR",
-		OrderCode: orderCode, BusinessName: bizName, Kind: kind}, nil
+	return &CheckoutInfo{Mode: "gateway", RazorpayOrderID: rzpOrderID, RazorpayKeyID: keyID, Amount: amount,
+		Currency: "INR", OrderCode: orderCode, BusinessName: bizName, Kind: kind}, nil
+}
+
+// ClaimUpiPayment records the reference (UTR) a buyer got from their UPI app.
+// Nothing is marked paid here — a claim is a buyer assertion, and the seller
+// confirms it against their own bank alert from the order card.
+func (s *Service) ClaimUpiPayment(ctx context.Context, orderCode, ref string) error {
+	ref = strings.ToUpper(strings.TrimSpace(ref))
+	if len(ref) < 6 || len(ref) > 40 {
+		return errors.New("enter the UPI reference / UTR number from your payment app")
+	}
+	var orderID, bizID string
+	err := s.pool.QueryRow(ctx, `update orders set payment_ref=$2, payment_status='claimed', updated_at=now()
+		where order_code=$1 and payment_status in ('pending','failed','claimed')
+		returning id, business_id`, orderCode, ref).Scan(&orderID, &bizID)
+	if err != nil {
+		return errors.New("order not found, or it is already paid")
+	}
+	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'new',$2)`,
+		orderID, "buyer reported a UPI payment, ref "+ref)
+	return s.orders.NotifyUpiClaim(ctx, bizID, orderID, ref)
+}
+
+// ConfirmUpiPayment is the seller's verdict on a claimed UPI transfer. Only a
+// claim can be settled this way — a gateway payment proves itself with a
+// signature, and nothing else may be talked into "paid" from the order card.
+func (s *Service) ConfirmUpiPayment(ctx context.Context, bizID, orderID string, approved bool) error {
+	var status, method string
+	if err := s.pool.QueryRow(ctx, `select payment_status, payment_method from orders where id=$1 and business_id=$2`,
+		orderID, bizID).Scan(&status, &method); err != nil {
+		return errors.New("order not found")
+	}
+	if status == "paid" || status == "token_paid" {
+		return nil // already settled, by this route or the gateway
+	}
+	if status != "claimed" {
+		return errors.New("no reported payment to verify on this order")
+	}
+	if !approved {
+		_, err := s.pool.Exec(ctx, `update orders set payment_status='pending', payment_ref='', updated_at=now()
+			where id=$1 and business_id=$2 and payment_status='claimed'`, orderID, bizID)
+		if err == nil {
+			s.pool.Exec(ctx, `insert into order_events (order_id, status, note)
+				values ($1,'new','seller could not find this UPI payment')`, orderID)
+		}
+		return err
+	}
+	// a COD order paying by UPI can only ever be paying its confirmation token
+	kind := "order"
+	if method == "cod" {
+		kind = "token"
+	}
+	return s.orders.MarkPaid(ctx, orderID, kind)
 }
 
 // VerifyBuyer validates the checkout signature against the seller's secret
@@ -119,6 +204,21 @@ func (s *Service) VerifyBuyer(ctx context.Context, rzpOrderID, rzpPaymentID, sig
 		return nil
 	}
 	return s.orders.MarkPaid(ctx, orderID, kind)
+}
+
+// ConfirmUpi is the seller's authed verdict on a buyer-claimed UPI transfer.
+func (s *Service) ConfirmUpi(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Approved bool `json:"approved"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := s.ConfirmUpiPayment(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), in.Approved); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
 }
 
 // Webhook handles Razorpay events on the platform account and acts as a

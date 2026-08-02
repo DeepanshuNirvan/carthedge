@@ -91,10 +91,10 @@ func main() {
 	linkSvc := link.NewService(pool, productSvc, cfg.PublicBaseURL)
 	planSvc := plan.NewService(pool, rdb, cfg, platformRzp, notifier, log)
 	paySvc := payment.NewService(pool, rdb, orderSvc, cipher, cfg, log)
-	authSvc := auth.NewService(pool, rdb, cfg, notifier, log)
+	authSvc := auth.NewService(pool, rdb, cfg, notifier, otpSvc, log)
 	broadcastSvc := broadcast.NewService(pool, notifier, log)
 	broadcastSvc.StartScheduler(ctx)
-	aiClient := ai.NewClient(cfg)
+	aiClient := ai.NewClient(cfg, log)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log)
 	metaClient := messaging.NewClient(cfg.MetaAppSecret, cfg.MetaGraphVersion)
 	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, log)
@@ -147,7 +147,7 @@ func main() {
 	}
 
 	go func() {
-		log.Info("carthedge api listening", "port", cfg.Port, "env", cfg.Env, "storage", cfg.StorageDriver, "aiProvider", cfg.AIProvider)
+		log.Info("carthedge api listening", "port", cfg.Port, "env", cfg.Env, "storage", cfg.StorageDriver, "aiProvider", aiClient.Provider())
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error("server failed", "err", err)
 			stop()

@@ -79,16 +79,28 @@ func (s *Service) Verify(ctx context.Context, bizCode, phone, code string) (stri
 	s.rdb.Del(ctx, key, key+":tries")
 
 	token := secure.Hex(24)
-	tokenKey := fmt.Sprintf("ordertoken:%s:%s:%s", bizCode, phone, token)
-	if err := s.rdb.Set(ctx, tokenKey, "1", 15*time.Minute).Err(); err != nil {
+	if err := s.rdb.Set(ctx, tokenKey(bizCode, phone, token), "1", 15*time.Minute).Err(); err != nil {
 		return "", err
 	}
 	return token, nil
 }
 
+// Valid reports whether a token is still live without burning it — for callers
+// that must check up front but can only commit at the end.
+func (s *Service) Valid(ctx context.Context, bizCode, phone, token string) bool {
+	if token == "" {
+		return false
+	}
+	n, err := s.rdb.Exists(ctx, tokenKey(bizCode, phone, token)).Result()
+	return err == nil && n == 1
+}
+
 // Consume validates and burns an order token.
 func (s *Service) Consume(ctx context.Context, bizCode, phone, token string) bool {
-	tokenKey := fmt.Sprintf("ordertoken:%s:%s:%s", bizCode, phone, token)
-	n, err := s.rdb.Del(ctx, tokenKey).Result()
+	n, err := s.rdb.Del(ctx, tokenKey(bizCode, phone, token)).Result()
 	return err == nil && n == 1
+}
+
+func tokenKey(bizCode, phone, token string) string {
+	return fmt.Sprintf("ordertoken:%s:%s:%s", bizCode, phone, token)
 }

@@ -35,6 +35,7 @@ type Order struct {
 	Status          string           `json:"status"`
 	PaymentMethod   string           `json:"paymentMethod"`
 	PaymentStatus   string           `json:"paymentStatus"`
+	PaymentRef      string           `json:"paymentRef,omitempty"` // UTR of a claimed UPI transfer
 	Source          string           `json:"source"`
 	Items           []product.Line   `json:"items"`
 	Subtotal        int              `json:"subtotal"`
@@ -111,17 +112,24 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 		return nil, errors.New("customer name and phone are required")
 	}
 
-	var bizName, bizWhatsApp string
+	var bizName, bizWhatsApp, razorpayKeyID, upiID string
 	var shippingFee, codTokenAmount, freeShippingAbove int
 	var codEnabled bool
-	err := s.pool.QueryRow(ctx, `select name, whatsapp, shipping_fee, cod_enabled, cod_token_amount, free_shipping_above
+	err := s.pool.QueryRow(ctx, `select name, whatsapp, shipping_fee, cod_enabled, cod_token_amount,
+		free_shipping_above, razorpay_key_id, upi_id
 		from businesses where id=$1 and status='active'`, p.BusinessID).Scan(
-		&bizName, &bizWhatsApp, &shippingFee, &codEnabled, &codTokenAmount, &freeShippingAbove)
+		&bizName, &bizWhatsApp, &shippingFee, &codEnabled, &codTokenAmount, &freeShippingAbove,
+		&razorpayKeyID, &upiID)
 	if err != nil {
 		return nil, errors.New("business not found")
 	}
 	if p.PaymentMethod == "cod" && !codEnabled {
 		return nil, errors.New("cash on delivery is not available for this seller")
+	}
+	// a seller with neither a gateway nor a UPI ID cannot be paid online; taking
+	// the order anyway strands the buyer on a checkout that can never complete
+	if p.PaymentMethod == "prepaid" && razorpayKeyID == "" && upiID == "" && p.Source != "manual" {
+		return nil, errors.New("this seller is not set up for online payments yet — choose cash on delivery")
 	}
 
 	cust, err := s.customers.Upsert(ctx, p.BusinessID, p.Name, p.Phone, p.Email, p.Address)
@@ -358,6 +366,29 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 	return nil
 }
 
+// NotifyUpiClaim tells the seller a buyer says they have transferred to the
+// seller's UPI ID. It is a prompt to check their bank alert, not a payment.
+func (s *Service) NotifyUpiClaim(ctx context.Context, bizID, orderID, ref string) error {
+	var code, ownerPhone, email, ownerName string
+	var total int
+	if err := s.pool.QueryRow(ctx, `select o.order_code, o.total, b.phone, b.email, b.owner_name
+		from orders o join businesses b on b.id = o.business_id
+		where o.id=$1 and o.business_id=$2`, orderID, bizID).Scan(&code, &total, &ownerPhone, &email, &ownerName); err != nil {
+		return ErrNotFound
+	}
+	body := fmt.Sprintf("Hi %s,\n\nA buyer reported paying %s for order %s by UPI (reference %s).\nCheck your bank alert and confirm or reject it on the order card: %s/app/orders\n\n— CartHedge",
+		ownerName, notify.Rupees(total), code, ref, s.baseURL)
+	s.notify.Async("upiClaim", func() error {
+		if err := s.notify.WhatsApp(ownerPhone, fmt.Sprintf("Order %s: buyer reported a UPI payment of %s, ref %s. Verify it in CartHedge.",
+			code, notify.Rupees(total), ref)); err != nil && email != "" {
+			return s.notify.Email(email, "Verify a UPI payment — order "+code, body)
+		}
+		return nil
+	})
+	s.publishOrder(ctx, bizID, orderID, "paymentClaimed")
+	return nil
+}
+
 var buyerStatusMessage = map[string]string{
 	"confirmed": "Your order %s is confirmed!",
 	"packed":    "Your order %s is packed and ready to ship.",
@@ -577,7 +608,8 @@ func (s *Service) Board(ctx context.Context, bizID string) (map[string]any, erro
 }
 
 func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]Order, error) {
-	rows, err := s.pool.Query(ctx, `select o.id, o.order_code, o.status, o.payment_method, o.payment_status, o.source,
+	rows, err := s.pool.Query(ctx, `select o.id, o.order_code, o.status, o.payment_method, o.payment_status,
+		o.payment_ref, o.source,
 		o.items, o.subtotal, o.discount, o.shipping, o.total, o.token_amount, o.offer_code, o.notes,
 		o.customer_id, c.name, c.phone, o.address, o.courier_name, o.courier_tracking_id, o.risk_flagged,
 		coalesce(to_char(o.cod_confirmed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
@@ -591,7 +623,7 @@ func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]
 	for rows.Next() {
 		var o Order
 		var items, addr []byte
-		if err := rows.Scan(&o.ID, &o.Code, &o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.Source,
+		if err := rows.Scan(&o.ID, &o.Code, &o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.PaymentRef, &o.Source,
 			&items, &o.Subtotal, &o.Discount, &o.Shipping, &o.Total, &o.TokenAmount, &o.OfferCode, &o.Notes,
 			&o.CustomerID, &o.CustomerName, &o.CustomerPhone, &addr, &o.CourierName, &o.CourierTracking,
 			&o.RiskFlagged, &o.CodConfirmedAt, &o.CreatedAt); err != nil {

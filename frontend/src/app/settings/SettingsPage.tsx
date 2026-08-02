@@ -10,6 +10,7 @@ import { uploadFile } from '@/api/uploads';
 import { toast } from '@/store/ui';
 import { pincodeSchema } from '@/lib/validators';
 import { rupeesToPaise, paiseToRupees } from '@/lib/money';
+import { cn } from '@/lib/cn';
 import { PageHeader } from '../shell/PageHeader';
 import { ShareActions, storeUrl } from '../shell/ShareActions';
 import { Card, CardHeader } from '@/ui/Card';
@@ -280,20 +281,37 @@ function PaymentsSection() {
 
   if (!business) return null;
 
+  // Which rail buyers actually see at checkout. A gateway confirms itself; a
+  // bare UPI ID means you verify each transfer from the order card.
+  const mode = business.razorpayConfigured ? 'gateway' : business.upiId ? 'upi' : 'none';
+  const modeNote = {
+    gateway: 'Buyers pay by UPI or card through Razorpay and the order confirms itself.',
+    upi: 'Buyers pay your UPI ID directly from GPay/PhonePe/Paytm and send you the reference. You confirm each one from the order card — add Razorpay later if you want that to be automatic.',
+    none: 'Buyers can only choose cash on delivery. Add a UPI ID below to start taking prepaid orders — that alone is enough, Razorpay is optional.',
+  }[mode];
+
   return (
     <Card>
       <CardHeader
         title="Payments"
         subtitle="Buyer payments settle directly in your accounts"
         action={
-          business.razorpayConfigured ? (
+          mode !== 'none' ? (
             <span className="flex items-center gap-1.5 text-xs font-medium text-jade-ink">
-              <ShieldCheck className="size-4" /> Razorpay connected
+              <ShieldCheck className="size-4" /> {mode === 'gateway' ? 'Razorpay connected' : 'UPI collection on'}
             </span>
           ) : undefined
         }
       />
       <div className="flex flex-col gap-6 p-5 pt-4">
+        <p
+          className={cn(
+            'rounded-md p-3 text-xs leading-relaxed',
+            mode === 'none' ? 'bg-gold-400/10 text-gold-ink' : 'bg-surface-2 text-mid',
+          )}
+        >
+          {modeNote}
+        </p>
         <form
           onSubmit={handleSubmit((data) =>
             updatePayments.mutate(
@@ -310,14 +328,16 @@ function PaymentsSection() {
           )}
           className="grid gap-4 sm:grid-cols-2"
         >
-          <Field label="Razorpay Key ID" hint="rzp_live_…">
+          <div className="sm:col-span-2">
+            <Field label="UPI ID" hint="Enough on its own — no gateway account needed. GPay, PhonePe, Paytm and every UPI app can pay it.">
+              <Input placeholder="you@okhdfcbank" {...register('upiId')} />
+            </Field>
+          </div>
+          <Field label="Razorpay Key ID" optional hint="rzp_live_… — adds cards and auto-confirmation">
             <Input {...register('razorpayKeyId')} autoComplete="off" />
           </Field>
-          <Field label="Razorpay Key Secret" hint="Stored AES-encrypted, never shown again">
+          <Field label="Razorpay Key Secret" optional hint="Stored AES-encrypted, never shown again">
             <Input type="password" placeholder="••••••••" {...register('razorpayKeySecret')} autoComplete="off" />
-          </Field>
-          <Field label="UPI ID" hint="Fallback for direct UPI collection">
-            <Input placeholder="you@upi" {...register('upiId')} />
           </Field>
           <Button type="submit" loading={updatePayments.isPending} className="self-end sm:justify-self-start">
             Save payment settings

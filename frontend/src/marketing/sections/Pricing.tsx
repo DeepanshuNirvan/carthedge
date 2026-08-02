@@ -16,14 +16,22 @@ const fallbackPlans = [
   { code: 'pro', name: 'Pro', priceMonthly: 199900, orderQuota: 1500, perOrderFee: 200, features: ['Everything in Growth', 'Courier handoff', 'GST-lite invoices', 'AI reply assistant', 'Priority support'], isCustom: false, id: 'pro' },
 ];
 
+// Every public plan is shown. The old three-card slice silently swallowed any
+// plan an admin created past the third, so new tiers looked like they had not
+// saved. Cards-per-row follows the count (the custom-plan card is the +1) and
+// never exceeds four, so a wide row still reads.
+const columnsFor = (count: number) =>
+  ({ 1: 'sm:grid-cols-2', 2: 'sm:grid-cols-3', 3: 'sm:grid-cols-2 lg:grid-cols-4' })[count] ??
+  'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+
 export function Pricing() {
   const { data, isLoading } = usePlans();
-  const plans = (data?.filter((p) => !p.isCustom) ?? fallbackPlans).slice(0, 3);
+  const plans = data?.filter((p) => !p.isCustom) ?? fallbackPlans;
 
   return (
     <Section id="pricing">
       <SectionHead eyebrow={pricing.eyebrow} title={pricing.title} sub={pricing.sub} />
-      <div className="grid gap-5 lg:grid-cols-4">
+      <div className={cn('grid gap-5', columnsFor(plans.length))}>
         {isLoading && !data
           ? Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-96" />)
           : plans.map((plan, i) => {
@@ -70,7 +78,7 @@ export function Pricing() {
               );
             })}
 
-        <Reveal delay={0.21}>
+        <Reveal delay={Math.min(plans.length, 4) * 0.07}>
           <article className="glass sheen relative flex h-full flex-col overflow-hidden rounded-2xl p-7 shadow-soft">
             <div
               aria-hidden

@@ -99,6 +99,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, "invalid pincode")
 		return
 	}
+	if in.WhatsApp != "" {
+		whatsapp, ok := httpx.NormalizePhone(in.WhatsApp)
+		if !ok {
+			httpx.Err(w, http.StatusBadRequest, "invalid WhatsApp number")
+			return
+		}
+		in.WhatsApp = whatsapp
+	}
+	in.Instagram = httpx.NormalizeHandle(in.Instagram)
 	_, err := h.pool.Exec(r.Context(), `update businesses set
 		name=$2, owner_name=$3, phone=$4, whatsapp=$5, instagram=$6, address=$7, city=$8, state=$9,
 		pincode=$10, gstin=$11, logo_url=$12,
@@ -113,6 +122,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		in.Pincode, in.Gstin, in.LogoURL, in.ShippingFee, in.FreeShippingAbove, in.CodEnabled,
 		in.CodTokenAmount, in.BaselineRtoPercent)
 	if err != nil {
+		// the same mobile / WhatsApp / Instagram cannot sit on two businesses
+		if field, dup := httpx.DuplicateField(err); dup {
+			httpx.Err(w, http.StatusConflict, "this "+field+" already belongs to another business")
+			return
+		}
 		httpx.Err(w, http.StatusInternalServerError, "update failed")
 		return
 	}
