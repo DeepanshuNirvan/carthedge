@@ -5,6 +5,7 @@ import { useInvoices } from '@/api/invoices';
 import { useBusiness } from '@/api/business';
 import { formatDate } from '@/lib/date';
 import { PageHeader } from '../shell/PageHeader';
+import { LogoMark } from '@/marketing/Wordmark';
 import { Table, Td, Th, Tr } from '@/ui/Table';
 import { MoneyText } from '@/ui/MoneyText';
 import { Modal } from '@/ui/Modal';
@@ -64,7 +65,10 @@ function InvoiceView({ invoice, onClose }: { invoice: Invoice | null; onClose: (
                 <dd><MoneyText paise={invoice.total} /></dd>
               </div>
             </dl>
-            <p className="mt-8 text-center text-xs text-low">Generated with CartHedge · carthedge.in</p>
+            <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-low">
+              <LogoMark size={14} />
+              Generated with CartHedge · carthedge.in
+            </p>
           </div>
           <Button variant="secondary" className="mt-4" icon={<Printer className="size-4" />} onClick={() => window.print()}>
             Print / save PDF

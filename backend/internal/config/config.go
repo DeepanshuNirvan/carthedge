@@ -101,7 +101,7 @@ func Load() (*Config, error) {
 		OpenAIModel: env("OPENAI_MODEL", "gpt-4o-mini"),
 		OpenAIBase:  strings.TrimSuffix(env("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
 		GeminiKey:   os.Getenv("GEMINI_API_KEY"),
-		GeminiModel: env("GEMINI_MODEL", "gemini-2.0-flash"),
+		GeminiModel: env("GEMINI_MODEL", "gemini-3.6-flash"),
 
 		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
 		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),

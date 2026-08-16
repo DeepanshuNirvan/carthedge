@@ -46,6 +46,6 @@ export const organizationJsonLd = {
   '@type': 'Organization',
   name: siteName,
   url: siteUrl,
-  logo: `${siteUrl}/favicon.svg`,
+  logo: `${siteUrl}/icon-512.png`,
   description: 'AI order desk for Instagram and WhatsApp sellers in India.',
 };

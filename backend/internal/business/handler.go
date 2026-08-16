@@ -145,14 +145,16 @@ func (h *Handler) UpdatePayments(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	enc, err := h.cipher.Encrypt(in.RazorpayKeySecret)
-	if err != nil {
-		httpx.Err(w, http.StatusInternalServerError, "could not store keys")
-		return
-	}
 	q := `update businesses set razorpay_key_id=$2, upi_id=$3, updated_at=now()`
 	args := []any{bizID, in.RazorpayKeyID, in.UpiID}
+	// a blank secret means "keep the stored one" — the seller can edit the rest of
+	// the form without retyping a key the API never gives back
 	if in.RazorpayKeySecret != "" {
+		enc, err := h.cipher.Encrypt(in.RazorpayKeySecret)
+		if err != nil {
+			httpx.Err(w, http.StatusInternalServerError, "could not store keys")
+			return
+		}
 		q += `, razorpay_key_secret=$4`
 		args = append(args, enc)
 	}

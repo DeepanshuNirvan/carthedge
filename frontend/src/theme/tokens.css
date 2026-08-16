@@ -80,6 +80,11 @@
   --danger-ink: 233 96 84;
   --info-ink: 96 156 226;
 
+  /* logo mark — one step brighter than the ink pair so the icon keeps its
+     presence at 16px; light theme drops both a step to stay legible on paper */
+  --brand-mark: 34 201 133;
+  --brand-coin: 233 185 96;
+
   --line: 255 255 255;
   --line-a: 0.09;
   --line-strong-a: 0.16;
@@ -134,6 +139,9 @@
   --gold-ink: 138 94 28;
   --danger-ink: 178 48 38;
   --info-ink: 38 92 166;
+
+  --brand-mark: 11 143 86;
+  --brand-coin: 214 158 62;
 
   --line: 32 27 22;
   --line-a: 0.1;

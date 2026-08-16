@@ -185,7 +185,14 @@ Unset = logged to console.
 
 ```env
 GEMINI_API_KEY=AIza...
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.6-flash
+```
+
+Keys issued recently have **no free-tier quota on the `gemini-2.x` models** — `gemini-2.0-flash` returns `429 … limit: 0` and `gemini-2.5-flash` returns `404 no longer available to new users`. If `/ai/parse` fails on a brand-new key, the model name is the first thing to check:
+
+```bash
+curl -s https://generativelanguage.googleapis.com/v1beta/models \
+  -H "x-goog-api-key: $GEMINI_API_KEY" | grep '"name"'
 ```
 
 ### Option B — OpenAI

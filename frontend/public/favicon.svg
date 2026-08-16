@@ -1,5 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#0B0B0E"/>
-  <path d="M40.5 22.5a12 12 0 1 0 0 19" stroke="#0FA968" stroke-width="7" stroke-linecap="round" fill="none"/>
-  <circle cx="46" cy="46" r="5" fill="#E8B559"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- CartHedge mark: the hedge (open C ring) cradling the cart, gold coin-wheels.
+       Colours follow the OS scheme so the tab icon reads on light and dark chrome. -->
+  <style>
+    .m { stroke: #0B8F56; fill: none }
+    .b { fill: #0B8F56 }
+    .c { fill: #D69E3E }
+    @media (prefers-color-scheme: dark) {
+      .m { stroke: #22C985 }
+      .b { fill: #22C985 }
+      .c { fill: #E9B960 }
+    }
+  </style>
+  <path class="m" d="M50.84 18.81A23 23 0 1 0 50.84 45.19" stroke-width="6.2" stroke-linecap="round"/>
+  <path class="m" d="M23.2 21.4 28.6 34.2" stroke-width="4.4" stroke-linecap="round"/>
+  <path class="b" d="M26 25.2h18.4l-4 11H30z"/>
+  <circle class="c" cx="31.9" cy="41" r="2.9"/>
+  <circle class="c" cx="38.5" cy="41" r="2.9"/>
 </svg>

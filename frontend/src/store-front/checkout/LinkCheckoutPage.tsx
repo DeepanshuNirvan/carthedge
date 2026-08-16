@@ -7,6 +7,7 @@ import { useResolvedLink } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { cn } from '@/lib/cn';
 import { CheckoutFlow } from './CheckoutFlow';
+import { LogoMark } from '@/marketing/Wordmark';
 import { Avatar } from '@/ui/Avatar';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { MoneyText } from '@/ui/MoneyText';
@@ -227,7 +228,9 @@ export default function LinkCheckoutPage() {
             : link.business.onlinePayment === 'upi'
               ? 'Pay by UPI direct to the seller'
               : 'Cash on delivery'}{' '}
-          · Powered by CartHedge
+          · Powered by
+          <LogoMark size={13} className="-ml-0.5" />
+          CartHedge
         </p>
       </main>
     </div>

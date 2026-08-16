@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Instagram, MessageCircle, PackageSearch } from 'lucide-react';
 import type { StoreBusiness } from '@/api/types';
+import { LogoMark } from '@/marketing/Wordmark';
 
 export function StoreFooter({ business }: { business: StoreBusiness }) {
   return (
@@ -45,7 +46,11 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
           {business.city && ` · ${business.city}`}
           {business.codEnabled && ' · Cash on delivery available'}
         </p>
-        <a href="/" className="text-[11px] text-low transition-colors hover:text-mid">
+        <a
+          href="/"
+          className="inline-flex items-center gap-1.5 text-[11px] text-low transition-colors hover:text-mid"
+        >
+          <LogoMark size={14} />
           Powered by <span className="font-medium text-mid">CartHedge</span>
         </a>
       </div>

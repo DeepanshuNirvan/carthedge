@@ -1,9 +1,10 @@
-import { Spinner } from './Spinner';
+import { LogoMark } from '@/marketing/Wordmark';
 
 export function PageLoader() {
   return (
     <div className="flex min-h-dvh items-center justify-center" role="status" aria-label="Loading">
-      <Spinner className="size-7 text-jade-ink" />
+      {/* the mark breathing beats a bare spinner on a full-page wait */}
+      <LogoMark size={40} className="animate-pulse" />
     </div>
   );
 }

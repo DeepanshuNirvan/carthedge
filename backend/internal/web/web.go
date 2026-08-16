@@ -151,7 +151,8 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 	}
 	return meta{Title: defaultTitle, Description: defaultDesc, JSONLD: map[string]any{
 		"@context": "https://schema.org", "@type": "Organization", "name": siteName,
-		"url": h.baseURL, "logo": h.baseURL + "/favicon.svg", "description": defaultDesc,
+		// raster: Google's Organization logo wants a real bitmap, not the SVG icon
+		"url": h.baseURL, "logo": h.baseURL + "/icon-512.png", "description": defaultDesc,
 	}}
 }
 

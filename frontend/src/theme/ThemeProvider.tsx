@@ -15,6 +15,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    // keep the mobile browser chrome on the same --bg the page just switched to
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#090A0D' : '#EEEBE5';
   }, [theme]);
 
   const toggle = () => {

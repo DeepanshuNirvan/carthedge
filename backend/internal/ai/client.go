@@ -168,6 +168,11 @@ func (c *Client) do(req *http.Request, providerName string) ([]byte, error) {
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode >= 300 {
+		// the seller only ever sees the status code; without the provider's own
+		// message here, a dead model or an exhausted quota is indistinguishable
+		// from any other 4xx and costs an afternoon to tell apart
+		c.log.Error("ai provider rejected the request", "provider", providerName,
+			"status", resp.StatusCode, "body", string(raw))
 		return nil, fmt.Errorf("%s api error (%d)", providerName, resp.StatusCode)
 	}
 	return raw, nil
