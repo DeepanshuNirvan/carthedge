@@ -1,0 +1,11 @@
+# Secrets must never reach an image layer — Render injects env vars at runtime.
+**/.env
+**/.env.*
+temp.env.test
+
+# Build inputs that the image rebuilds itself, or never needs.
+**/node_modules
+frontend/dist
+backend/uploads
+.git
+docs
