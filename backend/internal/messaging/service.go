@@ -19,6 +19,14 @@ import (
 // batched into one AI parse — bounds LLM cost during a buyer's burst of DMs.
 const lull = 12 * time.Second
 
+// tokenSweep is how often connections are checked for an approaching expiry,
+// and tokenRenewLead how far ahead of it a token is renewed. The lead is wide
+// so a few sweeps can fail before a seller actually loses their DM capture.
+const (
+	tokenSweep     = 6 * time.Hour
+	tokenRenewLead = 7 * 24 * time.Hour
+)
+
 // Service ingests Instagram/WhatsApp DMs, batches them into AI order drafts the
 // seller approves, and sends replies back on the seller's own channel token.
 type Service struct {
@@ -49,6 +57,79 @@ func (s *Service) Start(ctx context.Context) {
 			}
 		}
 	}()
+	go func() {
+		t := time.NewTicker(tokenSweep)
+		defer t.Stop()
+		s.refreshExpiring(ctx) // catch up on anything that lapsed while down
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.refreshExpiring(ctx)
+			}
+		}
+	}()
+}
+
+// alreadySeen reports whether this Meta message id is already in a thread.
+// Meta message ids are globally unique, so no business scoping is needed.
+func (s *Service) alreadySeen(ctx context.Context, messageID string) bool {
+	if messageID == "" {
+		return false
+	}
+	var exists bool
+	if err := s.pool.QueryRow(ctx,
+		`select exists(select 1 from conversation_messages where external_id=$1)`, messageID).Scan(&exists); err != nil {
+		return false // a failed check must not drop a real message
+	}
+	return exists
+}
+
+// refreshExpiring renews Instagram tokens before their 60-day expiry. A failure
+// flips the connection to 'error' so Settings can prompt the seller to
+// reconnect, rather than the DMs just stopping.
+func (s *Service) refreshExpiring(ctx context.Context) {
+	rows, err := s.pool.Query(ctx, `select id, access_token from channel_connections
+		where channel='instagram' and status='connected'
+		  and expires_at is not null and expires_at < now() + make_interval(secs => $1)`,
+		tokenRenewLead.Seconds())
+	if err != nil {
+		s.log.Error("token refresh query failed", "err", err)
+		return
+	}
+	type due struct{ id, enc string }
+	var pending []due
+	for rows.Next() {
+		var d due
+		if rows.Scan(&d.id, &d.enc) == nil {
+			pending = append(pending, d)
+		}
+	}
+	rows.Close()
+
+	for _, d := range pending {
+		token, err := s.cipher.Decrypt(d.enc)
+		if err != nil {
+			s.log.Error("could not decrypt channel token", "connection", d.id, "err", err)
+			continue
+		}
+		fresh, ttl, err := s.client.RefreshInstagram(ctx, token)
+		if err != nil {
+			s.log.Warn("instagram token refresh failed", "connection", d.id, "err", err)
+			s.pool.Exec(ctx, `update channel_connections set status='error', updated_at=now() where id=$1`, d.id)
+			continue
+		}
+		enc, err := s.cipher.Encrypt(fresh)
+		if err != nil {
+			continue
+		}
+		if _, err := s.pool.Exec(ctx, `update channel_connections
+			set access_token=$2, expires_at=now()+make_interval(secs => $3), updated_at=now()
+			where id=$1`, d.id, enc, ttl.Seconds()); err != nil {
+			s.log.Error("could not store refreshed token", "connection", d.id, "err", err)
+		}
+	}
 }
 
 // ConnectChannel stores (or refreshes) a seller's channel token, encrypted.
@@ -63,12 +144,19 @@ func (s *Service) ConnectChannel(ctx context.Context, bizID, channel, externalID
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `insert into channel_connections (business_id, channel, external_id, display_name, access_token, status)
-		values ($1,$2,$3,$4,$5,'connected')
+	// Instagram tokens die at 60 days and are renewed by refreshExpiring;
+	// WhatsApp business tokens do not expire, so they carry no deadline.
+	var expiresAt any
+	if channel == "instagram" {
+		expiresAt = time.Now().Add(instagramTokenTTL)
+	}
+	_, err = s.pool.Exec(ctx, `insert into channel_connections (business_id, channel, external_id, display_name, access_token, status, expires_at)
+		values ($1,$2,$3,$4,$5,'connected',$6)
 		on conflict (business_id, channel) do update set
 		  external_id=excluded.external_id, display_name=excluded.display_name,
-		  access_token=excluded.access_token, status='connected', updated_at=now()`,
-		bizID, channel, externalID, displayName, enc)
+		  access_token=excluded.access_token, status='connected',
+		  expires_at=excluded.expires_at, updated_at=now()`,
+		bizID, channel, externalID, displayName, enc, expiresAt)
 	if err != nil {
 		return errors.New("this account is already connected to another business")
 	}
@@ -103,6 +191,11 @@ func (s *Service) ListChannels(ctx context.Context, bizID string) ([]httpx.M, er
 // marks the conversation for the next parse pass.
 func (s *Service) Receive(ctx context.Context, body []byte) {
 	for _, in := range parseWebhook(body) {
+		// Meta retries until it gets a 200. Without this a retry re-bumps the
+		// unread count and re-triggers the AI parse on the same message.
+		if s.alreadySeen(ctx, in.MessageID) {
+			continue
+		}
 		var bizID, tokenEnc string
 		err := s.pool.QueryRow(ctx, `select business_id, access_token from channel_connections
 			where channel=$1 and external_id=$2 and status='connected'`, in.Channel, in.ExternalID).Scan(&bizID, &tokenEnc)
@@ -133,7 +226,7 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 			}
 		}
 		if _, err := s.pool.Exec(ctx, `insert into conversation_messages (conversation_id, direction, external_id, body)
-			values ($1,'in',$2,$3)`, convID, in.MessageID, in.Text); err != nil {
+			values ($1,'in',$2,$3) on conflict do nothing`, convID, in.MessageID, in.Text); err != nil {
 			s.log.Error("insert message failed", "err", err)
 			continue
 		}

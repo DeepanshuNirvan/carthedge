@@ -193,6 +193,29 @@ func (c *Client) exchangeInstagram(ctx context.Context, cfg OAuthConfig, code st
 	return me.ID, long.AccessToken, me.Username, nil
 }
 
+// RefreshInstagram extends a long-lived Instagram token. Meta allows this once
+// the token is at least 24 hours old and before it expires at 60 days; the
+// sweep runs a week early so a transient failure still has room to retry.
+func (c *Client) RefreshInstagram(ctx context.Context, token string) (string, time.Duration, error) {
+	var out struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int64  `json:"expires_in"`
+	}
+	if err := c.getJSON(ctx, "https://graph.instagram.com/refresh_access_token?"+url.Values{
+		"grant_type": {"ig_refresh_token"}, "access_token": {token},
+	}.Encode(), &out); err != nil {
+		return "", 0, err
+	}
+	if out.AccessToken == "" {
+		return "", 0, errors.New("Instagram did not return a refreshed token")
+	}
+	ttl := instagramTokenTTL
+	if out.ExpiresIn > 0 {
+		ttl = time.Duration(out.ExpiresIn) * time.Second
+	}
+	return out.AccessToken, ttl, nil
+}
+
 func (c *Client) getJSON(ctx context.Context, url string, dst any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -239,3 +262,7 @@ func (c *Client) do(req *http.Request, dst any) error {
 
 // oauthStateTTL bounds how long an authorize redirect stays valid.
 const oauthStateTTL = 10 * time.Minute
+
+// instagramTokenTTL is how long Meta issues long-lived Instagram tokens for.
+// WhatsApp business tokens do not expire, so only Instagram is swept.
+const instagramTokenTTL = 60 * 24 * time.Hour
