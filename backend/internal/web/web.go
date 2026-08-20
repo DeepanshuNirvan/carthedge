@@ -104,6 +104,10 @@ func knownRoute(seg []string) bool {
 	switch {
 	case len(seg) == 1 && (seg[0] == "" || seg[0] == "contact" || seg[0] == "reset-password" || seg[0] == "track"):
 		return true
+	// legal pages: Meta's crawler checks these before publishing the app, and a
+	// 404 status fails that check even though the shell still renders
+	case len(seg) == 1 && (seg[0] == "privacy" || seg[0] == "terms" || seg[0] == "data-deletion"):
+		return true
 	case seg[0] == "app" || seg[0] == "admin":
 		return true
 	case seg[0] == "s" && (len(seg) == 2 || (len(seg) == 4 && seg[2] == "p")):
@@ -145,6 +149,18 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 	case path == "/contact":
 		return meta{Title: "Contact CartHedge — Talk to a human",
 			Description: "Questions about CartHedge plans, migrations or custom volume pricing? We reply within a working day."}
+
+	case path == "/privacy":
+		return meta{Title: "Privacy Policy — " + siteName,
+			Description: "What CartHedge collects from sellers and buyers, how connected Instagram and WhatsApp accounts are used, and how to have your data deleted."}
+
+	case path == "/terms":
+		return meta{Title: "Terms of Service — " + siteName,
+			Description: "The terms that apply when you use CartHedge to run your Instagram or WhatsApp storefront, order board and checkout links."}
+
+	case path == "/data-deletion":
+		return meta{Title: "Delete Your Data — " + siteName,
+			Description: "How to disconnect a linked Instagram or WhatsApp account and how to request full deletion of your CartHedge data."}
 	}
 	if !knownRoute(seg) {
 		return meta{Title: "Page not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
