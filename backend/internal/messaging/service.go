@@ -271,8 +271,13 @@ func (s *Service) ingestDue(ctx context.Context) {
 }
 
 func (s *Service) thread(ctx context.Context, convID string) (string, error) {
-	rows, err := s.pool.Query(ctx, `select direction, body from conversation_messages
-		where conversation_id=$1 order by created_at asc limit 40`, convID)
+	// the newest 40 messages, then back into reading order. Taking the first 40
+	// instead would mean a repeat buyer's thread is pinned to its oldest messages
+	// forever, and their new order would never reach the parser.
+	rows, err := s.pool.Query(ctx, `select direction, body from (
+			select direction, body, created_at from conversation_messages
+			where conversation_id=$1 order by created_at desc limit 40
+		) recent order by created_at asc`, convID)
 	if err != nil {
 		return "", err
 	}

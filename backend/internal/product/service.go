@@ -658,7 +658,20 @@ func Release(ctx context.Context, conn db, lines []Line) error {
 }
 
 // Catalog returns a compact listing used as AI context.
+// Catalog renders the live catalog for the AI order parser, in paise — the draft
+// JSON the parser returns is in paise, so the two must agree.
 func (s *Service) Catalog(ctx context.Context, bizID string) (string, error) {
+	return s.catalog(ctx, bizID, func(paise int) string { return fmt.Sprintf("%d paise", paise) })
+}
+
+// CatalogForBuyer renders the same catalog in rupees, for prompts whose output is
+// read by a buyer. Formatting here instead of asking the model to divide by 100
+// is what stops "₹50 (5000 paise)" ending up in a customer's chat.
+func (s *Service) CatalogForBuyer(ctx context.Context, bizID string) (string, error) {
+	return s.catalog(ctx, bizID, notify.Rupees)
+}
+
+func (s *Service) catalog(ctx context.Context, bizID string, money func(int) string) (string, error) {
 	products, err := s.List(ctx, bizID, Filter{InStockOnly: true})
 	if err != nil {
 		return "", err
@@ -669,7 +682,7 @@ func (s *Service) Catalog(ctx context.Context, bizID string) (string, error) {
 		for i, v := range p.Variants {
 			names[i] = v.Name
 		}
-		fmt.Fprintf(&sb, "%s | %s | %s | price %d paise | variants: %s\n", p.ID, p.Name, p.Category, p.Price, strings.Join(names, ", "))
+		fmt.Fprintf(&sb, "%s | %s | %s | price %s | variants: %s\n", p.ID, p.Name, p.Category, money(p.Price), strings.Join(names, ", "))
 	}
 	return sb.String(), nil
 }

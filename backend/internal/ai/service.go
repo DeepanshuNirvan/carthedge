@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"carthedge/internal/customer"
+	"carthedge/internal/notify"
 	"carthedge/internal/order"
 	"carthedge/internal/product"
 
@@ -39,7 +40,8 @@ Store details: %s
 Catalog:
 %s
 
-Only answer from the store details and catalog. If you don't know, say the seller will confirm shortly. Never invent prices or delivery dates.`
+Only answer from the store details and catalog. If you don't know, say the seller will confirm shortly. Never invent prices or delivery dates.
+Every amount above is already written in rupees. Quote them exactly as given. Never mention paise, and never convert or recalculate an amount.`
 
 type DraftItem struct {
 	ProductID string `json:"productId"`
@@ -132,7 +134,11 @@ func (s *Service) parse(ctx context.Context, bizID, conversation, source, conver
 // without this the review card quotes ₹0 for a line that will bill in full.
 func (s *Service) priceFromCatalog(ctx context.Context, bizID string, items []DraftItem) {
 	for i := range items {
-		if items[i].ProductID == "" || items[i].Price > 0 {
+		// A matched product is always priced from the catalog, even when the model
+		// filled in a price — models guess prices, and the seller confirms the draft
+		// card on sight and may quote that number back to the buyer in chat.
+		// Unmatched (custom) lines keep the model's price; there is nothing to look up.
+		if items[i].ProductID == "" {
 			continue
 		}
 		p, err := s.products.Get(ctx, bizID, items[i].ProductID)
@@ -243,10 +249,12 @@ func (s *Service) Reply(ctx context.Context, bizID, question string) (string, er
 		bizID).Scan(&name, &city, &whatsapp, &shippingFee, &codEnabled); err != nil {
 		return "", err
 	}
-	catalog, err := s.products.Catalog(ctx, bizID)
+	// buyer-facing prompt: rupees, never paise
+	catalog, err := s.products.CatalogForBuyer(ctx, bizID)
 	if err != nil {
 		return "", err
 	}
-	details := fmt.Sprintf("ships from %s; delivery charge %d paise; COD available: %t; WhatsApp %s", city, shippingFee, codEnabled, whatsapp)
+	details := fmt.Sprintf("ships from %s; delivery charge %s; COD available: %t; WhatsApp %s",
+		city, notify.Rupees(shippingFee), codEnabled, whatsapp)
 	return s.client.Complete(ctx, fmt.Sprintf(replyPrompt, name, details, catalog), question, false)
 }
