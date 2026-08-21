@@ -247,6 +247,13 @@
 }
 
 /* ---------- cinematic film grain (fixed layer, never on scrolling content) ---------- */
+/* The marketing nav is fixed and floats over the page, so a native anchor jump
+   (#pricing on the home page) parks the section underneath it. Routed hash
+   navigation applies the same offset in useLenis. */
+.grain > main section[id] {
+  scroll-margin-top: 104px;
+}
+
 .grain::after {
   content: '';
   position: fixed;

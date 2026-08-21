@@ -39,7 +39,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="slider mt-3.5 w-full cursor-pointer"
+        className="slider mt-2 w-full cursor-pointer"
         style={{
           background: `linear-gradient(90deg, rgb(var(--jade-500)) ${pct}%, rgb(var(--surface-3)) ${pct}%)`,
         }}
@@ -76,9 +76,9 @@ export function RtoCalculator() {
     <Section id="calculator">
       <SectionHead eyebrow={calculator.eyebrow} title={calculator.title} sub={calculator.sub} tone="gold" />
       <Reveal>
-        <div className="glass sheen grid gap-8 rounded-2xl p-5 shadow-float sm:p-10 lg:grid-cols-[1fr_1.1fr]">
+        <div className="glass sheen mx-auto grid max-w-4xl gap-6 rounded-2xl p-5 shadow-float sm:gap-8 sm:p-7 lg:grid-cols-[1fr_1.05fr]">
           {/* the seller's numbers */}
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-6">
             <Slider
               label={calculator.orders}
               value={orders}
@@ -110,8 +110,8 @@ export function RtoCalculator() {
           </div>
 
           {/* the money */}
-          <div className="relative flex flex-col justify-center gap-7 overflow-hidden rounded-xl panel p-5 sm:p-8">
-            <div aria-hidden className="absolute -right-20 -top-20 size-56 rounded-full bg-jade-500/12 blur-3xl" />
+          <div className="relative flex flex-col justify-center gap-5 overflow-hidden rounded-xl panel p-5 sm:p-6">
+            <div aria-hidden className="absolute -right-16 -top-16 size-44 rounded-full bg-jade-500/12 blur-3xl" />
 
             <div className="relative">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
@@ -119,7 +119,7 @@ export function RtoCalculator() {
               </p>
               {/* tabular + nowrap: a rupee figure must never wrap mid-number,
                   which is exactly what break-all was doing here */}
-              <p className="mt-2 whitespace-nowrap font-display text-[clamp(2.4rem,1.2rem+4vw,4.25rem)] font-semibold leading-[0.95] tracking-tight text-brand-grad">
+              <p className="mt-1.5 whitespace-nowrap font-display text-[clamp(2rem,1.2rem+2.4vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-brand-grad">
                 <AnimatedRupees paise={saved} />
               </p>
             </div>
@@ -134,7 +134,7 @@ export function RtoCalculator() {
               </div>
 
               <div
-                className="mt-2 flex h-4 overflow-hidden rounded-full neu-inset"
+                className="mt-2 flex h-3 overflow-hidden rounded-full neu-inset"
                 role="img"
                 aria-label={`${formatPaise(saved)} of ${formatPaise(lossNow)} recovered`}
               >

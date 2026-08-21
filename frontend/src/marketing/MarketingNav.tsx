@@ -10,6 +10,7 @@ import { buttonLink } from '@/ui/buttonLink';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { IconButton } from '@/ui/Button';
 import { Wordmark } from './Wordmark';
+import { SectionLink } from './SectionLink';
 
 export function MarketingNav() {
   const announcement = useSite().data?.site.announcement?.trim();
@@ -38,23 +39,17 @@ export function MarketingNav() {
     />
   );
 
-  const linkEl = (l: { label: string; href: string }) => {
-    const body = (
-      <>
-        {hovered === l.href && pill}
-        {l.label}
-      </>
-    );
-    return l.href.startsWith('#') ? (
-      <a key={l.href} href={l.href} onPointerEnter={() => setHovered(l.href)} className={linkCls}>
-        {body}
-      </a>
-    ) : (
-      <Link key={l.href} to={l.href} onPointerEnter={() => setHovered(l.href)} className={linkCls}>
-        {body}
-      </Link>
-    );
-  };
+  const linkEl = (l: { label: string; href: string }) => (
+    <SectionLink
+      key={l.href}
+      href={l.href}
+      onPointerEnter={() => setHovered(l.href)}
+      className={linkCls}
+    >
+      {hovered === l.href && pill}
+      {l.label}
+    </SectionLink>
+  );
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
@@ -113,23 +108,13 @@ export function MarketingNav() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.05 * i, duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  {l.href.startsWith('#') ? (
-                    <a
-                      href={l.href}
-                      onClick={() => setOpen(false)}
-                      className="block py-3 font-display text-d3 font-semibold text-hi"
-                    >
-                      {l.label}
-                    </a>
-                  ) : (
-                    <Link
-                      to={l.href}
-                      onClick={() => setOpen(false)}
-                      className="block py-3 font-display text-d3 font-semibold text-hi"
-                    >
-                      {l.label}
-                    </Link>
-                  )}
+                  <SectionLink
+                    href={l.href}
+                    onClick={() => setOpen(false)}
+                    className="block py-3 font-display text-d3 font-semibold text-hi"
+                  >
+                    {l.label}
+                  </SectionLink>
                 </motion.div>
               ))}
               <div className="mt-6 flex flex-col gap-3">

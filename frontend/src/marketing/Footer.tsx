@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
 import { Instagram, Linkedin, Twitter, Youtube } from 'lucide-react';
 import { footer } from '@/strings/marketing';
 import { useSite } from '@/api/site';
 import { Wordmark } from './Wordmark';
+import { SectionLink } from './SectionLink';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 
 export function Footer() {
@@ -54,15 +54,9 @@ export function Footer() {
             <ul className="flex flex-col">
               {col.links.map((l) => (
                 <li key={l.href} className="flex">
-                  {l.href.startsWith('#') ? (
-                    <a href={l.href} className="inline-flex min-h-9 items-center text-sm text-mid transition-colors hover:text-hi">
-                      {l.label}
-                    </a>
-                  ) : (
-                    <Link to={l.href} className="inline-flex min-h-9 items-center text-sm text-mid transition-colors hover:text-hi">
-                      {l.label}
-                    </Link>
-                  )}
+                  <SectionLink href={l.href} className="inline-flex min-h-9 items-center text-sm text-mid transition-colors hover:text-hi">
+                    {l.label}
+                  </SectionLink>
                 </li>
               ))}
             </ul>

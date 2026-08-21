@@ -109,10 +109,6 @@ export default function ContactPage() {
             <p className="mt-3 text-sm font-medium text-hi">{site?.contact.supportHours}</p>
             <p className="mt-1 text-xs text-low">We reply within a working day</p>
           </div>
-          <div
-            aria-hidden
-            className="hidden flex-1 rounded-lg bg-[radial-gradient(circle_at_30%_30%,rgb(var(--jade-500)/0.15),transparent_60%),radial-gradient(circle_at_70%_70%,rgb(var(--gold-400)/0.12),transparent_55%)] lg:block"
-          />
         </aside>
       </main>
       <Footer />

@@ -18,7 +18,7 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside?: R
           aria-hidden
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 size-full scale-105 object-cover opacity-[0.18] saturate-[0.7] [mask-image:radial-gradient(120%_100%_at_50%_40%,black,transparent_78%)]"
+          className="absolute inset-0 size-full scale-105 object-cover opacity-[0.30] saturate-[0.8] [mask-image:radial-gradient(120%_100%_at_50%_40%,black,transparent_78%)]"
         />
         {/* faint structure grid: the order board the chat resolves into */}
         <div aria-hidden className="absolute inset-0 opacity-[0.55]">

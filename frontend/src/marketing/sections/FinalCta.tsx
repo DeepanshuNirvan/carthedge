@@ -16,7 +16,7 @@ export function FinalCta() {
             aria-hidden
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 size-full object-cover opacity-[0.10] saturate-[0.6] [mask-image:radial-gradient(100%_120%_at_50%_100%,black,transparent_72%)]"
+            className="absolute inset-0 size-full object-cover opacity-[0.17] saturate-[0.7] [mask-image:radial-gradient(100%_120%_at_50%_100%,black,transparent_72%)]"
           />
           <div aria-hidden className="absolute inset-0">
             <div className="absolute left-1/2 top-0 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-jade-500/16 blur-[130px]" />
