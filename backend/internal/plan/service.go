@@ -256,11 +256,16 @@ type Access struct {
 
 // access loads the subscription gate and plan entitlements in one round trip;
 // cached 2 minutes and dropped wherever the subscription changes.
-func (s *Service) access(ctx context.Context, bizID string) Access {
+// It returns an error rather than a zero Access when the lookup itself fails.
+// Collapsing "the database did not answer" into Active:false told a paying
+// seller their subscription had expired during a brief outage, and told their
+// buyers the shop was closed — a billing accusation caused by our own downtime.
+// Callers decide: the gate answers 503, the boolean helpers stay conservative.
+func (s *Service) access(ctx context.Context, bizID string) (Access, error) {
 	key := "sub:" + bizID
 	var a Access
 	if raw, err := s.rdb.Get(ctx, key).Bytes(); err == nil && json.Unmarshal(raw, &a) == nil {
-		return a
+		return a, nil
 	}
 	var caps []byte
 	err := s.pool.QueryRow(ctx, `select
@@ -268,25 +273,41 @@ func (s *Service) access(ctx context.Context, bizID string) Access {
 		p.capabilities
 		from subscriptions s join businesses b on b.id = s.business_id
 		join plans p on p.id = s.plan_id where s.business_id = $1`, bizID).Scan(&a.Active, &caps)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// genuinely no subscription row — that IS inactive, not a fault
+		return Access{}, nil
+	}
 	if err != nil {
-		return Access{}
+		return Access{}, err
 	}
 	json.Unmarshal(caps, &a.Capabilities)
 	if raw, err := json.Marshal(a); err == nil {
 		s.rdb.Set(ctx, key, raw, 2*time.Minute)
 	}
-	return a
+	return a, nil
 }
 
-// IsActive reports whether the business can take orders.
+// IsActive reports whether the business can take orders. A lookup failure is
+// reported as not-active because these callers have no way to say "unknown" —
+// but it is logged, so an outage shows up as our fault and not as a wave of
+// mysteriously paused storefronts.
 func (s *Service) IsActive(ctx context.Context, bizID string) bool {
-	return s.access(ctx, bizID).Active
+	a, err := s.access(ctx, bizID)
+	if err != nil {
+		slog.Error("subscription lookup failed; treating store as paused", "businessId", bizID, "err", err)
+		return false
+	}
+	return a.Active
 }
 
 // HasFeature reports whether the plan includes a capability; used on buyer
 // routes, which carry no seller context to read it from.
 func (s *Service) HasFeature(ctx context.Context, bizID, feature string) bool {
-	a := s.access(ctx, bizID)
+	a, err := s.access(ctx, bizID)
+	if err != nil {
+		slog.Error("capability lookup failed", "businessId", bizID, "feature", feature, "err", err)
+		return false
+	}
 	return a.Active && slices.Contains(a.Capabilities, feature)
 }
 
@@ -299,7 +320,19 @@ func (s *Service) invalidate(ctx context.Context, bizID string) {
 func (s *Service) RequireActive(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		a := s.access(ctx, middleware.BusinessID(ctx))
+		bizID := middleware.BusinessID(ctx)
+		a, err := s.access(ctx, bizID)
+		if err != nil {
+			// Our fault, not a billing problem. Saying "subscription expired"
+			// here accuses a paying seller of not paying and sends them to the
+			// billing page during what is actually our outage.
+			slog.Error("subscription gate lookup failed", "businessId", bizID, "err", err)
+			httpx.JSON(w, http.StatusServiceUnavailable, httpx.M{
+				"error": "we could not check your plan just now, try again in a moment",
+				"code":  "planCheckUnavailable",
+			})
+			return
+		}
 		if !a.Active {
 			httpx.JSON(w, http.StatusPaymentRequired, httpx.M{"error": "subscription expired", "code": "subscriptionExpired"})
 			return

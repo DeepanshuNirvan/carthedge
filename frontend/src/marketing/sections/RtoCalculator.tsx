@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { motion, useSpring, useTransform } from 'framer-motion';
-import { PiggyBank, TrendingDown } from 'lucide-react';
 import { calculator } from '@/strings/marketing';
 import { Section, SectionHead, Reveal } from '../Section';
 import { formatPaise } from '@/lib/money';
@@ -111,52 +110,59 @@ export function RtoCalculator() {
           </div>
 
           {/* the money */}
-          <div className="relative flex flex-col justify-center gap-6 overflow-hidden rounded-xl neu p-5 sm:p-8">
-            <div
-              aria-hidden
-              className="absolute -right-16 -top-16 size-48 rounded-full bg-jade-500/15 blur-3xl"
-            />
+          <div className="relative flex flex-col justify-center gap-7 overflow-hidden rounded-xl panel p-5 sm:p-8">
+            <div aria-hidden className="absolute -right-20 -top-20 size-56 rounded-full bg-jade-500/12 blur-3xl" />
+
             <div className="relative">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
-                <PiggyBank className="size-4" /> {calculator.savedLabel}
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
+                {calculator.savedLabel}
               </p>
-              <p className="mt-2 break-all font-display text-[2.5rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[3.25rem] md:text-[4.25rem]">
+              {/* tabular + nowrap: a rupee figure must never wrap mid-number,
+                  which is exactly what break-all was doing here */}
+              <p className="mt-2 whitespace-nowrap font-display text-[clamp(2.4rem,1.2rem+4vw,4.25rem)] font-semibold leading-[0.95] tracking-tight text-brand-grad">
                 <AnimatedRupees paise={saved} />
               </p>
             </div>
 
-            <div className="relative flex flex-col gap-4">
-              <div>
-                <div className="flex justify-between text-xs">
-                  <span className="flex items-center gap-1 text-mid">{calculator.lossNow}</span>
-                  <span className="font-mono tnum text-danger-ink">{formatPaise(lossNow)}</span>
-                </div>
-                <div className="mt-1.5 h-3 overflow-hidden rounded-full neu-inset">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-danger to-[rgb(210_78_66)]"
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                </div>
+            {/* One track, not two. The full width is today's loss; the jade part
+                is the share CartHedge removes. Two separate bars made the reader
+                do the subtraction themselves — this shows the cut directly. */}
+            <div className="relative">
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-mid">{calculator.lossNow}</span>
+                <span className="font-mono tnum text-danger-ink">{formatPaise(lossNow)}</span>
               </div>
-              <div>
-                <div className="flex justify-between text-xs">
-                  <span className="flex items-center gap-1 text-mid">
-                    <TrendingDown className="size-3.5 text-jade-ink" /> {calculator.withUs}
-                  </span>
-                  <span className="font-mono tnum text-jade-ink">{formatPaise(lossWith)}</span>
-                </div>
-                <div className="mt-1.5 h-3 overflow-hidden rounded-full neu-inset">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-jade-400 to-jade-500 shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]"
-                    animate={{ width: `${(lossWith / maxBar) * 100}%` }}
-                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                </div>
+
+              <div
+                className="mt-2 flex h-4 overflow-hidden rounded-full neu-inset"
+                role="img"
+                aria-label={`${formatPaise(saved)} of ${formatPaise(lossNow)} recovered`}
+              >
+                <motion.div
+                  className="h-full bg-[linear-gradient(90deg,rgb(var(--jade-400)),rgb(var(--jade-600)))] shadow-[inset_0_1px_0_rgb(255_255_255/0.28)]"
+                  animate={{ width: `${(saved / maxBar) * 100}%` }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                />
+                <motion.div
+                  className="h-full bg-[linear-gradient(90deg,rgb(var(--danger)/0.85),rgb(var(--danger)/0.6))]"
+                  animate={{ width: `${(lossWith / maxBar) * 100}%` }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                />
+              </div>
+
+              <div className="mt-2 flex items-baseline justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-jade-ink">
+                  <span className="size-2 rounded-full bg-jade-500" aria-hidden />
+                  recovered
+                </span>
+                <span className="text-mid">
+                  {calculator.withUs}{' '}
+                  <span className="font-mono tnum text-hi">{formatPaise(lossWith)}</span> still lost
+                </span>
               </div>
             </div>
 
-            <p className="relative rounded-md bg-gold-400/12 px-4 py-3 text-sm font-semibold text-gold-ink shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)]">
+            <p className="relative border-l-2 border-gold-400/60 pl-4 text-sm font-medium text-gold-ink">
               {calculator.paysFor(paysFor)}
             </p>
           </div>

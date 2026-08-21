@@ -18,9 +18,10 @@ export function MarketingBackground() {
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      {/* base wash — static, subtly brand-graded for depth */}
+      {/* Base wash: neutral. The colour belongs to the aurora layer alone —
+          tinting here too was double-dosing the same hue and turning the whole
+          viewport green, which is what read as a stock AI gradient. */}
       <div className="absolute inset-0 bg-[radial-gradient(130%_100%_at_50%_-10%,rgb(var(--bg-2)),rgb(var(--bg))_58%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(80%_50%_at_15%_0%,rgb(var(--aurora-1)/0.08),transparent_60%),radial-gradient(70%_50%_at_100%_100%,rgb(var(--aurora-2)/0.07),transparent_60%)]" />
 
       {/* aurora field — one wrapper carries the scroll parallax; blobs drift via CSS */}
       <motion.div

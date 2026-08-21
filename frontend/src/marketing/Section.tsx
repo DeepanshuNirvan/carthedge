@@ -47,7 +47,15 @@ export function SectionHead({
   );
 }
 
-/** Heavy, expensive scroll reveal — rises and de-blurs into place. Respects reduced motion. */
+/**
+ * Scroll reveal: rises and settles into place.
+ *
+ * Deliberately transform + opacity only. This used to animate
+ * `filter: blur(8px) → blur(0px)`, which forces the browser to re-rasterise the
+ * whole section on every frame of every reveal — the single heaviest thing on
+ * the page and the reason scrolling felt sticky on mid-range phones. A small
+ * scale gives the same sense of weight for free on the compositor.
+ */
 export function Reveal({
   children,
   className,
@@ -63,11 +71,52 @@ export function Reveal({
   return (
     <motion.div
       className={className}
-      initial={reduced ? false : { opacity: 0, y, filter: 'blur(8px)' }}
-      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      initial={reduced ? false : { opacity: 0, y, scale: 0.985 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.66, delay, ease: [0.16, 1, 0.3, 1] }}
     >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Stagger container: children cascade instead of all arriving together.
+ * Wrap a list and give each child <RevealItem>. Mounting everything on one
+ * frame is what makes a page read as generated rather than composed.
+ */
+export function RevealGroup({
+  children,
+  className,
+  gap = 0.07,
+}: {
+  children: ReactNode;
+  className?: string;
+  gap?: number;
+}) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.div
+      className={className}
+      initial={reduced ? false : 'hidden'}
+      whileInView="shown"
+      viewport={{ once: true, margin: '-80px' }}
+      variants={{ hidden: {}, shown: { transition: { staggerChildren: gap } } }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+export const revealItem = {
+  hidden: { opacity: 0, y: 20, scale: 0.99 },
+  shown: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
+};
+
+export function RevealItem({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <motion.div className={className} variants={revealItem}>
       {children}
     </motion.div>
   );

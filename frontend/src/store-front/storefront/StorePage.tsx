@@ -107,7 +107,7 @@ export default function StorePage() {
   }));
 
   return (
-    <div className="min-h-dvh">
+    <div className="grain min-h-dvh">
       <Seo
         title={`${store.business.name} — Shop online`}
         description={`Shop ${store.business.name}${store.business.city ? ` from ${store.business.city}` : ''}. Secure checkout with UPI, cards${store.business.codEnabled ? ' and cash on delivery' : ''}. No signup needed.`}

@@ -2,21 +2,34 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Wordmark } from '@/marketing/Wordmark';
+import { AuthOrb } from './AuthOrb';
 
 /** Split-screen auth: ambient brand panel + form. */
 export function AuthLayout({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
+    <div className="grain grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden overflow-hidden bg-ink-950 lg:block" data-theme="dark">
+        {/* Material ground: real chikankari, the craft our sellers actually sell.
+            Barely-there and desaturated — it gives the panel a woven texture
+            instead of flat colour, without competing with the orb or the copy. */}
         <img
-          src="/demo/auth-seller.webp"
-          alt="A boutique seller managing an order over chat"
-          className="absolute inset-0 size-full object-cover object-center"
+          src="/demo/chikankari.webp"
+          alt=""
+          aria-hidden
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 size-full scale-105 object-cover opacity-[0.18] saturate-[0.7] [mask-image:radial-gradient(120%_100%_at_50%_40%,black,transparent_78%)]"
         />
-        {/* legibility scrims — top for the wordmark, bottom for the copy */}
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/45 to-ink-950/70" />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink-950/60 to-transparent" />
-        <div aria-hidden className="absolute -bottom-10 left-0 h-64 w-72 rounded-full bg-jade-500/16 blur-[120px]" />
+        {/* faint structure grid: the order board the chat resolves into */}
+        <div aria-hidden className="absolute inset-0 opacity-[0.55]">
+          <div className="cart-grid" />
+        </div>
+        <AuthOrb />
+        {/* legibility scrim — the copy sits over the orb's lower bloom */}
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[linear-gradient(to_top,rgb(var(--bg))_2%,transparent_38%,transparent_64%,rgb(var(--bg)/0.7)_100%)]"
+        />
         <div className="relative z-10 flex h-full flex-col justify-between p-10">
           <Link to="/" aria-label="CartHedge home">
             <Wordmark />

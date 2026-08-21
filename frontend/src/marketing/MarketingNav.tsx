@@ -15,6 +15,7 @@ export function MarketingNav() {
   const announcement = useSite().data?.site.announcement?.trim();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
   useScrollLock(open);
 
   useEffect(() => {
@@ -24,16 +25,36 @@ export function MarketingNav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const linkEl = (l: { label: string; href: string }) =>
-    l.href.startsWith('#') ? (
-      <a key={l.href} href={l.href} className="text-sm text-mid transition-colors duration-micro hover:text-hi">
+  const linkCls =
+    'relative isolate rounded-lg px-3 py-1.5 text-sm text-mid transition-colors duration-micro hover:text-hi';
+
+  // One pill, shared across links via layoutId, so it glides from item to item
+  // instead of each link fading its own background in and out.
+  const pill = (
+    <motion.span
+      layoutId="navHover"
+      className="absolute inset-0 -z-10 rounded-lg bg-[rgb(var(--text-hi)/0.07)] hairline"
+      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+    />
+  );
+
+  const linkEl = (l: { label: string; href: string }) => {
+    const body = (
+      <>
+        {hovered === l.href && pill}
         {l.label}
+      </>
+    );
+    return l.href.startsWith('#') ? (
+      <a key={l.href} href={l.href} onPointerEnter={() => setHovered(l.href)} className={linkCls}>
+        {body}
       </a>
     ) : (
-      <Link key={l.href} to={l.href} className="text-sm text-mid transition-colors duration-micro hover:text-hi">
-        {l.label}
+      <Link key={l.href} to={l.href} onPointerEnter={() => setHovered(l.href)} className={linkCls}>
+        {body}
       </Link>
     );
+  };
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
@@ -53,7 +74,12 @@ export function MarketingNav() {
         <Link to="/" aria-label="CartHedge home" className="shrink-0">
           <Wordmark />
         </Link>
-        <div className="hidden items-center gap-7 md:flex">{nav.links.map(linkEl)}</div>
+        <div
+          className="hidden items-center gap-1 md:flex"
+          onPointerLeave={() => setHovered(null)}
+        >
+          {nav.links.map(linkEl)}
+        </div>
         <div className="hidden items-center gap-2 md:flex">
           <ThemeToggle />
           <Link to="/app/login" className={buttonLink('ghost')}>

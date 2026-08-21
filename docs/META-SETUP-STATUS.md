@@ -160,6 +160,89 @@ reusing the existing `notify.Rupees()` helper you already use for order messages
 never does money arithmetic — it just repeats an already-correct string. The order parser
 still receives paise, because the data it returns is in paise.
 
+### 3.10 Login said "wrong password" when the database was down — and leaked the connection string
+
+**File:** `backend/internal/auth/handler.go`, `backend/internal/auth/service.go`
+
+**How it was found:** the local server logged three failed logins (401) at 10:17 on
+21 August. Thirteen minutes earlier the machine had lost DNS and could not reach the Neon
+database. The logins were not wrong — the database was simply unreachable.
+
+**The problem in plain words:** the login handler turned **every** failure into
+"401 invalid email or password", including failures that had nothing to do with the
+password:
+
+```go
+session, err := h.svc.Login(...)
+if err != nil {
+    httpx.Err(w, http.StatusUnauthorized, err.Error())   // every error became 401
+}
+```
+
+Two separate faults:
+
+1. **Wrong answer.** A database outage told the seller their password was wrong, sending
+   them to reset a password that was never the problem. That is exactly what happened here.
+2. **It leaked internal details.** `err.Error()` was sent straight to the caller. During
+   that outage the reply body would have contained
+   `failed to connect to user=neondb_owner database=carthedge … 13.58.18.166:5432 …` —
+   the database username, the database name and the host IPs, handed to anyone who could
+   POST to the login endpoint. No account needed.
+
+**What I did:** the handler now distinguishes the three cases — bad credentials stay a 401,
+a suspended account is a 403, and anything else is a plain 500 saying "could not sign you
+in, try again in a moment" with the real error logged server-side only.
+
+**Verified live:** correct password 200; wrong password 401; unknown email 401 with the
+*same* wording, so the endpoint still cannot be used to discover which emails have accounts.
+
+The admin login already handled this correctly and needed no change.
+
+> Worth knowing: 58 handlers across the codebase send `err.Error()` to the client. Most are
+> deliberate validation messages ("channel must be whatsapp or instagram") and are fine. The
+> login one mattered because it is unauthenticated and funnelled infrastructure errors into
+> it. If you ever add another public endpoint, do not pass a raw error to the client.
+
+### 3.11 A database blip told paying sellers their subscription had expired
+
+**File:** `backend/internal/plan/service.go`
+
+**How it was found:** the same outage as 3.10. After the database came back, the log showed
+`GET /api/v1/links status=402` and `GET /api/v1/products status=402` — "Payment Required".
+But the demo seller's record was perfectly healthy: business active, subscription active,
+plan Pro, ends 2027-09-04, not lapsed.
+
+**The problem in plain words:** the code that checks a seller's plan treated *"the database
+did not answer"* and *"this seller has not paid"* as the same thing:
+
+```go
+err := s.pool.QueryRow(ctx, `...`).Scan(&a.Active, &caps)
+if err != nil {
+    return Access{}      // Active: false — i.e. "subscription expired"
+}
+```
+
+So whenever the database hiccuped:
+
+- the seller was locked out of their own workspace and told **"subscription expired"**,
+  sending a paying customer to the billing page to fix a problem that did not exist;
+- worse, the same check drives the public storefront (`IsActive`), so **buyers were shown
+  "This store is taking a short break"** and could not order.
+
+A short outage on our side therefore looked like the seller's billing failure, and cost them
+sales while doing it. That is the kind of thing that makes someone cancel.
+
+**What I did:** the lookup now reports *why* it failed. A genuinely missing subscription is
+still "inactive". A lookup that could not complete returns an error, and the gate answers
+**503 "we could not check your plan just now, try again in a moment"** with the real cause
+logged server-side — our fault, phrased as our fault. The storefront helpers still fail
+closed (they have no way to express "unknown") but now log loudly, so an outage appears in
+the logs instead of as a wave of mysteriously paused shops.
+
+**Verified live:** with a healthy Pro plan, `/api/v1/products`, `/links`, `/orders` and
+`/customers` all return **200** (they were 402), the storefront reports `paused: false`, and
+all 7 demo products still load for buyers.
+
 ### 3.9 Why money is stored in paise, not rupees
 
 You asked why. Short answer: **paise is correct, and it should stay.**

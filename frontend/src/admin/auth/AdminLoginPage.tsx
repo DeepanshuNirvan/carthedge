@@ -29,10 +29,13 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden p-5">
+    <div className="grain relative flex min-h-dvh items-center justify-center overflow-hidden p-5">
+      {/* Staff console reads as instrument panel, not marketing: a measured grid
+          and one restrained warm light, rather than the pair of floating colour
+          blobs this had — that pattern is the generic AI login background. */}
       <div aria-hidden className="absolute inset-0">
-        <div className="absolute left-1/3 top-1/4 size-96 rounded-full bg-gold-400/10 blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/3 size-72 rounded-full bg-jade-500/10 blur-[110px]" />
+        <div className="cart-grid opacity-70" />
+        <div className="absolute left-1/2 top-0 size-[38rem] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,rgb(var(--gold-400)/0.10),transparent_64%)] blur-2xl" />
       </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}

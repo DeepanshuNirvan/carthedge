@@ -78,7 +78,7 @@ export default function TrackPage() {
   const derailed = order?.status === 'rto' || order?.status === 'cancelled';
 
   return (
-    <div className="min-h-dvh">
+    <div className="grain min-h-dvh">
       <Seo title="Track your order — CartHedge" description="Check the live status of your order." path="/track" noIndex />
 
       <header className="border-b">

@@ -85,6 +85,10 @@
   --brand-mark: 34 201 133;
   --brand-coin: 233 185 96;
 
+  /* accent-type gradient endpoints (see .text-brand-grad) */
+  --grad-from: 108 232 176;
+  --grad-to: 22 168 108;
+
   --line: 255 255 255;
   --line-a: 0.09;
   --line-strong-a: 0.16;
@@ -105,12 +109,14 @@
   --neu-dark: 0 0 0;
   --neu-dark-a: 0.45;
 
-  /* aurora light sources behind glass — richer, more cinematic */
-  --aurora-1: 20 196 122;   /* jade */
-  --aurora-2: 238 180 84;   /* gold */
-  --aurora-3: 54 104 208;   /* indigo depth */
-  --aurora-a: 0.48;
-  --grid-a: 0.06;
+  /* Aurora = one brand light source, not a mesh of hues. Three saturated blobs
+     at high alpha is the stock "AI gradient" look; a single deep jade wash with
+     a faint warm bounce reads as considered lighting instead. */
+  --aurora-1: 16 122 84;    /* jade, deepened — glow, not paint */
+  --aurora-2: 150 112 52;   /* warm bounce, desaturated */
+  --aurora-3: 18 74 66;     /* deep teal shadow, same family as jade */
+  --aurora-a: 0.22;
+  --grid-a: 0.05;
 
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 34px -14px rgb(0 0 0 / 0.62);
   --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 30px 70px -24px rgb(0 0 0 / 0.72);
@@ -143,6 +149,9 @@
   --brand-mark: 11 143 86;
   --brand-coin: 214 158 62;
 
+  --grad-from: 17 152 96;
+  --grad-to: 7 92 58;
+
   --line: 32 27 22;
   --line-a: 0.1;
   --line-strong-a: 0.17;
@@ -163,12 +172,12 @@
   --neu-dark: 150 138 118;
   --neu-dark-a: 0.2;
 
-  /* elegant, present colour — not a muddy wash */
-  --aurora-1: 22 190 128;
-  --aurora-2: 240 194 116;
-  --aurora-3: 128 158 236;
-  --aurora-a: 0.26;
-  --grid-a: 0.05;
+  /* light theme: the same single-source lighting, warmed by the paper it sits on */
+  --aurora-1: 34 168 118;
+  --aurora-2: 208 168 104;
+  --aurora-3: 92 150 138;
+  --aurora-a: 0.16;
+  --grid-a: 0.045;
 
   /* soft, warm, layered — premium light depth */
   --shadow-soft: 0 1px 2px rgb(72 60 44 / 0.05), 0 10px 24px -12px rgb(72 60 44 / 0.13);

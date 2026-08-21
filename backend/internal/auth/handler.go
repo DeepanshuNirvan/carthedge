@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"carthedge/internal/httpx"
@@ -137,7 +138,19 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := h.svc.Login(r.Context(), in.Email, in.Password)
 	if err != nil {
-		httpx.Err(w, http.StatusUnauthorized, err.Error())
+		// This endpoint is unauthenticated, so it must never echo the raw error.
+		// It used to: during a database outage it answered a wrong-password 401
+		// whose body carried the connection string — DB user, database name and
+		// host IPs — to anyone who asked. Infra failures are now a plain 500.
+		switch {
+		case errors.Is(err, ErrBadLogin):
+			httpx.Err(w, http.StatusUnauthorized, ErrBadLogin.Error())
+		case errors.Is(err, ErrSuspended):
+			httpx.Err(w, http.StatusForbidden, ErrSuspended.Error())
+		default:
+			slog.Error("login failed", "err", err)
+			httpx.Err(w, http.StatusInternalServerError, "could not sign you in, try again in a moment")
+		}
 		return
 	}
 	httpx.OK(w, session)

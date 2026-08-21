@@ -264,12 +264,19 @@
   to { background-position: -200% 0; }
 }
 
-/* ---------- gradient brand text ---------- */
+/* ---------- brand accent type ----------
+   One hue, lit from the top-left, so the words read as a material catching
+   light. A two-hue jade→gold sweep is the stock "AI headline" gradient and was
+   the loudest generic tell on the landing page. Endpoints are theme tokens
+   because the brand ramp is theme-invariant — jade-300 on white paper is
+   unreadable, so light mode swaps to the deep end of the same family. */
 .text-brand-grad {
-  background: linear-gradient(100deg, rgb(var(--jade-400)), rgb(var(--gold-400)) 90%);
+  background: linear-gradient(166deg, rgb(var(--grad-from)) 4%, rgb(var(--grad-to)) 88%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* the gradient can hairline-clip descenders at display sizes */
+  padding-bottom: 0.06em;
 }
 
 /* ---------- premium range slider: recessed track + physical jade knob ---------- */
@@ -362,6 +369,41 @@
 @media (prefers-reduced-motion: reduce) {
   .aurora::before,
   .aurora::after {
+    animation: none;
+  }
+}
+
+/* ---------- auth orb ----------
+   Compositor-only: transform + opacity, never layout. Each layer is its own
+   element so the browser can cache them; the sphere never repaints. */
+@keyframes authOrbSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes authOrbBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.94; }
+  50% { transform: scale(1.045); opacity: 1; }
+}
+@keyframes authOrbTilt {
+  0%, 100% { transform: rotate3d(1, 0.3, 0, 74deg) rotate(0deg); }
+  50% { transform: rotate3d(1, 0.3, 0, 66deg) rotate(180deg); }
+}
+.auth-orb-spin {
+  animation: authOrbSpin 26s linear infinite;
+  will-change: transform;
+}
+.auth-orb-breathe {
+  animation: authOrbBreathe 7s ease-in-out infinite;
+  will-change: transform;
+}
+.auth-orb-tilt {
+  animation: authOrbTilt 22s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-orb-spin,
+  .auth-orb-breathe,
+  .auth-orb-tilt {
     animation: none;
   }
 }

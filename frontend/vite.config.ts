@@ -23,10 +23,15 @@ export default defineConfig({
     },
   },
   server: {
+    // Vite matches these as PREFIXES, so the trailing slash is load-bearing:
+    // bare '/p' also captured /privacy, /pricing and /products, which meant
+    // those SPA routes were proxied to the API and answered "404 page not
+    // found" in dev while working fine in production. Every real backend route
+    // here is /p/{businessCode}/... so '/p/' is the correct match.
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/p': 'http://localhost:8080',
-      '/uploads': 'http://localhost:8080',
+      '/api/': 'http://localhost:8080',
+      '/p/': 'http://localhost:8080',
+      '/uploads/': 'http://localhost:8080',
     },
   },
 });

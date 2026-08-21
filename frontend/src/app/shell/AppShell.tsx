@@ -112,7 +112,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           {({ isActive }) => (
             <>
               {isActive && (
-                <span aria-hidden className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-jade-400" />
+                // shared layout: the marker slides between items instead of
+                // popping, matching the marketing nav's hover pill
+                <motion.span
+                  layoutId="appNavMarker"
+                  aria-hidden
+                  className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-jade-400"
+                  transition={{ type: 'spring', stiffness: 460, damping: 38 }}
+                />
               )}
               <item.icon className="size-[18px] shrink-0" aria-hidden />
               {item.label}

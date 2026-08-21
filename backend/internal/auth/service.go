@@ -24,6 +24,7 @@ import (
 var (
 	ErrEmailTaken = errors.New("email already registered")
 	ErrBadLogin   = errors.New("invalid email or password")
+	ErrSuspended  = errors.New("account suspended, contact support")
 	ErrBadRefresh = errors.New("invalid refresh token")
 	ErrBadReset   = errors.New("invalid or expired reset token")
 	ErrTaken      = errors.New("already registered") // wrapped with the field name
@@ -195,7 +196,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*Session, 
 		return nil, ErrBadLogin
 	}
 	if status != "active" {
-		return nil, errors.New("account suspended, contact support")
+		return nil, ErrSuspended
 	}
 	tokens, err := s.issueTokens(ctx, bizID, code)
 	if err != nil {
