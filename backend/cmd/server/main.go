@@ -96,8 +96,15 @@ func main() {
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg, log)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log)
-	metaClient := messaging.NewClient(cfg.MetaAppSecret, cfg.MetaGraphVersion)
-	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, log)
+	// Instagram Login webhooks are signed with the Instagram app secret,
+	// WhatsApp ones with the Meta app secret; either is accepted
+	metaClient := messaging.NewClient(cfg.MetaGraphVersion, cfg.MetaIgAppSecret, cfg.MetaAppSecret)
+	messagingSvc := messaging.NewService(messaging.Deps{
+		Pool: pool, Client: metaClient, AI: aiSvc, Orders: orderSvc, Features: planSvc.HasFeature,
+		Bus: bus, Cipher: cipher, Log: log,
+	})
+	// a DM draft the seller confirms sends the buyer their order link in that chat
+	aiSvc.OnConfirm(messagingSvc.OrderConfirmed)
 	messagingSvc.Start(ctx)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)
 
@@ -131,6 +138,7 @@ func main() {
 				AppID: cfg.MetaAppID, AppSecret: cfg.MetaAppSecret,
 				IgAppID: cfg.MetaIgAppID, IgAppSecret: cfg.MetaIgAppSecret,
 				RedirectURL: cfg.MetaOAuthRedirect, Version: cfg.MetaGraphVersion,
+				WAConfigID: cfg.MetaWAConfigID,
 			},
 		}),
 		PaySvc: paySvc,

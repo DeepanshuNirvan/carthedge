@@ -16,8 +16,8 @@ func TestParseWebhookInstagram(t *testing.T) {
 		 "message":{"mid":"m4","text":"oops","is_deleted":true}}]}]}`)
 
 	got := parseWebhook(body)
-	if len(got) != 2 {
-		t.Fatalf("got %d inbound messages, want 2 (echo and deleted must be dropped): %+v", len(got), got)
+	if len(got) != 3 {
+		t.Fatalf("got %d messages, want 3 (deleted must be dropped, the echo kept as outbound): %+v", len(got), got)
 	}
 	if got[0].Text != "[replying to your story] ye wala M size me hai?" {
 		t.Errorf("story reply lost its context: %q", got[0].Text)
@@ -27,6 +27,15 @@ func TestParseWebhookInstagram(t *testing.T) {
 	}
 	if got[1].Text != "[shared a post: Pink Kurti]" {
 		t.Errorf("shared post lost its context: %q", got[1].Text)
+	}
+	// the seller's own reply belongs to the buyer's thread, not a thread with themselves
+	if echo := got[2]; !echo.Outbound || echo.ContactID != "BUYER1" || echo.Text != "haan hai" {
+		t.Errorf("echo not captured as the seller's message to the buyer: %+v", echo)
+	}
+	for _, m := range got[:2] {
+		if m.Outbound {
+			t.Errorf("buyer message marked outbound: %+v", m)
+		}
 	}
 }
 

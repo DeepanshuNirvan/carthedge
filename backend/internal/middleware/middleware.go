@@ -191,13 +191,14 @@ func CORS(origins []string) Middleware {
 func SecurityHeaders(production bool) Middleware {
 	csp := strings.Join([]string{
 		"default-src 'self'",
-		// Razorpay's checkout injects its own inline bootstrap
-		"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
+		// Razorpay's checkout injects its own inline bootstrap; the Facebook SDK
+		// runs WhatsApp Embedded Signup for sellers
+		"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://connect.facebook.net",
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: blob: https:",
 		"font-src 'self' data:",
-		"connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com",
-		"frame-src https://api.razorpay.com https://checkout.razorpay.com",
+		"connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.facebook.com https://*.facebook.net",
+		"frame-src https://api.razorpay.com https://checkout.razorpay.com https://*.facebook.com",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
 		"form-action 'self'",
@@ -210,7 +211,9 @@ func SecurityHeaders(production bool) Middleware {
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 			h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()")
-			h.Set("Cross-Origin-Opener-Policy", "same-origin")
+			// allow-popups: Meta's signup and Razorpay's bank pages open in a
+			// popup that must be able to report back to this window
+			h.Set("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
 			h.Set("Content-Security-Policy", csp)
 			if production {
 				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")

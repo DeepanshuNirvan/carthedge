@@ -347,9 +347,13 @@ export type Channel = {
   channel: 'whatsapp' | 'instagram';
   externalId: string;
   displayName: string;
+  /** connected | error — error means the token could not be renewed: reconnect */
   status: string;
   connectedAt: string;
+  expiresAt: string;
 };
+
+export type DmAutomation = { autoReply: boolean; autoConfirm: boolean };
 
 export type ConversationSummary = {
   id: string;
@@ -363,7 +367,13 @@ export type ConversationSummary = {
   preview: string;
 };
 
-export type ConversationMessage = { direction: 'in' | 'out'; body: string; createdAt: string };
+export type ConversationMessage = {
+  direction: 'in' | 'out';
+  body: string;
+  /** who sent an outbound message: seller (you), ai (auto-reply), system (order link) */
+  author?: '' | 'seller' | 'ai' | 'system';
+  createdAt: string;
+};
 
 export type ConversationDetail = {
   id: string;

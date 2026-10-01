@@ -1,10 +1,12 @@
 package messaging
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"carthedge/internal/httpx"
@@ -69,14 +71,65 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 // --- seller (authed) ---
 
 func (h *Handler) ListChannels(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListChannels(r.Context(), middleware.BusinessID(r.Context()))
+	bizID := middleware.BusinessID(r.Context())
+	items, err := h.svc.ListChannels(r.Context(), bizID)
 	if err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "could not load channels")
 		return
 	}
-	httpx.OK(w, httpx.M{"channels": items,
+	auto, err := h.svc.Automation(r.Context(), bizID)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not load channels")
+		return
+	}
+	out := httpx.M{"channels": items,
 		// the UI offers manual entry when a channel has no app credentials yet
-		"oauth": httpx.M{"whatsapp": h.oauth.enabled("whatsapp"), "instagram": h.oauth.enabled("instagram")}})
+		"oauth":      httpx.M{"whatsapp": h.oauth.enabled("whatsapp"), "instagram": h.oauth.enabled("instagram")},
+		"automation": auto,
+		// auto-reply is a plan feature; the toggle shows, locked, below it
+		"autoReplyAvailable": middleware.HasFeature(r.Context(), "aiReply"),
+	}
+	if h.oauth.enabled("whatsapp") {
+		// public values: the Facebook JS SDK needs them in the browser
+		out["whatsappSignup"] = httpx.M{"appId": h.oauth.AppID, "configId": h.oauth.WAConfigID, "version": h.oauth.Version}
+	}
+	httpx.OK(w, out)
+}
+
+// SetAutomation turns DM auto-reply / auto-confirm on or off for the seller.
+func (h *Handler) SetAutomation(w http.ResponseWriter, r *http.Request) {
+	var in Automation
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if in.AutoReply && !middleware.HasFeature(r.Context(), "aiReply") {
+		httpx.JSON(w, http.StatusForbidden, httpx.M{
+			"error": "auto-reply needs a plan with the AI reply assistant", "code": "featureNotInPlan", "feature": "aiReply"})
+		return
+	}
+	if err := h.svc.SetAutomation(r.Context(), middleware.BusinessID(r.Context()), in); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not save the setting")
+		return
+	}
+	httpx.OK(w, in)
+}
+
+// WhatsAppSignup finishes Embedded Signup: the browser posts what Meta's
+// popup returned, and the server swaps the code for a business token.
+func (h *Handler) WhatsAppSignup(w http.ResponseWriter, r *http.Request) {
+	var in EmbeddedSignup
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	conn, err := h.client.ExchangeWhatsApp(r.Context(), h.oauth, in)
+	if err == nil {
+		err = h.svc.ConnectChannel(r.Context(), middleware.BusinessID(r.Context()), conn)
+	}
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true, "displayName": conn.DisplayName})
 }
 
 // ConnectURL starts the OAuth handshake. The state is a short-lived signed
@@ -120,9 +173,13 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, h.settingsURL("", reason), http.StatusFound)
 		return
 	}
-	externalID, token, name, err := h.client.ExchangeCode(r.Context(), h.oauth, channel, q.Get("code"))
+	if channel != "instagram" {
+		http.Redirect(w, r, h.settingsURL("", "That connection link is not valid — start again from Settings."), http.StatusFound)
+		return
+	}
+	conn, err := h.client.ExchangeInstagram(r.Context(), h.oauth, q.Get("code"))
 	if err == nil {
-		err = h.svc.ConnectChannel(r.Context(), bizID, channel, externalID, token, name)
+		err = h.svc.ConnectChannel(r.Context(), bizID, conn)
 	}
 	if err != nil {
 		http.Redirect(w, r, h.settingsURL("", err.Error()), http.StatusFound)
@@ -178,8 +235,20 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	if err := h.svc.ConnectChannel(r.Context(), middleware.BusinessID(r.Context()),
-		in.Channel, in.ExternalID, in.AccessToken, in.DisplayName); err != nil {
+	conn := &Connection{Channel: in.Channel, ExternalID: strings.TrimSpace(in.ExternalID),
+		Token: strings.TrimSpace(in.AccessToken), DisplayName: in.DisplayName}
+	if conn.Channel == "instagram" {
+		// a pasted long-lived token is assumed fresh; the sweep renews it
+		exp := time.Now().Add(instagramTokenTTL)
+		conn.ExpiresAt = &exp
+		if conn.Token != "" {
+			if err := h.client.SubscribeInstagram(r.Context(), conn.Token); err != nil {
+				httpx.Err(w, http.StatusBadRequest, "Instagram rejected that token: "+err.Error())
+				return
+			}
+		}
+	}
+	if err := h.svc.ConnectChannel(r.Context(), middleware.BusinessID(r.Context()), conn); err != nil {
 		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -225,4 +294,67 @@ func (h *Handler) Reply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// --- Meta platform callbacks (public, signed by Meta) ---
+
+// signedAccount reads the account id out of a Meta signed_request form post.
+func (h *Handler) signedAccount(r *http.Request) (string, error) {
+	if err := r.ParseForm(); err != nil {
+		return "", err
+	}
+	data, err := h.client.ParseSignedRequest(r.PostForm.Get("signed_request"))
+	if err != nil {
+		return "", err
+	}
+	switch id := data["user_id"].(type) {
+	case string:
+		if id != "" {
+			return id, nil
+		}
+	case json.Number:
+		return id.String(), nil
+	}
+	return "", errors.New("signed_request has no user_id")
+}
+
+// Deauthorize is called when a seller removes CartHedge from their Instagram
+// account. The token is dead from that moment; drop it.
+func (h *Handler) Deauthorize(w http.ResponseWriter, r *http.Request) {
+	account, err := h.signedAccount(r)
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, "invalid signed_request")
+		return
+	}
+	if _, err := h.svc.Deauthorize(r.Context(), account); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not process")
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// DataDeletion erases what CartHedge holds for a Meta account and answers in
+// the shape Meta requires: a status URL and a confirmation code.
+func (h *Handler) DataDeletion(w http.ResponseWriter, r *http.Request) {
+	account, err := h.signedAccount(r)
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, "invalid signed_request")
+		return
+	}
+	code, err := h.svc.DeleteAccountData(r.Context(), account)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not process")
+		return
+	}
+	httpx.OK(w, httpx.M{"url": h.appBaseURL + "/data-deletion?code=" + code, "confirmation_code": code})
+}
+
+// DeletionStatus lets the /data-deletion page confirm a request by its code.
+func (h *Handler) DeletionStatus(w http.ResponseWriter, r *http.Request) {
+	status, at, err := h.svc.DeletionStatus(r.Context(), r.PathValue("code"))
+	if err != nil {
+		httpx.Err(w, http.StatusNotFound, "no deletion request with that code")
+		return
+	}
+	httpx.OK(w, httpx.M{"status": status, "requestedAt": at})
 }

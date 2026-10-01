@@ -54,6 +54,9 @@ func NewClient(cfg *config.Config, log *slog.Logger) *Client {
 
 func (c *Client) Configured() bool { return len(c.providers) > 0 }
 
+// ErrNotConfigured means no LLM key is set. Retrying will not help.
+var ErrNotConfigured = errors.New("AI provider not configured; set OPENAI_API_KEY or GEMINI_API_KEY")
+
 // Provider names the LLM that leads, for the boot log and the admin console.
 func (c *Client) Provider() string {
 	if !c.Configured() {
@@ -66,7 +69,7 @@ func (c *Client) Provider() string {
 // Providers are tried in order and the last error is reported if all fail.
 func (c *Client) Complete(ctx context.Context, system, user string, jsonMode bool) (string, error) {
 	if !c.Configured() {
-		return "", errors.New("AI provider not configured; set OPENAI_API_KEY or GEMINI_API_KEY")
+		return "", ErrNotConfigured
 	}
 	var lastErr error
 	for i, p := range c.providers {

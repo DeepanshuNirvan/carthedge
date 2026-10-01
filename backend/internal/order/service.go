@@ -639,3 +639,59 @@ func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]
 func (s *Service) trackURL(code string) string {
 	return s.baseURL + "/o/" + code
 }
+
+// ChatSummary is the message a buyer gets in the Instagram/WhatsApp chat their
+// order came from: what was booked, the total, and the one link that moves it
+// forward — the COD confirmation (the RTO check) or the payment page. Kept
+// well under Instagram's 1,000-character DM limit.
+func (s *Service) ChatSummary(ctx context.Context, o *Order) string {
+	var bizName string
+	s.pool.QueryRow(ctx, `select b.name from businesses b join orders o on o.business_id=b.id where o.id=$1`, o.ID).Scan(&bizName)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Order %s booked", o.Code)
+	if bizName != "" {
+		fmt.Fprintf(&b, " with %s", bizName)
+	}
+	b.WriteString(" ✅\n")
+	for i, l := range o.Items {
+		if i == 5 {
+			fmt.Fprintf(&b, "+ %d more item(s)\n", len(o.Items)-5)
+			break
+		}
+		name := l.Name
+		if l.Variant != "" {
+			name += " (" + l.Variant + ")"
+		}
+		fmt.Fprintf(&b, "%d× %s — %s\n", l.Qty, truncateRunes(name, 60), notify.Rupees(l.Price*l.Qty))
+	}
+	if o.Discount > 0 {
+		fmt.Fprintf(&b, "Discount: −%s\n", notify.Rupees(o.Discount))
+	}
+	if o.Shipping > 0 {
+		fmt.Fprintf(&b, "Delivery: %s\n", notify.Rupees(o.Shipping))
+	}
+	if o.PaymentMethod == "cod" {
+		fmt.Fprintf(&b, "Total: %s · Cash on Delivery\n\n", notify.Rupees(o.Total))
+		token, _ := s.rdb.Get(ctx, "codconfirm:"+o.Code).Result()
+		if token != "" {
+			fmt.Fprintf(&b, "Please confirm your order and address here: %s/o/%s/confirm?token=%s", s.baseURL, o.Code, token)
+		} else {
+			fmt.Fprintf(&b, "Track your order here: %s", s.trackURL(o.Code))
+		}
+		if o.TokenAmount > 0 {
+			fmt.Fprintf(&b, "\nA %s advance confirms it (adjusted in the COD amount).", notify.Rupees(o.TokenAmount))
+		}
+	} else {
+		fmt.Fprintf(&b, "Total: %s\n\nPay securely here to confirm: %s", notify.Rupees(o.Total), s.trackURL(o.Code))
+	}
+	return b.String()
+}
+
+func truncateRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n-1]) + "…"
+}

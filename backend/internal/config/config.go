@@ -62,6 +62,7 @@ type Config struct {
 	MetaIgAppID       string
 	MetaIgAppSecret   string
 	MetaOAuthRedirect string
+	MetaWAConfigID    string
 
 	ShiprocketEmail    string
 	ShiprocketPassword string
@@ -119,11 +120,14 @@ func Load() (*Config, error) {
 		MetaAppID:        os.Getenv("META_APP_ID"),
 		MetaAppSecret:    os.Getenv("META_APP_SECRET"),
 		MetaVerifyToken:  os.Getenv("META_VERIFY_TOKEN"),
-		MetaGraphVersion: env("META_GRAPH_VERSION", "v21.0"),
+		MetaGraphVersion: env("META_GRAPH_VERSION", "v24.0"),
 		MetaIgAppID:      os.Getenv("META_IG_APP_ID"),
 		MetaIgAppSecret:  os.Getenv("META_IG_APP_SECRET"),
 		// must match the redirect registered on the Meta app
 		MetaOAuthRedirect: env("META_OAUTH_REDIRECT_URL", ""),
+		// Facebook Login for Business configuration from the WhatsApp Embedded
+		// Signup builder; blank = WhatsApp one-tap connect is off
+		MetaWAConfigID: os.Getenv("META_WA_CONFIG_ID"),
 
 		ShiprocketEmail:    os.Getenv("SHIPROCKET_EMAIL"),
 		ShiprocketPassword: os.Getenv("SHIPROCKET_PASSWORD"),

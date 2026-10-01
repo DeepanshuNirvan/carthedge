@@ -26,6 +26,9 @@ const sourceBadge = (source?: string) =>
       ? { label: 'Instagram', tone: 'gold' as const }
       : null;
 
+// who sent an outbound message — the seller should see what went out in their name
+const authorLabel: Record<string, string> = { ai: 'AI auto-reply', system: 'Order link · sent automatically' };
+
 function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
   const { data: convos, isLoading } = useConversations();
   return (
@@ -97,10 +100,15 @@ function ConversationModal({
               <div
                 key={i}
                 className={cn(
-                  'max-w-[85%] rounded-lg px-3 py-2 text-sm text-hi',
+                  'max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm text-hi',
                   m.direction === 'in' ? 'bg-surface-3' : 'ml-auto bg-jade-500/15',
                 )}
               >
+                {m.direction === 'out' && authorLabel[m.author ?? ''] && (
+                  <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wider text-low">
+                    {authorLabel[m.author ?? '']}
+                  </span>
+                )}
                 {m.body}
               </div>
             ))}
@@ -212,7 +220,13 @@ function DraftReview({ draft, onClose }: { draft: AiDraft | null; onClose: () =>
               { id: draft.id, overrides: edited ?? undefined },
               {
                 onSuccess: () => {
-                  toast('success', 'Order created', 'It is now on your board as new.');
+                  toast(
+                    'success',
+                    'Order created',
+                    draft.conversationId
+                      ? 'The buyer gets the order link in the chat.'
+                      : 'It is now on your board as new.',
+                  );
                   onClose();
                 },
                 onError: (e) => toast('error', 'Could not confirm', e.message),

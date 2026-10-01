@@ -1,8 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { del, get, post } from './http';
-import type { Channel, ConversationDetail, ConversationSummary } from './types';
+import { del, get, post, put } from './http';
+import type { Channel, ConversationDetail, ConversationSummary, DmAutomation } from './types';
 
-type ChannelsResponse = { channels: Channel[]; oauth: Record<'whatsapp' | 'instagram', boolean> };
+export type WhatsAppSignupConfig = { appId: string; configId: string; version: string };
+
+type ChannelsResponse = {
+  channels: Channel[];
+  oauth: Record<'whatsapp' | 'instagram', boolean>;
+  automation: DmAutomation;
+  autoReplyAvailable: boolean;
+  /** present when WhatsApp Embedded Signup is configured on the server */
+  whatsappSignup?: WhatsAppSignupConfig;
+};
+
+export type WhatsAppSignupResult = {
+  code: string;
+  wabaId?: string;
+  phoneNumberId?: string;
+  coexistence?: boolean;
+};
 
 export const useChannelsInfo = () =>
   useQuery({
@@ -42,6 +58,15 @@ export function useChannelMutations() {
   return {
     connect: useMutation({
       mutationFn: (input: ConnectInput) => post<{ ok: boolean }>('/api/v1/channels', input),
+      onSuccess: invalidate,
+    }),
+    whatsappSignup: useMutation({
+      mutationFn: (input: WhatsAppSignupResult) =>
+        post<{ ok: boolean; displayName: string }>('/api/v1/channels/whatsapp/signup', input),
+      onSuccess: invalidate,
+    }),
+    setAutomation: useMutation({
+      mutationFn: (input: DmAutomation) => put<DmAutomation>('/api/v1/channels/automation', input),
       onSuccess: invalidate,
     }),
     disconnect: useMutation({

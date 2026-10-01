@@ -234,19 +234,24 @@ One Meta app carries both products. **Start this the same week as DLT** — busi
 3. **[business.facebook.com](https://business.facebook.com) → Business settings → Security Centre → Start verification.** Upload company registration, GST/utility bill, and a domain you control. This is the slow part.
 4. Add the **WhatsApp** product → *API Setup*. Meta gives you a free test number and up to 5 verified test recipients — the whole integration can be built on this at zero cost.
 5. Add the **Instagram** product → *Instagram API with Instagram Login*. Sellers need an Instagram **professional** (business/creator) account.
-6. **Webhooks:** callback URL `https://<your-domain>/webhooks/meta`, verify token = any random string you also put in `.env`. Subscribe to the **`messages`** field on both the WhatsApp and Instagram objects.
-7. **App review:** request `whatsapp_business_messaging`, `whatsapp_business_management`, `instagram_business_basic`, `instagram_business_manage_messages`. Record a screencast of the seller connect flow — Meta asks for one.
-8. **One-tap seller connect (optional but worth it):** add `https://<your-domain>/oauth/meta/callback` as a valid OAuth redirect URI on both products, and set `META_OAUTH_REDIRECT_URL` to the same string. Without it, sellers paste an account id and token by hand, which still works.
+6. **Webhooks:** callback URL `https://<your-domain>/webhooks/meta`, verify token = any random string you also put in `.env`. Subscribe to the **`messages`** field on both the WhatsApp and Instagram objects. Instagram webhooks are signed with the Instagram app secret and WhatsApp ones with the Meta app secret; the server accepts either.
+7. **Instagram one-tap connect:** Instagram → *Business login settings* → OAuth redirect URI `https://<your-domain>/oauth/meta/callback` (same value in `META_OAUTH_REDIRECT_URL`), Deauthorize callback `https://<your-domain>/webhooks/meta/deauthorize`, Data deletion request URL `https://<your-domain>/webhooks/meta/data-deletion`.
+8. **WhatsApp one-tap connect (Embedded Signup):** Facebook Login for Business → *Configurations* → create a **WhatsApp Embedded Signup** configuration with a non-expiring system-user token → put its id in `META_WA_CONFIG_ID`. Allow your domain under *Allowed domains for the JavaScript SDK*.
+9. **App review:** request `instagram_business_basic`, `instagram_business_manage_messages`, `whatsapp_business_messaging`, `whatsapp_business_management`. Record a screencast of the seller connect flow — Meta asks for one. Without one-tap connect, sellers can still paste an account id and token by hand.
+
+Step-by-step go-live checklist: [`META-SETUP-STATUS.md` §0](./META-SETUP-STATUS.md).
 
 ```env
 META_APP_ID=1234567890
 META_APP_SECRET=xxxxxxxx
 META_VERIFY_TOKEN=any_random_string_matching_the_webhook_config
-META_GRAPH_VERSION=v21.0
+META_GRAPH_VERSION=v24.0
 META_OAUTH_REDIRECT_URL=https://carthedge.in/oauth/meta/callback
-# only if Instagram Login uses separate credentials; blank falls back to META_APP_*
+# Instagram Login has its own app id and secret (Instagram → API setup); blank falls back to META_APP_*
 META_IG_APP_ID=
 META_IG_APP_SECRET=
+# WhatsApp Embedded Signup configuration id; blank = WhatsApp connects by manual token only
+META_WA_CONFIG_ID=
 ```
 
 **Cost.** Instagram messaging has no per-message fee. WhatsApp charges by category: replies inside the buyer-opened 24-hour window are **free** (which covers most of what CartHedge sends), utility messages are ~₹0.12–0.15, and **marketing messages are ~₹0.70–0.80** — price or meter broadcasts accordingly.

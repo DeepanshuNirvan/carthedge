@@ -14,7 +14,7 @@ export type LegalDoc = {
 };
 
 const CONTACT = 'privacy@carthedge.in';
-const UPDATED = '20 August 2026';
+const UPDATED = '1 October 2026';
 
 export const legalDocs = {
   privacy: {
@@ -56,9 +56,9 @@ export const legalDocs = {
         heading: 'Connected Instagram and WhatsApp accounts',
         body: [
           'Connecting an account is optional and always initiated by the seller through Meta’s own login screen. We never ask for, see, or store your Instagram or WhatsApp password.',
-          'Once connected, we receive messages and comments sent to that business account from the moment of connection onward. We do not download or read your message history from before you connected.',
-          'Message content is used for one purpose: drafting an order card that you review and confirm. We also use it to send replies and order updates that you or your configured automations trigger.',
-          'Message text is sent to our AI provider (Google Gemini) to extract order details such as item, size, address and payment preference. It is not used to train third-party models.',
+          'Once connected, we receive direct messages sent to that business account from the moment of connection onward. We do not download or read your message history from before you connected.',
+          'Message content is used to run your order desk: drafting an order card from the chat, sending the buyer their order link when an order is booked, and — only if you turn on auto-reply — answering buyer questions from your own catalog and store details.',
+          'Message text is sent to our AI provider (Google Gemini) to extract order details such as item, size, address and payment preference, and to write auto-replies when you have turned them on. It is not used to train third-party models.',
           'You can disconnect an account at any time from Settings. Disconnecting immediately stops all message access and deletes the stored access token.',
         ],
       },
@@ -179,6 +179,14 @@ export const legalDocs = {
           'Sign in to CartHedge, open Settings, find the connected channel and choose Disconnect.',
           'This takes effect immediately: the stored access token is deleted and CartHedge stops receiving any further messages or comments from that account.',
           'You can also revoke CartHedge from Instagram directly, under Settings and privacy → Website permissions → Apps and websites.',
+        ],
+      },
+      {
+        heading: 'Remove CartHedge from Instagram',
+        body: [
+          'If you remove CartHedge from your Instagram account, or ask Meta to delete the data CartHedge holds for it, Meta tells us automatically.',
+          'Removing the app deletes the stored access token at once. A deletion request also erases every conversation captured from that account and the chat text kept with order drafts. Orders you already booked stay in your ledger as business records.',
+          'A deletion request gives you a confirmation code. Open this page with that code to check its status.',
         ],
       },
       {

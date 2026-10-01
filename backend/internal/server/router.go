@@ -176,6 +176,9 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/channels", d.Messaging.Connect, authed, active, aiFeature)
 	handle("DELETE /api/v1/channels/{channel}", d.Messaging.Disconnect, authed, active, aiFeature)
 	handle("GET /api/v1/channels/{channel}/connect-url", d.Messaging.ConnectURL, authed, active, aiFeature)
+	handle("POST /api/v1/channels/whatsapp/signup", d.Messaging.WhatsAppSignup, authed, active, aiFeature,
+		byBusiness("waSignup", 10, 10*time.Minute))
+	handle("PUT /api/v1/channels/automation", d.Messaging.SetAutomation, authed, active, aiFeature)
 	handle("GET /api/v1/conversations", d.Messaging.ListConversations, authed, active, aiFeature)
 	handle("GET /api/v1/conversations/{id}", d.Messaging.Conversation, authed, active, aiFeature)
 	handle("POST /api/v1/conversations/{id}/reply", d.Messaging.Reply, authed, active, aiFeature)
@@ -238,6 +241,11 @@ func New(d Deps) http.Handler {
 
 	handle("GET /webhooks/meta", d.Messaging.Verify)
 	handle("POST /webhooks/meta", d.Messaging.Webhook)
+	// Meta platform callbacks: an account removed CartHedge, or asked for its
+	// data to be erased. Both are signed_request posts verified with the app secret.
+	handle("POST /webhooks/meta/deauthorize", d.Messaging.Deauthorize, byIP("metaDeauth", 60, time.Minute))
+	handle("POST /webhooks/meta/data-deletion", d.Messaging.DataDeletion, byIP("metaDeletion", 60, time.Minute))
+	handle("GET /api/v1/data-deletion/{code}", d.Messaging.DeletionStatus, byIP("deletionStatus", 30, time.Minute))
 
 	// SPA + per-route meta tags; registered last, its "/" pattern is the
 	// lowest-precedence match so every API route above still wins

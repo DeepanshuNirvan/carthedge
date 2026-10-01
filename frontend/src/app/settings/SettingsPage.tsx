@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,7 @@ import { Check, Instagram, Landmark, MessageCircle, ShieldCheck, Store } from 'l
 import { useBusiness, useUpdateBusiness, useUpdatePayments } from '@/api/business';
 import { getChannelConnectUrl, useChannelsInfo, useChannelMutations } from '@/api/messaging';
 import { uploadFile } from '@/api/uploads';
+import { launchWhatsAppSignup } from '@/lib/whatsappSignup';
 import { toast } from '@/store/ui';
 import { pincodeSchema } from '@/lib/validators';
 import { rupeesToPaise, paiseToRupees } from '@/lib/money';
@@ -22,14 +23,29 @@ import { Avatar } from '@/ui/Avatar';
 import { SkeletonRows } from '@/ui/Skeleton';
 
 const channelMeta = {
-  whatsapp: { label: 'WhatsApp', Icon: MessageCircle, idLabel: 'Phone number ID', hint: 'WhatsApp → API Setup in your Meta app' },
-  instagram: { label: 'Instagram', Icon: Instagram, idLabel: 'Instagram account ID', hint: 'Your Instagram professional account id' },
+  whatsapp: {
+    label: 'WhatsApp',
+    Icon: MessageCircle,
+    idLabel: 'Phone number ID',
+    hint: 'WhatsApp → API Setup in your Meta app',
+    tokenHint: 'A permanent system-user token',
+  },
+  instagram: {
+    label: 'Instagram',
+    Icon: Instagram,
+    idLabel: 'Instagram account ID',
+    hint: 'The user_id of your professional account',
+    tokenHint: 'A long-lived Instagram token',
+  },
 } as const;
 
-function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
+type ChannelKey = keyof typeof channelMeta;
+
+function ChannelRow({ channel }: { channel: ChannelKey }) {
   const { data } = useChannelsInfo();
-  const { connect, disconnect } = useChannelMutations();
+  const { connect, disconnect, whatsappSignup } = useChannelMutations();
   const existing = data?.channels?.find((c) => c.channel === channel);
+  const needsReconnect = existing?.status === 'error';
   const oauthReady = !!data?.oauth?.[channel];
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -38,15 +54,25 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
   const meta = channelMeta[channel];
   const Icon = meta.Icon;
 
-  // full-page redirect: Meta refuses to render its consent screen in an iframe
   const startOauth = async () => {
     setStarting(true);
     try {
+      if (channel === 'whatsapp') {
+        // Meta's Embedded Signup popup; the server swaps its code for a token
+        const cfg = data?.whatsappSignup;
+        if (!cfg) throw new Error('WhatsApp signup is not configured yet');
+        const result = await launchWhatsAppSignup(cfg);
+        const res = await whatsappSignup.mutateAsync(result);
+        toast('success', `WhatsApp connected${res.displayName ? ` · ${res.displayName}` : ''}`, 'DMs now become order drafts automatically.');
+        setStarting(false);
+        return;
+      }
+      // full-page redirect: Instagram refuses to render its consent screen in an iframe
       const { url } = await getChannelConnectUrl(channel);
       window.location.href = url;
     } catch (e) {
       setStarting(false);
-      toast('error', 'Could not start', e instanceof Error ? e.message : undefined);
+      toast('error', 'Could not connect', e instanceof Error ? e.message : undefined);
     }
   };
 
@@ -69,6 +95,16 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
     );
   };
 
+  const connectButton = oauthReady ? (
+    <Button size="sm" loading={starting} onClick={startOauth}>
+      {needsReconnect ? 'Reconnect' : `Connect ${meta.label}`}
+    </Button>
+  ) : (
+    <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
+      {open ? 'Cancel' : needsReconnect ? 'Reconnect' : 'Connect'}
+    </Button>
+  );
+
   return (
     <div className="neu-inset rounded-lg p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -77,28 +113,41 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
         </span>
         <div className="min-w-0 flex-1 basis-40">
           <p className="text-sm font-medium text-hi">{meta.label}</p>
-          <p className="truncate text-xs text-low">{existing ? `Connected · id ${existing.externalId}` : 'Not connected'}</p>
+          <p className="truncate text-xs text-low">
+            {!existing
+              ? 'Not connected'
+              : needsReconnect
+                ? 'Access expired — reconnect to keep receiving DMs'
+                : `Connected · ${existing.displayName || `id ${existing.externalId}`}`}
+          </p>
         </div>
-        {existing ? (
-          <>
-            <Badge tone="jade">
-              <Check className="size-3" /> Connected
-            </Badge>
-            <Button variant="ghost" size="sm" loading={disconnect.isPending} onClick={() => disconnect.mutate(channel)}>
-              Disconnect
-            </Button>
-          </>
-        ) : oauthReady ? (
-          <Button size="sm" loading={starting} onClick={startOauth}>
-            Connect {meta.label}
-          </Button>
-        ) : (
-          <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)}>
-            {open ? 'Cancel' : 'Connect'}
+        {existing && !needsReconnect && (
+          <Badge tone="jade">
+            <Check className="size-3" /> Connected
+          </Badge>
+        )}
+        {needsReconnect && <Badge tone="gold">Reconnect needed</Badge>}
+        {(!existing || needsReconnect) && connectButton}
+        {existing && (
+          <Button variant="ghost" size="sm" loading={disconnect.isPending} onClick={() => disconnect.mutate(channel)}>
+            Disconnect
           </Button>
         )}
       </div>
-      {!existing && oauthReady && (
+      {channel === 'instagram' && (!existing || needsReconnect) && (
+        <p className="mt-3 text-xs leading-relaxed text-low">
+          Needs an Instagram <span className="text-mid">Business or Creator</span> account. In the Instagram app, also
+          turn on <span className="text-mid">Settings → Messages and story replies → Message controls → Allow access to
+          messages</span> — without it, DMs never reach CartHedge.
+        </p>
+      )}
+      {channel === 'whatsapp' && oauthReady && !existing && (
+        <p className="mt-3 text-xs leading-relaxed text-low">
+          Keep using the WhatsApp Business app on your phone — choose it in the popup and scan the QR. Meta bills
+          WhatsApp messages to the card on your WhatsApp Business account.
+        </p>
+      )}
+      {(!existing || needsReconnect) && oauthReady && (
         <button
           onClick={() => setOpen((v) => !v)}
           className="mt-2 text-xs text-low underline underline-offset-2 transition-colors hover:text-mid"
@@ -106,12 +155,12 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
           {open ? 'Hide manual setup' : 'Enter account details manually instead'}
         </button>
       )}
-      {open && !existing && (
+      {open && (!existing || needsReconnect) && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label={meta.idLabel} hint={meta.hint}>
             <Input value={externalId} onChange={(e) => setExternalId(e.target.value)} />
           </Field>
-          <Field label="Access token">
+          <Field label="Access token" hint={meta.tokenHint}>
             <Input type="password" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} />
           </Field>
           <Button className="sm:col-span-2 sm:justify-self-start" loading={connect.isPending} onClick={doConnect}>
@@ -123,6 +172,70 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
   );
 }
 
+function AutomationRow({
+  title,
+  body,
+  checked,
+  disabled,
+  locked,
+  onChange,
+}: {
+  title: string;
+  body: string;
+  checked: boolean;
+  disabled?: boolean;
+  locked?: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-hi">{title}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-low">{body}</p>
+        {locked && (
+          <Link to="/app/billing" className="mt-1 inline-block text-xs font-medium text-jade-ink hover:underline">
+            Available on Pro — see plans →
+          </Link>
+        )}
+      </div>
+      <Switch label={title} checked={checked} disabled={disabled || locked} onChange={onChange} />
+    </div>
+  );
+}
+
+function AutomationSettings() {
+  const { data } = useChannelsInfo();
+  const { setAutomation } = useChannelMutations();
+  const auto = data?.automation ?? { autoReply: false, autoConfirm: false };
+  const anyConnected = (data?.channels ?? []).some((c) => c.status === 'connected');
+
+  const save = (patch: Partial<typeof auto>) =>
+    setAutomation.mutate(
+      { ...auto, ...patch },
+      { onError: (e) => toast('error', 'Could not save', e.message) },
+    );
+
+  return (
+    <div className="mt-1 divide-y border-t">
+      <AutomationRow
+        title="AI auto-reply"
+        body="Answers buyer questions on price, sizes, stock and delivery straight from your catalog, and asks for missing order details. It stays quiet on anything it is unsure of, never offers discounts or dates, and pauses for 30 minutes whenever you reply yourself."
+        checked={auto.autoReply}
+        locked={!data?.autoReplyAvailable}
+        disabled={setAutomation.isPending || !anyConnected}
+        onChange={(v) => save({ autoReply: v })}
+      />
+      <AutomationRow
+        title="Auto-confirm complete orders"
+        body="When the AI is 90%+ sure and has every detail — catalog items, name, phone, full address with pincode — the order is booked without your tap and the buyer gets the COD-confirm or payment link in the chat. Anything less waits on the AI desk."
+        checked={auto.autoConfirm}
+        disabled={setAutomation.isPending || !anyConnected}
+        onChange={(v) => save({ autoConfirm: v })}
+      />
+    </div>
+  );
+}
+
 function ChannelsSection() {
   // the OAuth callback redirects back here with the outcome in the query string
   const [params, setParams] = useSearchParams();
@@ -130,7 +243,7 @@ function ChannelsSection() {
     const connected = params.get('connected');
     const failure = params.get('connectError');
     if (!connected && !failure) return;
-    if (connected) toast('success', `${channelMeta[connected as 'whatsapp' | 'instagram']?.label ?? connected} connected`, 'DMs now become order drafts automatically.');
+    if (connected) toast('success', `${channelMeta[connected as ChannelKey]?.label ?? connected} connected`, 'DMs now become order drafts automatically.');
     else toast('error', 'Could not connect', failure ?? undefined);
     params.delete('connected');
     params.delete('connectError');
@@ -141,11 +254,13 @@ function ChannelsSection() {
     <Card>
       <CardHeader title="Connected channels" subtitle="Auto-capture orders from Instagram & WhatsApp DMs — no copy-paste" />
       <div className="flex flex-col gap-3 p-5 pt-4">
-        <ChannelRow channel="whatsapp" />
         <ChannelRow channel="instagram" />
+        <ChannelRow channel="whatsapp" />
         <p className="text-xs text-low">
-          Connected DMs turn into order drafts on the AI desk for one-tap approval. You can still paste chats manually anytime.
+          Connected DMs turn into order drafts on the AI desk. When you confirm one, the buyer gets their order link
+          in the same chat. You can still paste chats manually anytime.
         </p>
+        <AutomationSettings />
       </div>
     </Card>
   );
