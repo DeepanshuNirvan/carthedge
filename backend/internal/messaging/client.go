@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -18,27 +20,81 @@ import (
 // Client talks to the Meta Graph API — WhatsApp Cloud and Instagram messaging —
 // and verifies inbound webhook signatures. Pure REST, no SDK.
 type Client struct {
-	appSecret string
-	version   string
-	hc        *http.Client
+	secrets []string
+	version string
+	hc      *http.Client
 }
 
-func NewClient(appSecret, version string) *Client {
+// NewClient takes every app secret Meta may sign a webhook with: WhatsApp
+// events are signed with the Meta app secret, Instagram Login events with the
+// Instagram app secret. Checking only one silently 401s the other channel.
+func NewClient(version string, secrets ...string) *Client {
 	if version == "" {
-		version = "v21.0"
+		version = "v25.0"
 	}
-	return &Client{appSecret: appSecret, version: version, hc: &http.Client{Timeout: 10 * time.Second}}
+	var keep []string
+	for _, s := range secrets {
+		if s != "" {
+			keep = append(keep, s)
+		}
+	}
+	return &Client{secrets: keep, version: version, hc: &http.Client{Timeout: 10 * time.Second}}
 }
 
 // VerifySignature checks the X-Hub-Signature-256 header against the raw body.
 func (c *Client) VerifySignature(body []byte, header string) bool {
-	if c.appSecret == "" || !strings.HasPrefix(header, "sha256=") {
+	if !strings.HasPrefix(header, "sha256=") {
 		return false
 	}
-	mac := hmac.New(sha256.New, []byte(c.appSecret))
-	mac.Write(body)
-	want := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-	return hmac.Equal([]byte(want), []byte(header))
+	for _, secret := range c.secrets {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write(body)
+		if hmac.Equal([]byte("sha256="+hex.EncodeToString(mac.Sum(nil))), []byte(header)) {
+			return true
+		}
+	}
+	return false
+}
+
+// SignedUser verifies a Meta signed_request ("sig.payload", both base64url,
+// sig = HMAC-SHA256 of the encoded payload) and returns the user it names.
+func (c *Client) SignedUser(raw string) (string, bool) {
+	sig, payload, ok := strings.Cut(raw, ".")
+	if !ok {
+		return "", false
+	}
+	got, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(sig, "="))
+	if err != nil {
+		return "", false
+	}
+	for _, secret := range c.secrets {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(payload))
+		if !hmac.Equal(mac.Sum(nil), got) {
+			continue
+		}
+		body, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(payload, "="))
+		if err != nil {
+			return "", false
+		}
+		var claims struct {
+			UserID json.Number `json:"user_id"`
+		}
+		if json.Unmarshal(body, &claims) != nil || claims.UserID == "" {
+			return "", false
+		}
+		return claims.UserID.String(), true
+	}
+	return "", false
+}
+
+// SubscribeInstagram turns on webhook delivery for one connected account.
+// Configuring the callback on the app is not enough under Instagram Login:
+// each account must subscribe, or its DMs never reach /webhooks/meta.
+func (c *Client) SubscribeInstagram(ctx context.Context, token string) error {
+	return c.postForm(ctx, "https://graph.instagram.com/"+c.version+"/me/subscribed_apps", url.Values{
+		"subscribed_fields": {"messages"}, "access_token": {token},
+	})
 }
 
 // Send delivers a text reply on the given channel using the seller's own token,

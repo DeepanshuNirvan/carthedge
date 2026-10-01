@@ -2,6 +2,22 @@
 
 Written 20 August 2026. Plain English. Read top to bottom.
 
+> **Update, 1 October 2026.** Business verification has passed. Three bugs were found
+> that would have stopped Instagram working even after App Review:
+>
+> 1. **Wrong account id stored.** `/me?fields=id` returns an *app-scoped* id; webhooks
+>    route on `user_id` (the professional account id). Every inbound DM would have been
+>    logged as "inbound for unknown channel" and dropped. Now reads `user_id`.
+> 2. **No per-account webhook subscription.** Under Instagram Login each connected account
+>    must call `POST /me/subscribed_apps`. Connect now does it and fails loudly if Meta says no.
+> 3. **Signature checked with only the Meta app secret.** Instagram Login webhooks can be
+>    signed with the Instagram app secret. Both are now accepted.
+>
+> Also: a failed long-lived token exchange no longer stores a 1-hour token as "connected";
+> deauthorize + data-deletion callbacks added (see 7.2); Graph API default bumped
+> v21.0 → v25.0 (v21 stops working 21 Jan 2027 — **set `META_GRAPH_VERSION=v25.0` on
+> Render**); Settings shows "Reconnect" when a token refresh fails.
+
 ---
 
 ## 1. The short version
@@ -483,9 +499,14 @@ Paste these three exactly:
 
 ```
 OAuth redirect URI:            https://carthedge-app.onrender.com/oauth/meta/callback
-Deauthorize callback URL:      https://carthedge-app.onrender.com/oauth/meta/callback
-Data deletion request URL:     https://carthedge-app.onrender.com/data-deletion
+Deauthorize callback URL:      https://carthedge-app.onrender.com/webhooks/meta/deauthorize
+Data deletion request URL:     https://carthedge-app.onrender.com/webhooks/meta/data-deletion
 ```
+
+> Corrected 1 Oct 2026: Meta POSTs a `signed_request` to the deauthorize and
+> data-deletion URLs. The old values pointed at a GET-only route and a static
+> page, so both would have failed. The two `/webhooks/meta/...` endpoints now
+> exist and verify the signature with the Instagram app secret.
 
 **Why this matters:** when a seller finishes logging in at Instagram, Instagram sends them
 back to your site. It will only send them to an address you registered here first. If this
@@ -500,8 +521,9 @@ Callback URL:  https://carthedge-app.onrender.com/webhooks/meta
 Verify token:  the value of META_VERIFY_TOKEN in your Render environment variables
 ```
 
-Then click **Verify and save**, and subscribe to these fields:
-`messages`, `messaging_postbacks`, `messaging_seen`, `comments`, `live_comments`, `message_reactions`
+Then click **Verify and save**, and subscribe to the `messages` field. (CartHedge reads
+only DMs today. Subscribing to `comments` etc. adds nothing until code reads them, and
+every extra field is one more thing App Review expects to see demonstrated.)
 
 **Note:** Meta's own panel says *"To receive webhooks, your app must be in published state."*
 So this step only works after publishing. The endpoint itself is already tested and working.
@@ -687,8 +709,8 @@ Click **Save, rebuild, and deploy**.
   → **Verify and save**
 - Step 4 **Set up Instagram business login** → Business login settings:
   - OAuth redirect URI → `https://carthedge.in/oauth/meta/callback`
-  - Deauthorize callback URL → `https://carthedge.in/oauth/meta/callback`
-  - Data deletion request URL → `https://carthedge.in/data-deletion`
+  - Deauthorize callback URL → `https://carthedge.in/webhooks/meta/deauthorize`
+  - Data deletion request URL → `https://carthedge.in/webhooks/meta/data-deletion`
 
 ### Step 5 — check it worked
 

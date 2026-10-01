@@ -66,6 +66,37 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
+// Deauthorize runs when a seller removes CartHedge in Instagram's settings.
+func (h *Handler) Deauthorize(w http.ResponseWriter, r *http.Request) {
+	h.forget(w, r, false)
+}
+
+// DataDeletion runs when a seller asks Meta to delete their data. Meta needs a
+// status URL and a confirmation code back.
+func (h *Handler) DataDeletion(w http.ResponseWriter, r *http.Request) {
+	if !h.forget(w, r, true) {
+		return
+	}
+	code := secure.Token(8)
+	httpx.OK(w, httpx.M{"url": h.appBaseURL + "/data-deletion?code=" + code, "confirmation_code": code})
+}
+
+func (h *Handler) forget(w http.ResponseWriter, r *http.Request, purge bool) bool {
+	igID, ok := h.client.SignedUser(r.FormValue("signed_request"))
+	if !ok {
+		httpx.Err(w, http.StatusBadRequest, "bad signed request")
+		return false
+	}
+	if err := h.svc.ForgetInstagram(r.Context(), igID, purge); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not process the request")
+		return false
+	}
+	if !purge {
+		httpx.OK(w, httpx.M{"ok": true})
+	}
+	return true
+}
+
 // --- seller (authed) ---
 
 func (h *Handler) ListChannels(w http.ResponseWriter, r *http.Request) {

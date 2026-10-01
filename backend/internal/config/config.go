@@ -119,7 +119,7 @@ func Load() (*Config, error) {
 		MetaAppID:        os.Getenv("META_APP_ID"),
 		MetaAppSecret:    os.Getenv("META_APP_SECRET"),
 		MetaVerifyToken:  os.Getenv("META_VERIFY_TOKEN"),
-		MetaGraphVersion: env("META_GRAPH_VERSION", "v21.0"),
+		MetaGraphVersion: env("META_GRAPH_VERSION", "v25.0"),
 		MetaIgAppID:      os.Getenv("META_IG_APP_ID"),
 		MetaIgAppSecret:  os.Getenv("META_IG_APP_SECRET"),
 		// must match the redirect registered on the Meta app

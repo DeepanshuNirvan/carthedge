@@ -12,6 +12,7 @@ import (
 	"carthedge/internal/httpx"
 	"carthedge/internal/secure"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -140,6 +141,12 @@ func (s *Service) ConnectChannel(ctx context.Context, bizID, channel, externalID
 	if externalID == "" || token == "" {
 		return errors.New("account id and access token are required")
 	}
+	if channel == "instagram" {
+		if err := s.client.SubscribeInstagram(ctx, token); err != nil {
+			s.log.Error("instagram webhook subscribe failed", "businessId", bizID, "err", err)
+			return errors.New("Instagram would not turn on message delivery — check the account is a Business/Creator account and try again")
+		}
+	}
 	enc, err := s.cipher.Encrypt(token)
 	if err != nil {
 		return err
@@ -165,6 +172,26 @@ func (s *Service) ConnectChannel(ctx context.Context, bizID, channel, externalID
 
 func (s *Service) Disconnect(ctx context.Context, bizID, channel string) error {
 	_, err := s.pool.Exec(ctx, `delete from channel_connections where business_id=$1 and channel=$2`, bizID, channel)
+	return err
+}
+
+// ForgetInstagram handles a seller removing CartHedge on Instagram's side:
+// the token is already revoked, so the connection goes. purge also deletes
+// the captured DM threads (a data deletion request); drafts and orders stay,
+// they are the seller's own business records.
+func (s *Service) ForgetInstagram(ctx context.Context, igID string, purge bool) error {
+	var bizID string
+	err := s.pool.QueryRow(ctx, `delete from channel_connections where channel='instagram' and external_id=$1
+		returning business_id`, igID).Scan(&bizID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil // already gone, or never connected
+	}
+	if err != nil {
+		return err
+	}
+	if purge {
+		_, err = s.pool.Exec(ctx, `delete from conversations where business_id=$1 and channel='instagram'`, bizID)
+	}
 	return err
 }
 

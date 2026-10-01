@@ -69,6 +69,7 @@ func (c OAuthConfig) AuthorizeURL(channel, state string) (string, error) {
 	case "instagram":
 		q.Set("client_id", c.igID())
 		q.Set("scope", "instagram_business_basic,instagram_business_manage_messages")
+		q.Set("enable_fb_login", "0") // sellers are IG-first; skip the Facebook detour
 		return "https://www.instagram.com/oauth/authorize?" + q.Encode(), nil
 	}
 	return "", errors.New("channel must be whatsapp or instagram")
@@ -155,13 +156,18 @@ func (c *Client) exchangeWhatsApp(ctx context.Context, cfg OAuthConfig, code str
 func (c *Client) exchangeInstagram(ctx context.Context, cfg OAuthConfig, code string) (string, string, string, error) {
 	var short struct {
 		AccessToken string `json:"access_token"`
-		UserID      any    `json:"user_id"`
+		Data        []struct {
+			AccessToken string `json:"access_token"`
+		} `json:"data"` // documented shape; the live API answers flat
 	}
 	if err := c.postJSON(ctx, "https://api.instagram.com/oauth/access_token", url.Values{
 		"client_id": {cfg.igID()}, "client_secret": {cfg.igSecret()},
 		"grant_type": {"authorization_code"}, "redirect_uri": {cfg.RedirectURL}, "code": {code},
 	}, &short); err != nil {
 		return "", "", "", err
+	}
+	if short.AccessToken == "" && len(short.Data) > 0 {
+		short.AccessToken = short.Data[0].AccessToken
 	}
 	if short.AccessToken == "" {
 		return "", "", "", errors.New("Instagram did not return an access token")
@@ -175,22 +181,41 @@ func (c *Client) exchangeInstagram(ctx context.Context, cfg OAuthConfig, code st
 		"grant_type": {"ig_exchange_token"}, "client_secret": {cfg.igSecret()},
 		"access_token": {short.AccessToken},
 	}.Encode(), &long); err != nil || long.AccessToken == "" {
-		long.AccessToken = short.AccessToken // usable now, refreshed on reconnect
+		// a short token dies within the hour and cannot be refreshed, so keeping
+		// it would look connected while capture silently stops
+		return "", "", "", errors.New("Instagram did not issue a long-lived token — try connecting again")
 	}
 
-	var me struct {
-		ID       string `json:"id"`
-		Username string `json:"username"`
-	}
-	if err := c.getJSON(ctx, "https://graph.instagram.com/me?"+url.Values{
-		"fields": {"id,username"}, "access_token": {long.AccessToken},
+	var me igMe
+	if err := c.getJSON(ctx, "https://graph.instagram.com/"+cfg.Version+"/me?"+url.Values{
+		"fields": {"user_id,username"}, "access_token": {long.AccessToken},
 	}.Encode(), &me); err != nil {
 		return "", "", "", err
 	}
-	if me.ID == "" {
+	accountID, username := me.account()
+	if accountID == "" {
 		return "", "", "", errors.New("could not read the Instagram account id")
 	}
-	return me.ID, long.AccessToken, me.Username, nil
+	return accountID, long.AccessToken, username, nil
+}
+
+// igMe is the /me response. `id` is app-scoped; webhooks route on `user_id`,
+// the professional account id, so storing `id` would orphan every inbound DM.
+// The docs show the fields wrapped in `data` while the live API answers flat.
+type igMe struct {
+	UserID   json.Number `json:"user_id"` // accepts "123" and 123
+	Username string      `json:"username"`
+	Data     []struct {
+		UserID   json.Number `json:"user_id"`
+		Username string      `json:"username"`
+	} `json:"data"`
+}
+
+func (m igMe) account() (string, string) {
+	if m.UserID == "" && len(m.Data) > 0 {
+		return m.Data[0].UserID.String(), m.Data[0].Username
+	}
+	return m.UserID.String(), m.Username
 }
 
 // RefreshInstagram extends a long-lived Instagram token. Meta allows this once

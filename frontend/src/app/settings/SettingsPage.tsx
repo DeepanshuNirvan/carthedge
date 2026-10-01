@@ -30,6 +30,8 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
   const { data } = useChannelsInfo();
   const { connect, disconnect } = useChannelMutations();
   const existing = data?.channels?.find((c) => c.channel === channel);
+  // a failed token refresh flips status to 'error'; DMs stop until reconnect
+  const broken = !!existing && existing.status !== 'connected';
   const oauthReady = !!data?.oauth?.[channel];
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -77,13 +79,27 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
         </span>
         <div className="min-w-0 flex-1 basis-40">
           <p className="text-sm font-medium text-hi">{meta.label}</p>
-          <p className="truncate text-xs text-low">{existing ? `Connected · id ${existing.externalId}` : 'Not connected'}</p>
+          <p className="truncate text-xs text-low">
+            {!existing
+              ? 'Not connected'
+              : broken
+                ? 'Access expired — reconnect to keep capturing DMs'
+                : `Connected · ${existing.displayName || `id ${existing.externalId}`}`}
+          </p>
         </div>
         {existing ? (
           <>
-            <Badge tone="jade">
-              <Check className="size-3" /> Connected
-            </Badge>
+            {!broken ? (
+              <Badge tone="jade">
+                <Check className="size-3" /> Connected
+              </Badge>
+            ) : oauthReady ? (
+              <Button size="sm" loading={starting} onClick={startOauth}>
+                Reconnect
+              </Button>
+            ) : (
+              <Badge tone="danger">Needs reconnect</Badge>
+            )}
             <Button variant="ghost" size="sm" loading={disconnect.isPending} onClick={() => disconnect.mutate(channel)}>
               Disconnect
             </Button>

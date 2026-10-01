@@ -96,7 +96,7 @@ func main() {
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg, log)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log)
-	metaClient := messaging.NewClient(cfg.MetaAppSecret, cfg.MetaGraphVersion)
+	metaClient := messaging.NewClient(cfg.MetaGraphVersion, cfg.MetaAppSecret, cfg.MetaIgAppSecret)
 	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, log)
 	messagingSvc.Start(ctx)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)

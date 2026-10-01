@@ -238,6 +238,9 @@ func New(d Deps) http.Handler {
 
 	handle("GET /webhooks/meta", d.Messaging.Verify)
 	handle("POST /webhooks/meta", d.Messaging.Webhook)
+	// Instagram Business Login callbacks (signed_request, verified in-handler)
+	handle("POST /webhooks/meta/deauthorize", d.Messaging.Deauthorize, byIP("metaDeauth", 60, time.Minute))
+	handle("POST /webhooks/meta/data-deletion", d.Messaging.DataDeletion, byIP("metaDeletion", 60, time.Minute))
 
 	// SPA + per-route meta tags; registered last, its "/" pattern is the
 	// lowest-precedence match so every API route above still wins

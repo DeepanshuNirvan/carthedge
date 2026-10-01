@@ -1,6 +1,13 @@
 package messaging
 
-import "testing"
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"testing"
+)
 
 // Instagram orders usually start as a story reply or a shared post, not a plain
 // text DM. Those events used to be dropped, so the AI desk never saw them.
@@ -65,5 +72,55 @@ func TestPreviewKeepsValidUTF8(t *testing.T) {
 	}
 	if len([]rune(got)) != 121 { // 120 runes + the ellipsis
 		t.Errorf("got %d runes, want 121", len([]rune(got)))
+	}
+}
+
+func sign(secret, body string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(body))
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+// WhatsApp signs with the Meta app secret, Instagram Login with the Instagram
+// app secret. Both must pass; anything else must not.
+func TestVerifySignatureEitherSecret(t *testing.T) {
+	c := NewClient("", "metaSecret", "", "igSecret")
+	body := `{"object":"instagram"}`
+	if !c.VerifySignature([]byte(body), sign("metaSecret", body)) || !c.VerifySignature([]byte(body), sign("igSecret", body)) {
+		t.Fatal("a webhook signed by one of our secrets was rejected")
+	}
+	if c.VerifySignature([]byte(body), sign("other", body)) || c.VerifySignature([]byte(body), "") {
+		t.Fatal("a forged webhook was accepted")
+	}
+}
+
+func TestSignedUser(t *testing.T) {
+	c := NewClient("", "igSecret")
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"algorithm":"HMAC-SHA256","user_id":17841400000000001}`))
+	mac := hmac.New(sha256.New, []byte("igSecret"))
+	mac.Write([]byte(payload))
+	good := base64.RawURLEncoding.EncodeToString(mac.Sum(nil)) + "." + payload
+	if id, ok := c.SignedUser(good); !ok || id != "17841400000000001" {
+		t.Fatalf("got %q %v", id, ok)
+	}
+	if _, ok := c.SignedUser("AAAA." + payload); ok {
+		t.Fatal("unsigned request accepted")
+	}
+}
+
+// Webhooks route on user_id; id is app-scoped and matches nothing.
+func TestIgMeUsesProfessionalID(t *testing.T) {
+	for _, raw := range []string{
+		`{"user_id":"1784","username":"shop","id":"999"}`,
+		`{"user_id":1784,"username":"shop"}`,
+		`{"data":[{"user_id":"1784","username":"shop"}]}`,
+	} {
+		var m igMe
+		if err := json.Unmarshal([]byte(raw), &m); err != nil {
+			t.Fatalf("%s: %v", raw, err)
+		}
+		if id, name := m.account(); id != "1784" || name != "shop" {
+			t.Errorf("%s: got %q %q", raw, id, name)
+		}
 	}
 }
