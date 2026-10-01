@@ -69,7 +69,6 @@ func (c OAuthConfig) AuthorizeURL(channel, state string) (string, error) {
 	case "instagram":
 		q.Set("client_id", c.igID())
 		q.Set("scope", "instagram_business_basic,instagram_business_manage_messages")
-		q.Set("enable_fb_login", "0") // sellers are IG-first; skip the Facebook detour
 		return "https://www.instagram.com/oauth/authorize?" + q.Encode(), nil
 	}
 	return "", errors.New("channel must be whatsapp or instagram")

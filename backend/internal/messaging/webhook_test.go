@@ -124,3 +124,15 @@ func TestIgMeUsesProfessionalID(t *testing.T) {
 		}
 	}
 }
+
+// Meta's dashboard "Test" (and some subscriptions) send a DM as one bare event
+// under changes[].value instead of entry[].messaging[].
+func TestParseWebhookInstagramChangesShape(t *testing.T) {
+	body := []byte(`{"object":"instagram","entry":[{"id":"SELLER_IG","changes":[{"field":"messages","value":{
+		"sender":{"id":"BUYER1"},"recipient":{"id":"SELLER_IG"},"timestamp":"1527459824",
+		"message":{"mid":"m9","text":"pink kurti M size COD"}}}]}]}`)
+	got := parseWebhook(body)
+	if len(got) != 1 || got[0].Text != "pink kurti M size COD" || got[0].ContactID != "BUYER1" || got[0].ExternalID != "SELLER_IG" {
+		t.Fatalf("changes-shaped DM lost: %+v", got)
+	}
+}

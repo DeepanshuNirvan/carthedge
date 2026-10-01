@@ -191,8 +191,10 @@ func parseWebhook(body []byte) []Inbound {
 						} `json:"interactive"`
 					} `json:"messages"`
 					// Instagram delivers messaging events under `changes` too,
-					// depending on which product the app was subscribed through
+					// depending on which product the app was subscribed through:
+					// as a list, or (field "messages") as one bare event
 					Messaging []igMessagingEvent `json:"messaging"`
+					igMessagingEvent
 				} `json:"value"`
 			} `json:"changes"`
 			Messaging []igMessagingEvent `json:"messaging"`
@@ -207,6 +209,9 @@ func parseWebhook(body []byte) []Inbound {
 			events := e.Messaging
 			for _, ch := range e.Changes {
 				events = append(events, ch.Value.Messaging...)
+				if ch.Field == "messages" && ch.Value.Sender.ID != "" {
+					events = append(events, ch.Value.igMessagingEvent)
+				}
 			}
 			for _, m := range events {
 				// e.ID is the seller's own account: their outbound echoes land here too
