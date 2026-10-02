@@ -218,7 +218,7 @@ A cool-neutral ground lit by two signal hues: jade for what is settled, bulb-gol
 
 ## Layout
 
-The seller app content column is capped at 90rem with 16px gutters on phones and 24px from sm up. It clears a bottom glass tab bar on phones (6.75rem plus the safe area) and uses a sidebar from lg up. Marketing sections are centred at max-w-6xl (72rem) with 20px/32px gutters and 80px/96px vertical rhythm. Section heads are left-aligned by default.
+The seller app and console content column fills the width beside the sidebar (no centred cap, which left side voids on wide screens), with 16px gutters on phones and 24px from sm up. Pages whose content is naturally narrow split into two columns from xl (Settings, Insights) instead of capping. It clears a bottom glass tab bar on phones (6.75rem plus the safe area) and uses a sidebar from lg up. Marketing sections are centred at max-w-6xl (72rem) with 20px/32px gutters and 64px/80px vertical padding (about 160px between blocks on desktop). The pinned order journey centres itself in the viewport, so the sections either side of it drop their adjoining padding from md up. Section heads are left-aligned by default.
 
 Page headers stack on phones, and their actions grow to full width so nothing gets squeezed. Horizontal chip and card rails scroll without a visible bar and contain overscroll. Touch targets are 44px on touch and 40px where a cursor can aim (IconButton and tabs). Fields use 16px text below sm so iOS does not zoom.
 
@@ -266,6 +266,9 @@ Tactile lit capsules.
 - **Shadow Strategy:** Soft, rising to Raised on hover for interactive cards.
 - **Border:** inset hairline plus a specular top line.
 - **Internal Padding:** 20px. Card titles are 15px semibold, with a 13px low-contrast subtitle.
+- **No photo yet (`NoPhoto`):** a product without a photo shows its initials as a quiet monogram on the surface, named for screen readers. Never a broken-image icon.
+- **Dead ends (`BuyerNotice`):** a buyer page that cannot continue (expired link, paused or unknown store, removed product, incomplete COD link) keeps the seller's header, an h1, and the one action that helps (visit the store, WhatsApp the seller, track the order).
+- **Charts:** daily series are zero-filled across the chosen window (`fillDays`), and a chart takes its row's height (`height="100%"`) instead of leaving a gap above it.
 
 ### Inputs / Fields
 - **Style:** a recessed well (field tint at 4.5–5% with an inner shadow), 14px radius, 44px tall.
@@ -282,7 +285,8 @@ Thick glass-nav material with sheen and the Float shadow, at a 28px radius. On p
 ### The Strand (signature)
 - **Bulb:** a circle on bulb-off. When lit, it turns gold with a 3px halo and a downward light cast. When done, it turns jade with a halo.
 - **BulbString:** a short sagging wire with hung bulbs. Unlit, it marks empty or waiting states, such as an empty list or lane.
-- **LaneGround:** a fixed ground with nine lit lamps on a two-sag wire, warm fall-off, and a jade and gold reflection pool.
+- **LaneGround:** a fixed ground with nine lit lamps on a two-sag wire (`LampStrand`), warm fall-off, and a jade and gold reflection pool. The same `LampStrand` hangs across the top of the landing page. Hovering or tapping a lamp swells the bulb and its halo.
+- **Side lamps (landing):** two edge-anchored lights, warm from the right (mid to low) and jade low on the left, that trade strength with scroll like walking past lit stalls. Opacity only; `--lamp-a` dims them by day.
 - **Typing dots:** three bulbs taking turns, used only for "assistant is replying".
 
 ### Motion

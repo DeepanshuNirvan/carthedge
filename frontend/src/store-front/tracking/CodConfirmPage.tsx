@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { PackageCheck, ShieldAlert } from 'lucide-react';
+import { PackageCheck, PackageSearch, ShieldAlert } from 'lucide-react';
 import { confirmCod } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { Wordmark } from '@/marketing/Wordmark';
 import { ThemeToggle } from '@/ui/ThemeToggle';
 import { Button } from '@/ui/Button';
-import { EmptyState } from '@/ui/EmptyState';
 import { SuccessMark } from '@/ui/SuccessMark';
 import { buttonLink } from '@/ui/buttonLink';
 import { LaneGround } from '@/ui/LaneGround';
 import { toast } from '@/store/ui';
+import { BuyerNotice } from '../BuyerNotice';
 
 /** The RTO-cutting screen: buyer confirms they will accept the COD delivery. */
 export default function CodConfirmPage() {
@@ -35,11 +35,17 @@ export default function CodConfirmPage() {
 
   if (!token) {
     return (
-      <EmptyState
-        className="min-h-dvh"
+      <BuyerNotice
         icon={<ShieldAlert className="size-5" />}
         title="Confirmation link incomplete"
-        message="Open the exact link the seller sent you on WhatsApp."
+        message="Open the exact link the seller sent you on WhatsApp. You can still track this order."
+        actions={
+          orderCode && (
+            <Link to={`/o/${orderCode}`} className={buttonLink('secondary')}>
+              <PackageSearch className="size-4" aria-hidden /> Track order {orderCode}
+            </Link>
+          )
+        }
       />
     );
   }

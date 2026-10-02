@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { ReactElement } from 'react';
 import type { SalesPoint, TopProduct } from '@/api/types';
 import { formatPaiseCompact, formatPaise } from '@/lib/money';
 import { useIsMobile } from '@/hooks/useMediaQuery';
@@ -46,9 +47,24 @@ function ChartTooltip({
 const dayLabel = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
-export function SalesAreaChart({ series, height = 260 }: { series: SalesPoint[]; height?: number }) {
+/** `height="100%"` lets a chart take whatever height its card row gives it. */
+type ChartHeight = number | '100%';
+
+function ChartFrame({ height, empty, children }: { height: ChartHeight; empty: string | false; children: ReactElement }) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div className="relative" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
+      </ResponsiveContainer>
+      {empty && <p className="absolute inset-0 grid place-items-center pb-6 text-sm text-low">{empty}</p>}
+    </div>
+  );
+}
+
+export function SalesAreaChart({ series, height = 260 }: { series: SalesPoint[]; height?: ChartHeight }) {
+  const empty = series.every((p) => p.revenue === 0);
+  return (
+    <ChartFrame height={height} empty={empty && 'No sales in this period yet'}>
       <AreaChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
         <defs>
           <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
@@ -58,7 +74,7 @@ export function SalesAreaChart({ series, height = 260 }: { series: SalesPoint[];
         </defs>
         <CartesianGrid stroke={grid} vertical={false} />
         <XAxis dataKey="date" tickFormatter={dayLabel} tick={tickStyle} axisLine={false} tickLine={false} minTickGap={28} />
-        <YAxis tickFormatter={(v: number) => formatPaiseCompact(v)} tick={tickStyle} axisLine={false} tickLine={false} width={54} />
+        <YAxis hide={empty} tickFormatter={(v: number) => formatPaiseCompact(v)} tick={tickStyle} axisLine={false} tickLine={false} width={54} />
         <Tooltip content={<ChartTooltip money />} cursor={{ stroke: grid, strokeWidth: 1 }} />
         <Area
           type="monotone"
@@ -71,21 +87,22 @@ export function SalesAreaChart({ series, height = 260 }: { series: SalesPoint[];
           activeDot={{ r: 4, strokeWidth: 2, stroke: 'rgb(var(--surface))' }}
         />
       </AreaChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }
 
-export function OrdersBarChart({ series, height = 260 }: { series: SalesPoint[]; height?: number }) {
+export function OrdersBarChart({ series, height = 260 }: { series: SalesPoint[]; height?: ChartHeight }) {
+  const empty = series.every((p) => p.orders === 0);
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ChartFrame height={height} empty={empty && 'No orders in this period yet'}>
       <BarChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 4 }} barCategoryGap="35%">
         <CartesianGrid stroke={grid} vertical={false} />
         <XAxis dataKey="date" tickFormatter={dayLabel} tick={tickStyle} axisLine={false} tickLine={false} minTickGap={28} />
-        <YAxis allowDecimals={false} tick={tickStyle} axisLine={false} tickLine={false} width={30} />
+        <YAxis hide={empty} allowDecimals={false} tick={tickStyle} axisLine={false} tickLine={false} width={30} />
         <Tooltip content={<ChartTooltip />} cursor={{ fill: grid }} />
         <Bar dataKey="orders" name="Orders" fill={jade} radius={[4, 4, 0, 0]} maxBarSize={26} />
       </BarChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }
 

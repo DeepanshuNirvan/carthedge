@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /** iOS large title: the page name set big and tight, its one-line context under it, actions to the right. */
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="mb-5 flex flex-col gap-3 sm:mb-7 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
       <div className="min-w-0">

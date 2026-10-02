@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ImageOff, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { PublicProduct } from '@/api/types';
 import { useCart } from '@/store/cart';
 import { toast } from '@/store/ui';
 import { MoneyText } from '@/ui/MoneyText';
+import { NoPhoto } from '@/ui/NoPhoto';
 
 // The add control is identical whether it opens variants or adds straight to the
 // cart; only the element differs. Kept in one place so the two can never drift.
@@ -51,9 +52,7 @@ export function ProductCard({
                 className="size-full object-cover transition-transform duration-expr ease-enter [@media(hover:hover)]:group-hover:scale-[1.04]"
               />
             ) : (
-              <span className="flex size-full items-center justify-center text-low">
-                <ImageOff className="size-7" aria-hidden />
-              </span>
+              <NoPhoto name={product.name} />
             )}
             {!product.inStock && (
               <span className="absolute inset-x-2 bottom-2 rounded-full bg-ink-950/70 py-1.5 text-center text-xs font-semibold text-white backdrop-blur-md">

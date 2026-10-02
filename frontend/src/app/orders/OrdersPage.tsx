@@ -107,7 +107,7 @@ function LaneFallback({
       {orders.map((o) => (
         <OrderCard key={o.id} order={o} onOpen={() => onOpen(o.id)} />
       ))}
-      <p className="px-1 pt-1 text-center text-[11px] text-dim">Older than 60 days</p>
+      <p className="px-1 pt-1 text-center text-xs text-low">Older than 60 days</p>
     </>
   );
 }
@@ -199,7 +199,12 @@ export default function OrdersPage() {
     <>
       <PageHeader
         title="Orders"
-        subtitle="Tap a card to open it · drag between columns on desktop"
+        subtitle={
+          <>
+            <span className="lg:hidden">Tap a card to open it and move it along</span>
+            <span className="hidden lg:inline">Click a card to open it, or drag it to another column</span>
+          </>
+        }
         actions={
           <>
             <div className="relative basis-full sm:basis-auto">
@@ -208,7 +213,7 @@ export default function OrdersPage() {
                 placeholder="Search buyer, code, phone…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-11 rounded-full pl-10 sm:h-10 sm:w-52"
+                className="h-11 rounded-full pl-10 sm:h-10 sm:w-64"
                 aria-label="Search orders"
               />
             </div>

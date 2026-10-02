@@ -68,7 +68,7 @@ export default function ResetPasswordPage() {
           This link is missing its token. Request a fresh reset link from the login page.
         </p>
       )}
-      <Link to="/app/login" className="mt-5 inline-block text-sm font-medium text-jade-ink hover:underline">
+      <Link to="/app/login" className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-jade-ink hover:underline">
         Back to login
       </Link>
     </AuthLayout>

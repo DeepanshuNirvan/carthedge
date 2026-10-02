@@ -4,8 +4,9 @@ import { useEffect } from 'react';
 import { AlertTriangle, ArrowUpRight, KanbanSquare, Link2, Repeat, ShieldCheck } from 'lucide-react';
 import { useDashboard, useSales, useTopProducts } from '@/api/analytics';
 import { useOrders } from '@/api/orders';
+import { useSubscriptionInfo } from '@/api/plans';
 import { useAuth } from '@/store/auth';
-import { formatPaise } from '@/lib/money';
+import { formatPaise, formatRupees } from '@/lib/money';
 import { timeAgo } from '@/lib/date';
 import { cn } from '@/lib/cn';
 import { PageHeader } from '../shell/PageHeader';
@@ -18,10 +19,10 @@ import { Skeleton, SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 import { buttonLink } from '@/ui/buttonLink';
 
-function Rupees({ paise }: { paise: number }) {
+function Rupees({ paise, whole }: { paise: number; whole?: boolean }) {
   const spring = useSpring(0, { stiffness: 70, damping: 20 });
   useEffect(() => spring.set(paise), [paise, spring]);
-  const text = useTransform(spring, (v) => formatPaise(Math.round(v)));
+  const text = useTransform(spring, (v) => (whole ? formatRupees(v) : formatPaise(Math.round(v))));
   return <motion.span className="tnum">{text}</motion.span>;
 }
 
@@ -54,7 +55,8 @@ function RtoMeter() {
         <Skeleton className="mt-3 h-10 w-40 rounded-full" />
       ) : (
         <p className="mt-2 text-[2.25rem] font-semibold leading-none tracking-tightest text-gold-ink">
-          <Rupees paise={meter?.savedThisMonth ?? 0} />
+          {/* an estimate (baseline rate x COD value), so whole rupees: paise would be false precision */}
+          <Rupees paise={meter?.savedThisMonth ?? 0} whole />
         </p>
       )}
       <div className="mt-5 space-y-3">
@@ -153,6 +155,9 @@ export default function DashboardPage() {
   const { data: sales } = useSales(30);
   const { data: topProducts } = useTopProducts();
   const { data: recentOrders, isLoading: ordersLoading } = useOrders({ limit: 6 });
+  // the same billing-period count Billing shows (and overage is charged on), not the calendar month
+  const { data: subInfo } = useSubscriptionInfo();
+  const sub = subInfo?.subscription;
   const businessName = useAuth((s) => s.businessName);
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -203,8 +208,11 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          <div className="mt-auto px-2 pb-2 pt-4">
-            {sales ? <SalesAreaChart series={sales} height={220} /> : <Skeleton className="m-3 h-52" />}
+          {/* the chart takes the height the row gives the card, so no gap opens above it on wide screens */}
+          <div className="relative min-h-60 flex-1">
+            <div className="absolute inset-0 px-2 pb-2 pt-4">
+              {sales ? <SalesAreaChart series={sales} height="100%" /> : <Skeleton className="size-full" />}
+            </div>
           </div>
         </Card>
 
@@ -214,27 +222,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {dash?.quota && (
+      {sub && (
         <Card className="mt-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-hi">
-              Plan usage <span className="text-low">·</span> <span className="capitalize">{dash.quota.plan}</span>
-            </p>
+            <Link to="/app/billing" className="-my-3 py-3 text-sm font-medium text-hi hover:text-jade-ink">
+              {sub.planName} plan usage
+            </Link>
             <p className="text-xs text-mid tnum">
-              {dash.quota.used} of {dash.quota.included} orders
-              {dash.quota.overageOrders > 0 && (
+              {sub.ordersUsed} of {sub.orderQuota} orders this billing period
+              {!!subInfo?.overageOrders && (
                 <span className="text-gold-ink">
                   {' '}
-                  ({dash.quota.overageOrders} over, <MoneyText paise={dash.quota.overageFee} /> fee)
+                  ({subInfo.overageOrders} over, <MoneyText paise={subInfo.overageFee} /> at renewal)
                 </span>
               )}
             </p>
           </div>
           <Progress
             className="mt-3"
-            value={dash.quota.used}
-            max={dash.quota.included}
-            tone={dash.quota.overageOrders > 0 ? 'gold' : 'jade'}
+            value={sub.ordersUsed}
+            max={sub.orderQuota}
+            tone={sub.ordersUsed > sub.orderQuota ? 'gold' : 'jade'}
           />
         </Card>
       )}

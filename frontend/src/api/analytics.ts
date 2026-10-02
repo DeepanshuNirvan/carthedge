@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { get } from './http';
+import { fillDays } from '@/lib/date';
 import type { Dashboard, Insights, MonthlyReport, SalesPoint, TopProduct } from './types';
 
 export const useDashboard = () =>
@@ -13,7 +14,7 @@ export const useSales = (days: number) =>
   useQuery({
     queryKey: ['analytics', 'sales', days],
     queryFn: () => get<{ series: SalesPoint[] }>('/api/v1/analytics/sales', { days }),
-    select: (d) => d.series,
+    select: (d) => fillDays(d.series ?? [], days),
   });
 
 export const useTopProducts = (days = 30) =>

@@ -14,11 +14,12 @@ import type {
 
 // All buyer endpoints are tokenless — auth: 'none' keeps seller/admin headers out.
 
-export const useStore = (code: string) =>
+export const useStore = (code: string, enabled = true) =>
   useQuery({
     queryKey: ['store', code],
     queryFn: () => get<StoreHome>(`/p/${code}/store`, undefined, 'none'),
     staleTime: 60_000,
+    enabled: enabled && !!code,
   });
 
 export const useStoreProducts = (code: string, filters: { search?: string; category?: string } = {}) =>

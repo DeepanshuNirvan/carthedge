@@ -10,6 +10,14 @@ import { Field, Input, Select, Textarea } from '@/ui/Input';
 import { StatusChip } from '@/ui/Badge';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
+import { Tabs } from '@/ui/Tabs';
+
+/** datetime-local wants local wall time, not UTC */
+const nowLocal = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
 
 const segments = [
   { value: 'all', label: 'All customers' },
@@ -25,6 +33,8 @@ export default function BroadcastsPage() {
   const [message, setMessage] = useState('');
   const [segment, setSegment] = useState('all');
   const [scheduledAt, setScheduledAt] = useState('');
+  // the time picker only appears once the seller chooses to schedule
+  const [when, setWhen] = useState<'now' | 'later'>('now');
 
   const submit = (thenSend: boolean) => {
     if (!name || message.length < 5) {
@@ -46,6 +56,7 @@ export default function BroadcastsPage() {
           setName('');
           setMessage('');
           setScheduledAt('');
+          setWhen('now');
         },
         onError: (e) => toast('error', 'Could not create broadcast', e.message),
       },
@@ -55,7 +66,7 @@ export default function BroadcastsPage() {
   return (
     <>
       <PageHeader title="Broadcasts" subtitle="Collection drops and announcements over WhatsApp" />
-      <div className="grid items-start gap-4 lg:grid-cols-5">
+      <div className="grid items-start gap-4 lg:grid-cols-5 lg:items-stretch">
         <Card className="lg:col-span-3">
           <CardHeader title="Compose a drop" />
           <div className="flex flex-col gap-4 p-5 pt-4">
@@ -81,14 +92,40 @@ export default function BroadcastsPage() {
                 onChange={(e) => setMessage(e.target.value)}
               />
             </Field>
-            <Field label="Schedule for" optional>
-              <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-            </Field>
-            <div className="flex gap-3">
-              <Button icon={<Send className="size-4" />} loading={create.isPending || send.isPending} onClick={() => submit(!scheduledAt)}>
-                {scheduledAt ? 'Schedule' : 'Send now'}
+            <div className="flex flex-col gap-3">
+              <Tabs
+                className="w-fit"
+                tabs={[
+                  { value: 'now', label: 'Send now' },
+                  { value: 'later', label: 'Schedule' },
+                ]}
+                value={when}
+                onChange={(v) => {
+                  setWhen(v);
+                  if (v === 'now') setScheduledAt('');
+                }}
+              />
+              {when === 'later' && (
+                <Field label="Send at">
+                  <Input
+                    type="datetime-local"
+                    min={nowLocal()}
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                  />
+                </Field>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                icon={<Send className="size-4" />}
+                loading={create.isPending || send.isPending}
+                disabled={when === 'later' && !scheduledAt}
+                onClick={() => submit(!scheduledAt)}
+              >
+                {when === 'later' ? 'Schedule' : 'Send now'}
               </Button>
-              {!scheduledAt && (
+              {when === 'now' && (
                 <Button variant="ghost" onClick={() => submit(false)}>
                   Save as draft
                 </Button>
@@ -98,17 +135,17 @@ export default function BroadcastsPage() {
         </Card>
 
         {/* WhatsApp-style live preview */}
-        <Card className="lg:col-span-2">
+        <Card className="flex flex-col lg:col-span-2">
           <CardHeader title="Preview" subtitle="How buyers see it" />
-          <div className="p-5 pt-4">
-            <div className="mx-auto max-w-sm rounded-[2rem] bg-[linear-gradient(160deg,rgb(var(--ink-700)),rgb(var(--ink-950)))] p-2 shadow-float">
-              <div className="min-h-56 rounded-[1.6rem] bg-ink-950 p-4" data-theme="dark">
+          <div className="flex flex-1 flex-col p-5 pt-4">
+            <div className="mx-auto flex w-full max-w-sm flex-1 flex-col rounded-[2rem] bg-[linear-gradient(160deg,rgb(var(--ink-700)),rgb(var(--ink-950)))] p-2 shadow-float">
+              <div className="min-h-56 flex-1 rounded-[1.6rem] bg-ink-950 p-4" data-theme="dark">
                 <p className="mb-4 text-center text-[11px] text-low">Today</p>
                 <div className="ml-auto w-fit max-w-[88%] rounded-[18px] rounded-br-md bg-jade-700 px-3.5 py-2 shadow-raised">
                   <p className="whitespace-pre-wrap break-words text-sm text-white">
                     {message || 'Your message shows here'}
                   </p>
-                  <p className="mt-1 flex items-center justify-end gap-1 text-[10.5px] text-white/65">
+                  <p className="mt-1 flex items-center justify-end gap-1 text-[10.5px] text-white/90">
                     {new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
                     <CheckCheck className="size-3.5" aria-hidden />
                   </p>

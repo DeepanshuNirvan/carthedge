@@ -7,6 +7,7 @@ import { cartCount, useCart } from '@/store/cart';
 import { cn } from '@/lib/cn';
 import { Avatar } from '@/ui/Avatar';
 import { ThemeToggle } from '@/ui/ThemeToggle';
+import { whatsappHref } from '@/lib/validators';
 
 const iconBtn =
   'flex size-11 items-center justify-center rounded-full text-mid transition-colors hover:bg-[rgb(var(--field)/0.08)] hover:text-hi active:scale-95 sm:size-10';
@@ -81,7 +82,7 @@ export function StoreHeader({
           )}
           {business.whatsapp && (
             <a
-              href={`https://wa.me/91${business.whatsapp.replace(/\D/g, '').slice(-10)}`}
+              href={whatsappHref(business.whatsapp)}
               target="_blank"
               rel="noreferrer"
               aria-label="WhatsApp"
@@ -159,7 +160,7 @@ export function StoreProfile({ business }: { business: StoreBusiness }) {
           )}
           {business.whatsapp && (
             <a
-              href={`https://wa.me/91${business.whatsapp.replace(/\D/g, '').slice(-10)}`}
+              href={whatsappHref(business.whatsapp)}
               target="_blank"
               rel="noreferrer"
               className="neu inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full text-[13px] font-semibold text-hi sm:flex-none sm:px-5"

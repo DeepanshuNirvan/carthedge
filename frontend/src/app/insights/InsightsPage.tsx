@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowUpRight, Clock3, Repeat, ShieldCheck, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, Clock3, Hourglass, Repeat, ShieldCheck, TrendingUp } from 'lucide-react';
 import { useDashboard, useInsights } from '@/api/analytics';
 import { PageHeader } from '../shell/PageHeader';
 import { MoneyText } from '@/ui/MoneyText';
@@ -163,7 +163,7 @@ export default function InsightsPage() {
           )}
         </InsightCard>
 
-        <InsightCard icon={<TrendingUp className="size-5" />} tone="jade" title="Pending money" action={{ to: '/app/orders', label: 'Clear the queue' }}>
+        <InsightCard icon={<Hourglass className="size-5" />} tone="jade" title="Pending money" action={{ to: '/app/orders', label: 'Clear the queue' }}>
           {dash && dash.pendingOrders > 0 ? (
             <>
               <span className="font-medium text-hi">{dash.pendingOrders}</span> order

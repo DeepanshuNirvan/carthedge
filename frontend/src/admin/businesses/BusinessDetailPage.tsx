@@ -51,7 +51,7 @@ export default function BusinessDetailPage() {
 
   return (
     <>
-      <Link to="/admin/businesses" className="mb-4 inline-flex items-center gap-1.5 text-sm text-mid hover:text-hi">
+      <Link to="/admin/businesses" className="-mt-3 mb-1 inline-flex items-center gap-1.5 py-3 text-sm text-mid hover:text-hi">
         <ArrowLeft className="size-4" /> All businesses
       </Link>
       <PageHeader

@@ -415,7 +415,7 @@ export default function RegisterPage() {
       {step < 3 && (
         <p className="mt-6 text-sm text-mid">
           Already selling with us?{' '}
-          <Link to="/app/login" className="font-medium text-jade-ink hover:underline">
+          <Link to="/app/login" className="-my-3 inline-block py-3 font-medium text-jade-ink hover:underline">
             Log in
           </Link>
         </p>

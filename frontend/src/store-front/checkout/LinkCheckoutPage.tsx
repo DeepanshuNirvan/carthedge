@@ -1,12 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ImageOff, Link2Off, Minus, Plus, ShieldCheck } from 'lucide-react';
-import type { OrderRef, Product, Variant } from '@/api/types';
-import { useResolvedLink } from '@/api/storefront';
+import {
+  Banknote,
+  Link2Off,
+  MessageCircle,
+  Minus,
+  Phone,
+  Plus,
+  ShieldCheck,
+  Store,
+  Truck,
+  Wallet,
+} from 'lucide-react';
+import type { OrderRef, Product, ResolvedLink, Variant } from '@/api/types';
+import { useResolvedLink, useStore } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { cn } from '@/lib/cn';
+import { formatPaise } from '@/lib/money';
+import { whatsappHref } from '@/lib/validators';
 import { CheckoutFlow } from './CheckoutFlow';
+import { BuyerNotice } from '../BuyerNotice';
 import { LogoMark } from '@/marketing/Wordmark';
 import { Avatar } from '@/ui/Avatar';
 import { ThemeToggle } from '@/ui/ThemeToggle';
@@ -15,14 +29,88 @@ import { Button } from '@/ui/Button';
 import { Badge } from '@/ui/Badge';
 import { Skeleton } from '@/ui/Skeleton';
 import { LaneGround } from '@/ui/LaneGround';
-import { EmptyState } from '@/ui/EmptyState';
+import { NoPhoto } from '@/ui/NoPhoto';
+import { buttonLink } from '@/ui/buttonLink';
 
 type Selection = { qty: number; variantId?: string };
+
+const paymentLine = (b: ResolvedLink['business']) =>
+  b.onlinePayment === 'gateway'
+    ? 'Pay online, secured by Razorpay'
+    : b.onlinePayment === 'upi'
+      ? `Pay by UPI straight to ${b.name}`
+      : null;
+
+/** Desktop only: what the buyer is ordering, large, with the facts that make paying a stranger feel safe. */
+function LinkShowcase({ link, products }: { link: ResolvedLink; products: Product[] }) {
+  const b = link.business;
+  const shown = products.slice(0, 4);
+  const pay = paymentLine(b);
+  const facts: { icon: typeof ShieldCheck; text: string }[] = [
+    ...(b.verified ? [{ icon: ShieldCheck, text: 'Verified seller on CartHedge' }] : []),
+    ...(pay ? [{ icon: Wallet, text: pay }] : []),
+    ...(b.codEnabled ? [{ icon: Banknote, text: 'Cash on delivery available' }] : []),
+    { icon: Truck, text: b.shippingFee > 0 ? `Shipping ${formatPaise(b.shippingFee)}` : 'Free shipping' },
+    { icon: Phone, text: 'No account needed, just your phone number' },
+  ];
+
+  return (
+    <section aria-label="Your order" className="hidden lg:block">
+      {shown.length === 1 ? (
+        <div className="aspect-[4/5] max-h-[34rem] overflow-hidden rounded-xl bg-surface-2 shadow-float">
+          {shown[0].images[0] ? (
+            <img src={shown[0].images[0]} alt={shown[0].name} className="size-full object-cover" />
+          ) : (
+            <NoPhoto name={shown[0].name} size="lg" />
+          )}
+        </div>
+      ) : shown.length > 1 ? (
+        <ul className="grid grid-cols-2 gap-4">
+          {shown.map((p) => (
+            <li key={p.id}>
+              <div className="aspect-[4/5] overflow-hidden rounded-lg bg-surface-2 shadow-soft">
+                {p.images[0] ? (
+                  <img src={p.images[0]} alt={p.name} className="size-full object-cover" loading="lazy" />
+                ) : (
+                  <NoPhoto name={p.name} />
+                )}
+              </div>
+              <p className="mt-2 truncate text-sm font-medium text-hi">{p.name}</p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="panel flex items-center gap-4 rounded-xl p-6">
+          <Avatar name={b.name} src={b.logoUrl || undefined} className="size-16" />
+          <div className="min-w-0">
+            <p className="truncate text-d4 font-semibold text-hi">{b.name}</p>
+            <p className="mt-1 text-sm text-mid">A custom order, priced by the seller for you</p>
+          </div>
+        </div>
+      )}
+      {products.length > shown.length && (
+        <p className="mt-3 text-sm text-low">and {products.length - shown.length} more in this order</p>
+      )}
+      <ul className="mt-7 grid gap-3.5">
+        {facts.map((f) => (
+          <li key={f.text} className="flex items-center gap-3 text-sm text-mid">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-jade-500/10 text-jade-ink">
+              <f.icon className="size-4" aria-hidden />
+            </span>
+            {f.text}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /** A shared link resolves into a single focused checkout — the highest-intent screen we have. */
 export default function LinkCheckoutPage() {
   const { businessCode = '', token = '' } = useParams();
   const { data: link, isLoading, isError } = useResolvedLink(businessCode, token);
+  // a dead link still knows the shop from its URL: find the seller so the buyer has somewhere to go
+  const { data: store } = useStore(businessCode, isError);
   const [selections, setSelections] = useState<Record<string, Selection>>({});
   const [checkingOut, setCheckingOut] = useState(false);
 
@@ -59,29 +147,61 @@ export default function LinkCheckoutPage() {
   }
 
   if (isError || !link) {
+    const seller = store?.business;
     return (
-      <EmptyState
-        className="min-h-dvh"
+      <BuyerNotice
+        business={seller}
         icon={<Link2Off className="size-5" />}
         title="This link is no longer available"
-        message="It may have expired or been turned off by the seller. Ask them for a fresh link."
+        message={`It may have expired or been turned off by ${seller ? seller.name : 'the seller'}. Ask them for a fresh link.`}
+        actions={
+          seller && (
+            <>
+              <a href={`/s/${seller.code}`} className={buttonLink('primary')}>
+                <Store className="size-4" aria-hidden /> Visit the store
+              </a>
+              {seller.whatsapp && (
+                <a
+                  href={whatsappHref(seller.whatsapp)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonLink('secondary')}
+                >
+                  <MessageCircle className="size-4" aria-hidden /> Chat on WhatsApp
+                </a>
+              )}
+            </>
+          )
+        }
       />
     );
   }
 
   if (link.paused) {
     return (
-      <EmptyState
-        className="min-h-dvh"
-        icon={<Link2Off className="size-5" />}
-        title="This store is paused"
-        message={`${link.business.name} is temporarily not accepting orders.`}
+      <BuyerNotice
+        business={link.business}
+        icon={<Store className="size-5" />}
+        title="This store is taking a short break"
+        message={`${link.business.name} is temporarily not accepting orders. Check back soon.`}
+        actions={
+          link.business.whatsapp && (
+            <a
+              href={whatsappHref(link.business.whatsapp)}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonLink('secondary')}
+            >
+              <MessageCircle className="size-4" aria-hidden /> Chat on WhatsApp
+            </a>
+          )
+        }
       />
     );
   }
 
   return (
-    <div className="min-h-dvh bg-bg">
+    <div className="min-h-dvh">
       <Seo
         title={`${link.title || 'Checkout'} | ${link.business.name}`}
         description={`Complete your order with ${link.business.name}. Secure checkout, no signup needed.`}
@@ -91,7 +211,7 @@ export default function LinkCheckoutPage() {
 
       <LaneGround />
       <header className="glass-bar scroll-edge sticky top-0 z-30 shadow-[0_1px_0_rgb(var(--line)/var(--line-a))]">
-        <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+        <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] lg:max-w-5xl">
           <Avatar name={link.business.name} src={link.business.logoUrl || undefined} className="size-10" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-semibold tracking-snug text-hi">{link.business.name}</p>
@@ -105,135 +225,161 @@ export default function LinkCheckoutPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg px-4 py-5">
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="panel rounded-xl p-5 sm:p-6"
-        >
-          {!checkingOut ? (
-            <>
-              <Badge tone="jade">{link.kind === 'custom' ? 'Custom order' : 'Reserved for you'}</Badge>
-              <h1 className="mt-3 text-[1.5rem] font-semibold leading-tight tracking-[-0.025em] text-hi">
-                {link.title || 'Your order'}
-              </h1>
+      <main className="mx-auto w-full max-w-lg px-4 py-5 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start lg:gap-12 lg:py-10">
+        <LinkShowcase link={link} products={products} />
+        <div className="lg:sticky lg:top-24">
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="panel rounded-xl p-5 sm:p-6"
+          >
+            {!checkingOut ? (
+              <>
+                <Badge tone="jade">{link.kind === 'custom' ? 'Custom order' : 'Reserved for you'}</Badge>
+                <h1 className="mt-3 text-[1.5rem] font-semibold leading-tight tracking-[-0.025em] text-hi">
+                  {link.title || 'Your order'}
+                </h1>
 
-              {link.kind === 'custom' ? (
-                <p className="mt-4 text-[2.5rem] font-semibold leading-none tracking-tightest text-hi">
-                  <MoneyText paise={link.amount ?? 0} />
-                </p>
-              ) : (
-                <ul className="mt-4 flex flex-col divide-y">
-                  {products.map((p) => {
-                    const sel = selectionFor(p);
-                    return (
-                      <li key={p.id} className="flex gap-3 py-3.5">
-                        <div className="size-20 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-soft">
-                          {p.images[0] ? (
-                            <img src={p.images[0]} alt={p.name} className="size-full object-cover" loading="lazy" />
-                          ) : (
-                            <span className="flex size-full items-center justify-center text-low">
-                              <ImageOff className="size-5" aria-hidden />
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium leading-snug text-hi">{p.name}</p>
-                          <MoneyText paise={priceOf(p, sel.variantId)} className="text-sm text-mid" />
-
-                          {p.variants.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {p.variants.map((v: Variant) => (
-                                <button
-                                  key={v.id}
-                                  disabled={!v.inStock}
-                                  onClick={() => setSelections({ ...selections, [p.id]: { ...sel, variantId: v.id } })}
-                                  className={cn(
-                                    'min-h-9 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors active:scale-95',
-                                    sel.variantId === v.id ? 'bg-hi text-bg' : 'neu text-mid',
-                                    !v.inStock && 'cursor-not-allowed line-through opacity-50',
-                                  )}
-                                >
-                                  {v.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="mt-2 flex w-fit items-center rounded-full neu">
-                            <button
-                              aria-label={`Decrease quantity of ${p.name}`}
-                              onClick={() =>
-                                setSelections({ ...selections, [p.id]: { ...sel, qty: Math.max(1, sel.qty - 1) } })
-                              }
-                              className="flex size-10 items-center justify-center rounded-full text-mid hover:text-hi active:scale-90"
-                            >
-                              <Minus className="size-3.5" />
-                            </button>
-                            <span className="w-7 text-center text-sm font-semibold tnum">{sel.qty}</span>
-                            <button
-                              aria-label={`Increase quantity of ${p.name}`}
-                              onClick={() => setSelections({ ...selections, [p.id]: { ...sel, qty: sel.qty + 1 } })}
-                              className="flex size-10 items-center justify-center rounded-full text-mid hover:text-hi active:scale-90"
-                            >
-                              <Plus className="size-3.5" />
-                            </button>
+                {link.kind === 'custom' ? (
+                  <p className="mt-4 text-[2.5rem] font-semibold leading-none tracking-tightest text-hi">
+                    <MoneyText paise={link.amount ?? 0} />
+                  </p>
+                ) : (
+                  <ul className="mt-4 flex flex-col divide-y">
+                    {products.map((p) => {
+                      const sel = selectionFor(p);
+                      return (
+                        <li key={p.id} className="flex gap-3 py-3.5">
+                          <div className="size-20 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-soft">
+                            {p.images[0] ? (
+                              <img
+                                src={p.images[0]}
+                                alt={p.name}
+                                className="size-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <NoPhoto name={p.name} size="sm" />
+                            )}
                           </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium leading-snug text-hi">{p.name}</p>
+                            <MoneyText paise={priceOf(p, sel.variantId)} className="text-sm text-mid" />
 
-              <dl className="mt-4 flex flex-col gap-1.5 border-t pt-4 text-sm">
-                <div className="flex justify-between text-mid">
-                  <dt>Subtotal</dt>
-                  <dd><MoneyText paise={subtotal} /></dd>
-                </div>
-                <div className="flex justify-between text-mid">
-                  <dt>Shipping</dt>
-                  <dd>{link.business.shippingFee > 0 ? <MoneyText paise={link.business.shippingFee} /> : 'Free'}</dd>
-                </div>
-                <div className="flex justify-between text-base font-semibold text-hi">
-                  <dt>Total</dt>
-                  <dd><MoneyText paise={subtotal + link.business.shippingFee} /></dd>
-                </div>
-              </dl>
+                            {p.variants.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {p.variants.map((v: Variant) => (
+                                  <button
+                                    key={v.id}
+                                    disabled={!v.inStock}
+                                    onClick={() =>
+                                      setSelections({ ...selections, [p.id]: { ...sel, variantId: v.id } })
+                                    }
+                                    className={cn(
+                                      'min-h-9 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors active:scale-95',
+                                      sel.variantId === v.id ? 'bg-hi text-bg' : 'neu text-mid',
+                                      !v.inStock && 'cursor-not-allowed line-through opacity-50',
+                                    )}
+                                  >
+                                    {v.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
 
-              <Button size="lg" className="mt-5 w-full" onClick={() => setCheckingOut(true)}>
-                Continue to checkout
-              </Button>
-            </>
-          ) : (
-            <CheckoutFlow
-              ctx={{
-                businessCode,
-                businessName: link.business.name,
-                linkToken: token,
-                items: link.kind === 'custom' ? undefined : orderRefs,
-                subtotal,
-                shippingFee: link.business.shippingFee,
-                codEnabled: link.business.codEnabled,
-                onlinePayment: link.business.onlinePayment,
-              }}
-              onDone={() => {}}
-            />
-          )}
-        </motion.div>
+                            <div className="mt-2 flex w-fit items-center rounded-full neu">
+                              <button
+                                aria-label={`Decrease quantity of ${p.name}`}
+                                onClick={() =>
+                                  setSelections({
+                                    ...selections,
+                                    [p.id]: { ...sel, qty: Math.max(1, sel.qty - 1) },
+                                  })
+                                }
+                                className="flex size-10 items-center justify-center rounded-full text-mid hover:text-hi active:scale-90"
+                              >
+                                <Minus className="size-3.5" />
+                              </button>
+                              <span className="w-7 text-center text-sm font-semibold tnum">{sel.qty}</span>
+                              <button
+                                aria-label={`Increase quantity of ${p.name}`}
+                                onClick={() =>
+                                  setSelections({ ...selections, [p.id]: { ...sel, qty: sel.qty + 1 } })
+                                }
+                                className="flex size-10 items-center justify-center rounded-full text-mid hover:text-hi active:scale-90"
+                              >
+                                <Plus className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
 
-        <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-low">
-          <ShieldCheck className="size-3.5 text-jade-ink" />
-          {link.business.onlinePayment === 'gateway'
-            ? 'Payments secured by Razorpay'
-            : link.business.onlinePayment === 'upi'
-              ? 'Pay by UPI direct to the seller'
-              : 'Cash on delivery'}
-          <span aria-hidden className="text-dim">|</span> Powered by
-          <LogoMark size={13} className="-ml-0.5" />
-          CartHedge
-        </p>
+                <dl className="mt-4 flex flex-col gap-1.5 border-t pt-4 text-sm">
+                  <div className="flex justify-between text-mid">
+                    <dt>Subtotal</dt>
+                    <dd>
+                      <MoneyText paise={subtotal} />
+                    </dd>
+                  </div>
+                  <div className="flex justify-between text-mid">
+                    <dt>Shipping</dt>
+                    <dd>
+                      {link.business.shippingFee > 0 ? (
+                        <MoneyText paise={link.business.shippingFee} />
+                      ) : (
+                        'Free'
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between text-base font-semibold text-hi">
+                    <dt>Total</dt>
+                    <dd>
+                      <MoneyText paise={subtotal + link.business.shippingFee} />
+                    </dd>
+                  </div>
+                </dl>
+
+                <Button size="lg" className="mt-5 w-full" onClick={() => setCheckingOut(true)}>
+                  Continue to checkout
+                </Button>
+              </>
+            ) : (
+              <CheckoutFlow
+                ctx={{
+                  businessCode,
+                  businessName: link.business.name,
+                  linkToken: token,
+                  items: link.kind === 'custom' ? undefined : orderRefs,
+                  subtotal,
+                  shippingFee: link.business.shippingFee,
+                  codEnabled: link.business.codEnabled,
+                  onlinePayment: link.business.onlinePayment,
+                }}
+                onDone={() => {}}
+              />
+            )}
+          </motion.div>
+
+          <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-low">
+            <ShieldCheck className="size-3.5 text-jade-ink" />
+            {link.business.onlinePayment === 'gateway'
+              ? 'Payments secured by Razorpay'
+              : link.business.onlinePayment === 'upi'
+                ? 'Pay by UPI direct to the seller'
+                : 'Cash on delivery'}
+            <span aria-hidden className="text-dim">
+              |
+            </span>{' '}
+            Powered by
+            <LogoMark size={13} className="-ml-0.5" />
+            CartHedge
+          </p>
+        </div>
       </main>
     </div>
   );

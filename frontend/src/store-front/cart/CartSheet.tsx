@@ -7,6 +7,7 @@ import { Sheet } from '@/ui/Modal';
 import { Button, IconButton } from '@/ui/Button';
 import { MoneyText } from '@/ui/MoneyText';
 import { EmptyState } from '@/ui/EmptyState';
+import { NoPhoto } from '@/ui/NoPhoto';
 import { CheckoutFlow } from '../checkout/CheckoutFlow';
 
 export function CartSheet({
@@ -61,7 +62,11 @@ export function CartSheet({
             {items.map((item) => (
               <li key={`${item.productId}:${item.variantId ?? ''}`} className="flex gap-3 py-3">
                 <div className="h-20 w-16 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-soft">
-                  {item.image && <img src={item.image} alt="" className="size-full object-cover" loading="lazy" />}
+                  {item.image ? (
+                    <img src={item.image} alt="" className="size-full object-cover" loading="lazy" />
+                  ) : (
+                    <NoPhoto name={item.name} size="sm" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-hi">{item.name}</p>

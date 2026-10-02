@@ -19,6 +19,11 @@ export function formatPaise(paise: number) {
   return (p % 100 === 0 ? inr : inrPaise).format(p / 100);
 }
 
+/** Whole rupees, for estimates where paise would be false precision. */
+export function formatRupees(paise: number) {
+  return inr.format(Math.round(paise / 100));
+}
+
 /** ₹1.2L / ₹3.4Cr for dense dashboards. */
 export function formatPaiseCompact(paise: number) {
   const r = Math.abs(paise) / 100;

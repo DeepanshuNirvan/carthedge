@@ -16,6 +16,7 @@ import { Switch } from '@/ui/Switch';
 import { Badge } from '@/ui/Badge';
 import { Skeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
+import { NoPhoto } from '@/ui/NoPhoto';
 import { Modal } from '@/ui/Modal';
 import { cn } from '@/lib/cn';
 
@@ -38,9 +39,7 @@ function ProductCard({
         {product.images[0] ? (
           <img src={product.images[0]} alt={product.name} loading="lazy" className="size-full object-cover transition-transform duration-expr ease-enter [@media(hover:hover)]:group-hover:scale-[1.03]" />
         ) : (
-          <div className="flex size-full items-center justify-center text-low">
-            <Package className="size-8" aria-hidden />
-          </div>
+          <NoPhoto name={product.name} />
         )}
         {product.trending && (
           <Badge tone="gold" className="absolute left-2.5 top-2.5 bg-[rgb(var(--surface)/0.85)] backdrop-blur-md">

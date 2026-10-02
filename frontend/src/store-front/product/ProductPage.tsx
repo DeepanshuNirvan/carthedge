@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BellRing, Check, ImageOff, Minus, Plus, ShieldCheck, Truck } from 'lucide-react';
+import { ArrowLeft, BellRing, Check, Minus, PackageX, Plus, ShieldCheck, Store, Truck } from 'lucide-react';
 import type { PublicVariant } from '@/api/types';
 import { joinWaitlist, useStore, useStoreProduct } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
@@ -10,11 +10,13 @@ import { toast } from '@/store/ui';
 import { phoneSchema } from '@/lib/validators';
 import { StoreHeader, trustLine } from '../storefront/StoreHeader';
 import { CartSheet } from '../cart/CartSheet';
+import { BuyerNotice } from '../BuyerNotice';
 import { MoneyText } from '@/ui/MoneyText';
 import { Button } from '@/ui/Button';
 import { Field, Input } from '@/ui/Input';
 import { Skeleton } from '@/ui/Skeleton';
-import { EmptyState } from '@/ui/EmptyState';
+import { NoPhoto } from '@/ui/NoPhoto';
+import { buttonLink } from '@/ui/buttonLink';
 import { LaneGround } from '@/ui/LaneGround';
 import { Modal } from '@/ui/Modal';
 
@@ -60,9 +62,7 @@ function Gallery({
               />
             ))
           ) : (
-            <span className="flex size-full items-center justify-center text-low">
-              <ImageOff className="size-8" aria-hidden />
-            </span>
+            <NoPhoto name={name} size="lg" />
           )}
         </div>
         {images.length > 1 && (
@@ -96,7 +96,7 @@ function Gallery({
 
 export default function ProductPage() {
   const { businessCode = '', productId = '' } = useParams();
-  const { data: store } = useStore(businessCode);
+  const { data: store, isError: storeMissing } = useStore(businessCode);
   const { data: product, isLoading, isError } = useStoreProduct(businessCode, productId);
   const add = useCart((s) => s.add);
 
@@ -106,6 +106,16 @@ export default function ProductPage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [waitPhone, setWaitPhone] = useState('');
+
+  if (storeMissing) {
+    return (
+      <BuyerNotice
+        icon={<Store className="size-5" />}
+        title="Store not found"
+        message="This link may have expired, or the seller changed their store address."
+      />
+    );
+  }
 
   if (isLoading || !store) {
     return (
@@ -123,13 +133,14 @@ export default function ProductPage() {
 
   if (isError || !product) {
     return (
-      <EmptyState
-        className="min-h-dvh"
+      <BuyerNotice
+        business={store.business}
+        icon={<PackageX className="size-5" />}
         title="Product unavailable"
-        message="This item may have been removed by the seller."
-        action={
-          <Link to={`/s/${businessCode}`} className="text-sm font-medium text-jade-ink hover:underline">
-            Back to store
+        message={`This item may have been removed by ${store.business.name}.`}
+        actions={
+          <Link to={`/s/${businessCode}`} className={buttonLink('primary')}>
+            <Store className="size-4" aria-hidden /> Back to the store
           </Link>
         }
       />

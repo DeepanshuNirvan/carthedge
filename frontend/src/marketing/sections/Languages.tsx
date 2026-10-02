@@ -14,7 +14,7 @@ export function Languages() {
       </Reveal>
 
       <div
-        className="group relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]"
+        className="group relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)] xl:[mask-image:linear-gradient(90deg,transparent,transparent_6rem,black_13rem,black_92%,transparent)]"
         aria-label={languages.lines.join(', ')}
         role="img"
       >

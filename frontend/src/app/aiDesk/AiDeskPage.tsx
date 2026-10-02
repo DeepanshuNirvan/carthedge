@@ -58,7 +58,7 @@ const replyingNow = (c: ConversationSummary) =>
 function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
   const { data: convos, isLoading } = useConversations();
   return (
-    <Card className="mt-4">
+    <Card>
       <CardHeader title="Inbox" subtitle="DMs captured automatically from your connected channels" />
       <div className="p-5 pt-4">
         {isLoading ? (
@@ -410,126 +410,130 @@ export default function AiDeskPage() {
 
   return (
     <>
-      <PageHeader title="AI order desk" subtitle="Paste a chat, get an order" />
+      <PageHeader title="AI order desk" subtitle="Chats the assistant is handling, and orders waiting for your tap" />
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card glass className="relative overflow-hidden">
-          <div
-            aria-hidden
-            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-jade-400 to-transparent"
-          />
-          <CardHeader
-            title="Parse a DM thread"
-            subtitle="Hinglish works: item, size, address, payment"
-            action={
-              <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
-                <Sparkles className="size-4.5" />
-              </span>
-            }
-          />
-          <div className="relative flex flex-col gap-4 p-5 pt-4">
-            <Textarea
-              rows={7}
-              placeholder={'pink wali kurti M size chahiye\nCOD karwa do\n45 Civil Lines Delhi 110054\nPriya 98110 43210'}
-              value={conversation}
-              onChange={(e) => setConversation(e.target.value)}
-              aria-label="DM conversation"
-            />
-            <Button icon={<Wand2 className="size-4" />} loading={parse.isPending} onClick={doParse}>
-              {parse.isPending ? 'Reading the chat…' : 'Draft the order'}
-            </Button>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="Reply assistant" subtitle="Draft a pre-sales answer in your tone" />
-          <div className="flex flex-col gap-4 p-5 pt-4">
-            <Field label="Buyer's question">
-              <Input
-                placeholder="kya isme XL milega? delivery kitne din?"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                disabled={!canReply}
-              />
-            </Field>
-            {canReply ? (
-              <Button
-                variant="secondary"
-                icon={<MessageSquareText className="size-4" />}
-                loading={replyMut.isPending}
-                onClick={() =>
-                  replyMut.mutate(question, {
-                    onSuccess: (r) => setReply(r.reply),
-                    onError: (e) => toast('error', 'No reply generated', e.message),
-                  })
-                }
-              >
-                Suggest reply
-              </Button>
-            ) : (
-              <p className="flex flex-wrap items-center gap-2 text-xs text-low">
-                <Lock className="size-3.5" /> The reply assistant needs a higher plan.
-                <Link to="/app/billing" className="font-medium text-jade-ink hover:underline">
-                  See plans
-                </Link>
-              </p>
-            )}
-            {reply && (
-              <div className="rounded-lg bg-[rgb(var(--field)/0.04)] p-4 hairline">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-hi">{reply}</p>
-                <Button variant="ghost" size="sm" className="mt-2" onClick={() => copy(reply)}>
-                  {copied ? 'Copied' : 'Copy reply'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      <Inbox onOpen={setOpenConvId} />
-
-      <Card className="mt-4">
-        <CardHeader title="Pending drafts" subtitle="Parsed orders from DMs or a paste, waiting for your one-tap confirm" />
-        <div className="p-5 pt-4">
-          {isLoading ? (
-            <SkeletonRows rows={3} />
-          ) : pending.length > 0 ? (
-            <ul className="divide-y">
-              {pending.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5">
-                  {/* lit only where the seller is needed (unsure, or nothing matched). The draft is the AI's reading, so it is set in hairline
-                      (dotted) type until confirmed; how sure it is reads as words, not a score pill. */}
-                  <span className="bulb size-2 shrink-0" data-lit={d.confidence < 80 || d.draft.items.length === 0} />
-                  <div className="min-w-0 flex-1 basis-[80%] sm:basis-0">
-                    <p className="truncate text-sm text-hi">
-                      <span className="font-medium">{d.draft.customerName || 'Unknown buyer'}</span>
-                      <span className="text-low">, </span>
-                      <span className="text-mid underline decoration-dotted decoration-[rgb(var(--text-low)/0.6)] underline-offset-[3px]">
-                        {d.draft.items.map((i) => `${i.qty}x ${i.name}`).join(', ') || 'no items matched'}
+      {/* the live side leads: chats the assistant is handling and drafts waiting for a tap.
+          The manual tools (paste a chat, draft a reply) sit beside them on wide screens, below on phones. */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Inbox onOpen={setOpenConvId} />
+          <Card>
+            <CardHeader title="Pending drafts" subtitle="Parsed orders from DMs or a paste, waiting for your one-tap confirm" />
+            <div className="p-5 pt-4">
+              {isLoading ? (
+                <SkeletonRows rows={3} />
+              ) : pending.length > 0 ? (
+                <ul className="divide-y">
+                  {pending.map((d) => (
+                    <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5">
+                      {/* lit only where the seller is needed (unsure, or nothing matched). The draft is the AI's reading, so it is set in hairline
+                          (dotted) type until confirmed; how sure it is reads as words, not a score pill. */}
+                      <span className="bulb size-2 shrink-0" data-lit={d.confidence < 80 || d.draft.items.length === 0} />
+                      <div className="min-w-0 flex-1 basis-[80%] sm:basis-0">
+                        <p className="truncate text-sm text-hi">
+                          <span className="font-medium">{d.draft.customerName || 'Unknown buyer'}</span>
+                          <span className="text-low">, </span>
+                          <span className="text-mid underline decoration-dotted decoration-[rgb(var(--text-low)/0.6)] underline-offset-[3px]">
+                            {d.draft.items.map((i) => `${i.qty}x ${i.name}`).join(', ') || 'no items matched'}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-low">{d.conversation.slice(0, 90)}…</p>
+                      </div>
+                      {sourceBadge(d.source) && <Badge tone={sourceBadge(d.source)!.tone}>{sourceBadge(d.source)!.label}</Badge>}
+                      <span className={cn('text-xs font-medium', d.confidence >= 80 ? 'text-jade-ink' : 'text-gold-ink')}>
+                        {d.confidence >= 80 ? 'AI is sure' : d.confidence >= 50 ? 'Check details' : 'Needs a closer look'}
                       </span>
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-low">{d.conversation.slice(0, 90)}…</p>
-                  </div>
-                  {sourceBadge(d.source) && <Badge tone={sourceBadge(d.source)!.tone}>{sourceBadge(d.source)!.label}</Badge>}
-                  <span className={cn('text-xs font-medium', d.confidence >= 80 ? 'text-jade-ink' : 'text-gold-ink')}>
-                    {d.confidence >= 80 ? 'AI is sure' : d.confidence >= 50 ? 'Check details' : 'Needs a closer look'}
-                  </span>
-                  <span className="hidden text-xs text-low sm:inline">{timeAgo(d.createdAt)}</span>
-                  <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setReviewing(d)}>
-                    Review
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              icon={<Bot className="size-5" />}
-              title="No drafts waiting"
-              message="Parsed chats appear here until you confirm or discard them."
-            />
-          )}
+                      <span className="hidden text-xs text-low sm:inline">{timeAgo(d.createdAt)}</span>
+                      <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setReviewing(d)}>
+                        Review
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState
+                  icon={<Bot className="size-5" />}
+                  title="No drafts waiting"
+                  message="Parsed chats appear here until you confirm or discard them."
+                />
+              )}
+            </div>
+          </Card>
         </div>
-      </Card>
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card glass className="relative overflow-hidden">
+            <div
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-jade-400 to-transparent"
+            />
+            <CardHeader
+              title="Parse a DM thread"
+              subtitle="Hinglish works: item, size, address, payment"
+              action={
+                <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
+                  <Sparkles className="size-4.5" />
+                </span>
+              }
+            />
+            <div className="relative flex flex-col gap-4 p-5 pt-4">
+              <Textarea
+                rows={7}
+                placeholder={'pink wali kurti M size chahiye\nCOD karwa do\n45 Civil Lines Delhi 110054\nPriya 98110 43210'}
+                value={conversation}
+                onChange={(e) => setConversation(e.target.value)}
+                aria-label="DM conversation"
+              />
+              <Button icon={<Wand2 className="size-4" />} loading={parse.isPending} onClick={doParse}>
+                {parse.isPending ? 'Reading the chat…' : 'Draft the order'}
+              </Button>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Reply assistant" subtitle="Draft a pre-sales answer in your tone" />
+            <div className="flex flex-col gap-4 p-5 pt-4">
+              <Field label="Buyer's question">
+                <Input
+                  placeholder="kya isme XL milega? delivery kitne din?"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  disabled={!canReply}
+                />
+              </Field>
+              {canReply ? (
+                <Button
+                  variant="secondary"
+                  icon={<MessageSquareText className="size-4" />}
+                  loading={replyMut.isPending}
+                  onClick={() =>
+                    replyMut.mutate(question, {
+                      onSuccess: (r) => setReply(r.reply),
+                      onError: (e) => toast('error', 'No reply generated', e.message),
+                    })
+                  }
+                >
+                  Suggest reply
+                </Button>
+              ) : (
+                <p className="flex flex-wrap items-center gap-2 text-xs text-low">
+                  <Lock className="size-3.5" /> The reply assistant needs a higher plan.
+                  <Link to="/app/billing" className="font-medium text-jade-ink hover:underline">
+                    See plans
+                  </Link>
+                </p>
+              )}
+              {reply && (
+                <div className="rounded-lg bg-[rgb(var(--field)/0.04)] p-4 hairline">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-hi">{reply}</p>
+                  <Button variant="ghost" size="sm" className="mt-2" onClick={() => copy(reply)}>
+                    {copied ? 'Copied' : 'Copy reply'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
 
       {openConvId && (
         <ConversationModal

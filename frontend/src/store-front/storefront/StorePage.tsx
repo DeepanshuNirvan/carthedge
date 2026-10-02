@@ -1,19 +1,22 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { PackageSearch, Search, SlidersHorizontal, Store, Ticket } from 'lucide-react';
+import { MessageCircle, PackageSearch, Search, SlidersHorizontal, Store, Ticket } from 'lucide-react';
 import { useStore, useStoreProducts } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { formatPaise } from '@/lib/money';
 import { cn } from '@/lib/cn';
+import { whatsappHref } from '@/lib/validators';
 import { StoreHeader, StoreProfile } from './StoreHeader';
 import { ProductCard } from './ProductCard';
 import { CartSheet } from '../cart/CartSheet';
 import { StoreFooter } from './StoreFooter';
+import { BuyerNotice } from '../BuyerNotice';
 import { Input, Select } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 import { Skeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
+import { buttonLink } from '@/ui/buttonLink';
 import { Sheet } from '@/ui/Modal';
 import { LaneGround } from '@/ui/LaneGround';
 import { Switch } from '@/ui/Switch';
@@ -82,11 +85,15 @@ export default function StorePage() {
 
   if (isError || !store) {
     return (
-      <EmptyState
-        className="min-h-dvh"
+      <BuyerNotice
         icon={<Store className="size-5" />}
         title="Store not found"
         message="This link may have expired, or the seller changed their store address."
+        actions={
+          <Link to="/track" className={buttonLink('secondary')}>
+            <PackageSearch className="size-4" aria-hidden /> Track an order
+          </Link>
+        }
       />
     );
   }
@@ -100,6 +107,18 @@ export default function StorePage() {
           icon={<Store className="size-5" />}
           title="This store is taking a short break"
           message={`${store.business.name} is temporarily not accepting orders. Check back soon.`}
+          action={
+            store.business.whatsapp && (
+              <a
+                href={whatsappHref(store.business.whatsapp)}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonLink('secondary')}
+              >
+                <MessageCircle className="size-4" aria-hidden /> Chat on WhatsApp
+              </a>
+            )
+          }
         />
       </>
     );

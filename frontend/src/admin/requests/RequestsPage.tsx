@@ -134,7 +134,7 @@ function PlanRequestList({ requests, onWork }: { requests: PlanRequest[]; onWork
         <Card key={r.id} className="flex flex-wrap items-start gap-4 p-5">
           <div className="min-w-0 flex-1 basis-64">
             <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-hi">
-              <Link to={`/admin/businesses/${r.businessId}`} className="hover:text-jade-ink">
+              <Link to={`/admin/businesses/${r.businessId}`} className="-my-3 inline-block py-3 hover:text-jade-ink">
                 {r.businessName}
               </Link>
               <StatusChip status={r.status} />

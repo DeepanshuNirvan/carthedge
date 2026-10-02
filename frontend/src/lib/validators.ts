@@ -43,3 +43,6 @@ export const addressSchema = z.object({
   state: z.string().min(2, 'State is required'),
   pincode: pincodeSchema,
 });
+
+/** wa.me chat link for an Indian number in any of the forms sellers type it. */
+export const whatsappHref = (phone: string) => `https://wa.me/91${phone.replace(/\D/g, '').slice(-10)}`;

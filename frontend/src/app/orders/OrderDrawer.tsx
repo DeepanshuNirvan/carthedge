@@ -14,6 +14,7 @@ import { Field, Input, Select } from '@/ui/Input';
 import { MoneyText } from '@/ui/MoneyText';
 import { StatusChip } from '@/ui/Badge';
 import { SkeletonRows } from '@/ui/Skeleton';
+import { whatsappHref } from '@/lib/validators';
 
 export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId ?? undefined);
@@ -77,7 +78,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               {/* the seller's next move is usually a message: one tap to the buyer's chat or phone */}
               <div className="flex shrink-0 gap-1">
                 <a
-                  href={`https://wa.me/91${order.customerPhone.replace(/\D/g, '').slice(-10)}`}
+                  href={whatsappHref(order.customerPhone)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`WhatsApp ${order.customerName}`}

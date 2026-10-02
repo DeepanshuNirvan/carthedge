@@ -15,7 +15,7 @@ export default function OverviewPage() {
 
   const money = [
     { label: 'Revenue this month', paise: o?.revenueThisMonth ?? 0, hint: o ? <>total <MoneyText paise={o.revenueTotal ?? 0} /></> : null },
-    { label: 'GMV, last 30 days', paise: o?.gmvLast30Days ?? 0, hint: o ? `${o.ordersLast30Days} orders` : null },
+    { label: 'GMV, last 30 days', paise: o?.gmvLast30Days ?? 0, hint: o ? `${o.ordersLast30Days} ${o.ordersLast30Days === 1 ? 'order' : 'orders'}` : null },
   ];
   const attention = [
     { to: '/admin/requests', icon: Inbox, label: 'Open plan requests', value: o?.openPlanRequests ?? 0 },
@@ -120,7 +120,7 @@ export default function OverviewPage() {
                         {b.name} <span className="font-mono text-xs text-low">/{b.code}</span>
                       </p>
                       <p className="truncate text-xs text-low">
-                        {b.ownerName}, {b.city || '-'}, {timeAgo(b.createdAt)}
+                        {[b.ownerName, b.city, timeAgo(b.createdAt)].filter(Boolean).join(', ')}
                       </p>
                     </div>
                     <StatusChip status={b.subscriptionStatus || b.status} className="hidden sm:inline-flex" />

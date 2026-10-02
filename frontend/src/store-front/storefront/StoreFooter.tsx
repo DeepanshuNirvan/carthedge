@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Instagram, MessageCircle, PackageSearch } from 'lucide-react';
 import type { StoreBusiness } from '@/api/types';
 import { LogoMark } from '@/marketing/Wordmark';
+import { whatsappHref } from '@/lib/validators';
 
 export function StoreFooter({ business }: { business: StoreBusiness }) {
   return (
@@ -9,7 +10,7 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 text-center">
         <Link
           to="/track"
-          className="inline-flex items-center gap-2 text-sm font-medium text-jade-ink hover:underline"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-jade-ink hover:underline"
         >
           <PackageSearch className="size-4" />
           Track your order
@@ -31,7 +32,7 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
             )}
             {business.whatsapp && (
               <a
-                href={`https://wa.me/91${business.whatsapp.replace(/\D/g, '').slice(-10)}`}
+                href={whatsappHref(business.whatsapp)}
                 target="_blank"
                 rel="noreferrer"
                 className="neu inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm text-mid transition-colors hover:text-hi"
@@ -48,7 +49,7 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
         </p>
         <a
           href="/"
-          className="inline-flex items-center gap-1.5 text-[11px] text-low transition-colors hover:text-mid"
+          className="inline-flex min-h-11 items-center gap-1.5 px-2 text-[11px] text-low transition-colors hover:text-mid"
         >
           <LogoMark size={14} />
           Powered by <span className="font-medium text-mid">CartHedge</span>
