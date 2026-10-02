@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 export function Section({ className, ...rest }: HTMLAttributes<HTMLElement>) {
   return (
     <section
-      className={cn('relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24', className)}
+      className={cn('relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20', className)}
       {...rest}
     />
   );

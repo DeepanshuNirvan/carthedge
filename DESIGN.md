@@ -238,7 +238,7 @@ The system is layered. Depth comes from three materials plus a cool ambient shad
 - **Glow / Glow-gold** (`0 18px 40px -18px` jade-500 or gold-400 at 55%): a lit pane casts light downward like a lamp.
 
 ### Named Rules
-**The Chrome-Only Glass Rule.** Glass (`.glass`, `.glass-nav`, `.glass-bar`) is for floating chrome: nav, tab bars, sheets, menus, toasts, sticky headers and the hero counter. Content cards are opaque panels. A card uses glass only when it floats over imagery.
+**The Chrome-Only Glass Rule.** Glass (`.glass`, `.glass-nav`, `.glass-bar`) is for floating chrome: nav, tab bars, sheets, menus, toasts, sticky headers and the hero counter. Content cards are opaque panels. A card uses glass only when it floats over imagery. The floating desktop header in the app and console adds `.glass-float` (thinner fill `--glass-clear-a`, lit top edge, sheen ring) so the lamp strand reads through it; below `lg` it stays a plain edge bar.
 
 **The Lift-Is-A-Target Rule.** Only cards that are themselves a click target get the pointer-lit jade spotlight edge and the 2px lift.
 

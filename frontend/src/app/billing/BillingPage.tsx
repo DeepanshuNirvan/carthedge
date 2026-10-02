@@ -64,7 +64,7 @@ export default function BillingPage() {
     <>
       <PageHeader title="Billing" subtitle="Your CartHedge plan, renewal and usage" />
 
-      <div className="max-w-5xl">
+      <div>
         {/* the current plan, with the period's usage as the one bar on the page */}
         <Card className="overflow-hidden">
           {isLoading ? (
@@ -161,7 +161,7 @@ export default function BillingPage() {
                     ))}
                   </ul>
                   <Button
-                    className="mt-5 w-full"
+                    className="mt-5 w-full xl:w-auto xl:self-start xl:px-8"
                     variant={current ? 'secondary' : 'primary'}
                     loading={paying === plan.code}
                     icon={<Wallet className="size-4" />}

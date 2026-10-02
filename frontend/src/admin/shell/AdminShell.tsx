@@ -99,7 +99,7 @@ export function AdminShell() {
       </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass-bar scroll-edge sticky top-0 z-30 flex items-center gap-2 px-4 lg:after:hidden pb-2.5 pt-[calc(0.6rem+env(safe-area-inset-top))] sm:px-6 lg:top-3 lg:mx-3 lg:mt-3 lg:rounded-xl lg:pb-2 lg:pt-2 lg:shadow-[inset_0_0_0_1px_rgb(var(--line)/var(--glass-rim-a)),var(--shadow-soft)]">
+        <header className="glass-bar glass-float sheen scroll-edge sticky top-0 z-30 flex items-center gap-2 px-4 lg:after:hidden pb-2.5 pt-[calc(0.6rem+env(safe-area-inset-top))] sm:px-6 lg:top-3 lg:mx-3 lg:mt-3 lg:rounded-xl lg:pb-2 lg:pt-2">
           <IconButton label="Open menu" className="-ml-2 lg:hidden" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </IconButton>
@@ -120,7 +120,7 @@ export function AdminShell() {
           initial={reduced ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-          className="mx-auto w-full min-w-0 max-w-[90rem] flex-1 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4"
+          className="w-full min-w-0 flex-1 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4"
         >
           <Outlet />
         </motion.main>

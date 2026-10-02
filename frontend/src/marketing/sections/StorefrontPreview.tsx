@@ -33,7 +33,7 @@ export function StorefrontPreview() {
   const v = (m: MotionValue<number>) => (reduced ? undefined : m);
 
   return (
-    <section id="storefront" className="relative mx-auto w-full max-w-6xl px-5 pb-12 pt-20 sm:px-8 sm:pb-16 sm:pt-24">
+    <section id="storefront" className="relative mx-auto w-full max-w-6xl px-5 pb-12 pt-16 sm:px-8 sm:pb-16 sm:pt-20 md:pt-0">
       <SectionHead title={storefrontPreview.title} sub={storefrontPreview.copy} />
 
       <div ref={stage} className="relative mx-auto mt-4 flex max-w-4xl justify-center py-6 sm:py-12">

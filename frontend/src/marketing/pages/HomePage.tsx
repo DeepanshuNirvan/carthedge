@@ -5,6 +5,7 @@ import { MarketingBackground } from '../MarketingBackground';
 import { MarketingNav } from '../MarketingNav';
 import { Strand } from '../Strand';
 import { Footer } from '../Footer';
+import { LampStrand } from '@/ui/LaneGround';
 import { Hero } from '../sections/Hero';
 import { Problem } from '../sections/Problem';
 import { Autopilot } from '../sections/Autopilot';
@@ -31,7 +32,7 @@ const faqJsonLd = {
 export default function HomePage() {
   useLenis();
   return (
-    <div className="grain">
+    <div className="grain relative">
       <Seo
         title="CartHedge | AI sales assistant and order desk for Instagram & WhatsApp sellers"
         description="CartHedge answers every buyer DM in seconds from your catalog, closes the order in the chat, and gives you a no-signup storefront, order board and COD confirmation. 15-day free trial."
@@ -39,6 +40,10 @@ export default function HomePage() {
         jsonLd={[organizationJsonLd, faqJsonLd]}
       />
       <MarketingBackground />
+      {/* the strand the app hangs over every working surface, strung across the top of the page */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-14">
+        <LampStrand />
+      </div>
       <MarketingNav />
       <Strand />
       <main>

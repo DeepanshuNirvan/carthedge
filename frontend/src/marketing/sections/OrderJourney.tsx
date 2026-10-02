@@ -70,7 +70,7 @@ export function OrderJourney() {
 
   if (flat) {
     return (
-      <section id="journey" ref={root} className="relative mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
+      <section id="journey" ref={root} className="relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
         <SectionHead title={journey.title} sub={journey.sub} />
         <OrderCard status="delivered" className="mb-10 max-w-sm" />
         <JourneyList />
@@ -79,7 +79,7 @@ export function OrderJourney() {
   }
 
   return (
-    <section id="journey" ref={root} className="relative h-[300vh]">
+    <section id="journey" ref={root} className="relative h-[230vh]">
       <div className="sticky top-0 flex h-[100dvh] flex-col justify-center overflow-hidden">
         <div className="mx-auto w-full max-w-6xl px-8">
           <SectionHead title={journey.title} sub={journey.sub} className="mb-10 sm:mb-12" />
@@ -102,7 +102,7 @@ export function OrderJourney() {
                 <div
                   key={column.status}
                   className={cn(
-                    'relative flex h-[13.5rem] flex-col justify-end gap-2 rounded-lg p-2.5 transition-[background-color,box-shadow] duration-expr',
+                    'relative flex h-[clamp(13.5rem,32dvh,20rem)] flex-col justify-end gap-2 rounded-lg p-2.5 transition-[background-color,box-shadow] duration-expr',
                     i === idx
                       ? 'bg-[rgb(var(--bulb)/0.07)] shadow-[inset_0_0_0_1px_rgb(var(--bulb)/0.28)]'
                       : 'bg-[rgb(var(--field)/0.035)] shadow-[inset_0_0_0_1px_rgb(var(--line)/var(--line-a))]',

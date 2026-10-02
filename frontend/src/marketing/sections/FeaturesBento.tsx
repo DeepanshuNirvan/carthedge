@@ -8,13 +8,13 @@ import { RevealGroup, RevealItem, SectionHead } from '../Section';
  */
 export function FeaturesBento() {
   return (
-    <section id="features" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <section id="features" className="relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
       <SectionHead title={features.title} />
       <div className="flex flex-col">
         {features.groups.map((group) => (
           <RevealGroup
             key={group.title}
-            className="grid gap-x-10 gap-y-5 border-t py-8 first:border-t-0 first:pt-0 lg:grid-cols-[13rem_1fr] lg:py-10"
+            className="grid gap-x-10 gap-y-5 border-t py-8 first:border-t-0 first:pt-0 last:pb-0 lg:grid-cols-[13rem_1fr] lg:py-10"
           >
             <RevealItem>
               <h3 className="text-d4 font-semibold text-hi lg:sticky lg:top-28">{group.title}</h3>

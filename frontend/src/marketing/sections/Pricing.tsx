@@ -26,7 +26,7 @@ export function Pricing() {
   const plans = data?.filter((p) => !p.isCustom) ?? fallbackPlans;
 
   return (
-    <section id="pricing" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <section id="pricing" className="relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
       <SectionHead title={pricing.title} sub={pricing.sub} />
 
       <Reveal>

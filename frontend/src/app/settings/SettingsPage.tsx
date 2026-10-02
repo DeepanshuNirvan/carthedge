@@ -520,16 +520,21 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="flex max-w-3xl flex-col gap-5">
-        <ProfileSection />
-        <ChannelsSection />
-        <AiAssistantSection />
-        <PaymentsSection />
-        <p className="flex items-center gap-2 px-1 text-xs text-low">
-          <Landmark className="size-3.5" /> CartHedge never holds your money, Razorpay and UPI settle straight to you.
-          <Store className="ml-3 size-3.5" /> Store pauses automatically if your subscription lapses.
-        </p>
+      {/* two columns from xl: who you are and where buyers reach you, then how the assistant and payments behave */}
+      <div className="grid items-start gap-5 xl:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-5">
+          <ProfileSection />
+          <ChannelsSection />
+        </div>
+        <div className="flex min-w-0 flex-col gap-5">
+          <AiAssistantSection />
+          <PaymentsSection />
+        </div>
       </div>
+      <p className="mt-5 flex items-center gap-2 px-1 text-xs text-low">
+        <Landmark className="size-3.5" /> CartHedge never holds your money, Razorpay and UPI settle straight to you.
+        <Store className="ml-3 size-3.5" /> Store pauses automatically if your subscription lapses.
+      </p>
     </>
   );
 }

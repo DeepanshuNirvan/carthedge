@@ -35,7 +35,7 @@ export function Guides() {
   const [open, setOpen] = useState<number | null>(0);
   const faqs = useSite().data?.faqs ?? guides.faqs;
   return (
-    <section id="guides" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <section id="guides" className="relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
       <SectionHead title={guides.title} />
       <Steps />
 

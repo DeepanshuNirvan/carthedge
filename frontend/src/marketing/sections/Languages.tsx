@@ -5,7 +5,7 @@ import { Reveal } from '../Section';
 export function Languages() {
   const row = [...languages.lines, ...languages.lines];
   return (
-    <section aria-labelledby="languages-title" className="relative py-20 sm:py-24">
+    <section aria-labelledby="languages-title" className="relative py-16 sm:py-20 md:pb-0">
       <Reveal className="mx-auto mb-10 w-full max-w-6xl px-5 sm:px-8">
         <h2 id="languages-title" className="max-w-[20ch] text-d3 font-semibold text-hi">
           {languages.title}

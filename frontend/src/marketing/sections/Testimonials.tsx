@@ -29,7 +29,7 @@ export function Testimonials() {
     <section
       id="stories"
       aria-label={testimonials.title}
-      className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24"
+      className="relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20"
       onPointerEnter={() => setPaused(true)}
       onPointerLeave={() => setPaused(false)}
     >

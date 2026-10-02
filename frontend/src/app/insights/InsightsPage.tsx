@@ -26,7 +26,7 @@ function InsightCard({
     info: 'bg-info/12 text-info-ink',
   };
   return (
-    <li className="flex gap-4 px-5 py-5 sm:px-6">
+    <li className="flex gap-4 border-b px-5 py-5 last:border-b-0 sm:px-6 xl:odd:border-r xl:[&:nth-last-child(2):nth-child(odd)]:border-b-0">
       <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>{icon}</span>
       <div className="min-w-0 flex-1">
         <h2 className="text-[15px] font-semibold tracking-snug text-hi">{title}</h2>
@@ -59,9 +59,9 @@ export default function InsightsPage() {
     return (
       <>
         <PageHeader title="AI insights" subtitle="What your numbers are telling you" />
-        <div className="panel max-w-4xl divide-y rounded-xl">
-          {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className="flex gap-4 px-6 py-5">
+        <div className="panel grid overflow-hidden rounded-xl xl:grid-cols-2">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="flex gap-4 border-b px-6 py-5 last:border-b-0 xl:odd:border-r">
               <Skeleton className="size-10 shrink-0 rounded-full" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-3.5 w-1/3 rounded-full" />
@@ -77,11 +77,11 @@ export default function InsightsPage() {
   return (
     <>
       <PageHeader title="AI insights" subtitle="What your numbers are telling you, read from your own orders" />
-      <ol className="panel max-w-4xl divide-y rounded-xl">
+      <ol className="panel grid overflow-hidden rounded-xl xl:grid-cols-2">
         <InsightCard icon={<TrendingUp className="size-5" />} tone="jade" title="Best seller this month" action={{ to: '/app/products', label: 'Manage products' }}>
           {bestSeller ? (
             <>
-              <span className="font-medium text-hi">{bestSeller.name}</span> leads with {bestSeller.units} {bestSeller.units === 1 ? 'unit' : 'units'}
+              <span className="font-medium text-hi">{bestSeller.name}</span> leads with {bestSeller.units} {bestSeller.units === 1 ? 'unit' : 'units'}{' '}
               (<MoneyText paise={bestSeller.revenue} compact />). Keep it in stock and pin it as trending on your
               storefront.
             </>

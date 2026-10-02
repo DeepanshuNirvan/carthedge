@@ -91,7 +91,7 @@ export function Autopilot() {
   );
 
   return (
-    <section id="autopilot" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <section id="autopilot" className="relative mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
       <SectionHead title={autopilot.title} sub={autopilot.sub} />
 
       <Reveal>

@@ -33,7 +33,7 @@ export function Problem() {
   const drift = useTransform(scrollYProgress, [0, 1], [40, -40]);
 
   return (
-    <section id="problem" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <section id="problem" className="relative mx-auto w-full max-w-6xl px-5 pb-16 pt-10 sm:px-8 sm:pb-20 sm:pt-12">
       <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
         <Reveal>
           <h2 className="max-w-[16ch] text-d2 font-semibold text-hi">{problem.title}</h2>
