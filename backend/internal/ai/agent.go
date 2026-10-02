@@ -55,7 +55,8 @@ How a great seller texts:
 - Short: one or two lines, about 25 words in total. Each line may go out as its own message, so every line must read well on its own.
 - Answer exactly what they asked first, then one natural next step, usually a light question.
 - Sell with feeling, not specs: one real detail from the product's "about" that makes them want it. Never a list of features.
-- Sound like this: "Haan ji, M available hai 😊" / "Bahut soft cotton hai, garmi me perfect rahegi" / "Pack kar du aapke liye?" / "Done! Bas naam, number aur address pincode ke saath bhej dijiye" / "Aapko ye bahut pasand aayegi".
+- In a Hinglish chat, sound like: "Haan ji, M available hai 😊" / "Bahut soft cotton hai, garmi me perfect rahegi" / "Pack kar du aapke liye?" / "Done! Bas naam, number aur address pincode ke saath bhej dijiye". In an English chat: "Yes, M is available 😊" / "It's super soft cotton, perfect for summer" / "Shall I pack one for you?".
+- Speak for the shop as "hum" / "we", never "main" / "I".
 - Never sound like a form or a bot. Never write: "10-digit", "6-digit", "(house, street, area, city)", "in one message", "kindly", "please share", "proceed", "assist", "Would you like to", "Is there anything else".
 - Ask for delivery details casually, and only once they want to order.
 - Use their name now and then once you know it, not in every message.
@@ -128,8 +129,10 @@ type TurnInput struct {
 }
 
 type TurnResult struct {
-	Action      Action
-	Reply       string // empty = send nothing
+	Action Action
+	// Messages go out in order, each as its own DM the way people text;
+	// the order summary is always one card. Empty = send nothing.
+	Messages    []string
 	Cart        Cart
 	Quote       Quote
 	Stage       string
@@ -149,7 +152,7 @@ func (s *Service) Turn(ctx context.Context, in TurnInput) (*TurnResult, error) {
 		facts := s.facts(in, cart, quote, problems, missing)
 		reply, err := s.write(ctx, in, replyLanguage(in.Transcript, ""), facts,
 			"The customer went quiet before finishing their order. Send ONE short, friendly follow-up about the item they were looking at, and ask if they would like to go ahead. No pressure and no made-up urgency.", "")
-		return &TurnResult{Action: ActReply, Reply: reply, Cart: cart, Quote: quote, Stage: in.Stage, SummaryHash: in.SummaryHash}, err
+		return &TurnResult{Action: ActReply, Messages: reply, Cart: cart, Quote: quote, Stage: in.Stage, SummaryHash: in.SummaryHash}, err
 	}
 
 	u, err := s.understand(ctx, in)
@@ -180,14 +183,14 @@ func (s *Service) Turn(ctx context.Context, in TurnInput) (*TurnResult, error) {
 			return res, nil // the placed order sends its own confirmation with the link
 		}
 		res.Stage = "awaiting_seller"
-		task = "They just confirmed their order. Thank them warmly in one line and tell them the shop is confirming it now and will send the order link here shortly."
+		task = "They just said yes to their order. Thank them warmly in one line and say the shop will confirm it shortly and send the order details here. Do not say it is already confirmed, and do not mention payment links."
 	case ActReply:
 		if in.Stage == "confirming" && cart.hash() != in.SummaryHash {
 			res.Stage = "open" // the summary they saw no longer matches
 		}
 		task = replyTask(*u, in, cart, problems, missing)
 	}
-	res.Reply, err = s.write(ctx, in, replyLanguage(in.Transcript, u.Language), facts, task, summary)
+	res.Messages, err = s.write(ctx, in, replyLanguage(in.Transcript, u.Language), facts, task, summary)
 	return res, err
 }
 
@@ -405,38 +408,82 @@ func (s *Service) understand(ctx context.Context, in TurnInput) (*Understanding,
 	return nil, errors.New("could not read the conversation")
 }
 
-// write produces the message and refuses ungrounded amounts and links: one
-// retry naming the problem, then a plain holding line rather than a guess.
-func (s *Service) write(ctx context.Context, in TurnInput, language, facts, task, summary string) (string, error) {
+// maxWords is where a DM stops reading like a person typing.
+const maxWords = 55
+
+// write produces the messages and refuses ungrounded amounts and links: one
+// retry naming the problem, then a plain holding line rather than a guess. A
+// reply that is merely too long gets one rewrite, and is used as-is if the
+// rewrite fails — long but true beats a holding line.
+func (s *Service) write(ctx context.Context, in TurnInput, language, facts, task, summary string) ([]string, error) {
 	if language == "" {
 		language = "the language the customer writes in"
 	}
 	system := fmt.Sprintf(dmReplyPrompt, in.Store.Name, language, facts, task)
-	note := ""
+	note, long := "", ""
 	for attempt := 0; attempt < 2; attempt++ {
 		raw, err := s.client.Complete(ctx, system+note, transcript(in.Transcript, 16), false)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		text := tidy(raw)
-		if ok, why := grounded(text, facts); ok && text != "" {
-			return withSummary(text, summary), nil
-		} else if why != "" {
-			s.log.Warn("dm agent: reply not grounded", "why", why)
-			note = "\n\nYour previous draft broke a hard rule: " + why + ". Rewrite it using only the facts."
+		ok, why := grounded(text, facts)
+		switch {
+		case !ok || text == "":
+			if why != "" {
+				s.log.Warn("dm agent: reply not grounded", "why", why)
+				note = "\n\nYour previous draft broke a hard rule: " + why + ". Rewrite it using only the facts."
+			}
+		case len(strings.Fields(strings.ReplaceAll(text, summaryToken, ""))) > maxWords && attempt == 0:
+			long = text
+			note = "\n\nYour previous draft was too long for a DM. Say the same thing in at most two short lines."
+		default:
+			return compose(text, summary), nil
 		}
 	}
-	return withSummary(holdingLine(language), summary), nil
+	if long != "" {
+		return compose(long, summary), nil
+	}
+	return compose(holdingLine(language), summary), nil
 }
 
-func withSummary(text, summary string) string {
+// maxTexts caps how many separate messages one reply becomes; anything beyond
+// joins the last one. ponytail: fixed at 3, a setting if sellers ask for it.
+const maxTexts = 3
+
+// compose turns a reply into the DMs a person would send: one per line, with
+// the order summary as a single card where the writer put the token (or last).
+func compose(text, summary string) []string {
+	var before, after []string
+	target := &before
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, summaryToken) {
+			if rest := strings.TrimSpace(strings.ReplaceAll(line, summaryToken, "")); rest != "" {
+				*target = append(*target, rest)
+			}
+			target = &after
+			continue
+		}
+		if line = strings.TrimSpace(line); line != "" {
+			*target = append(*target, line)
+		}
+	}
+	capTexts := func(lines []string, n int) []string {
+		if n < 1 {
+			n = 1
+		}
+		if len(lines) > n {
+			lines = append(lines[:n-1], strings.Join(lines[n-1:], "\n"))
+		}
+		return lines
+	}
 	if summary == "" {
-		return strings.ReplaceAll(text, summaryToken, "")
+		return capTexts(append(before, after...), maxTexts)
 	}
-	if strings.Contains(text, summaryToken) {
-		return strings.Replace(text, summaryToken, summary, 1)
-	}
-	return text + "\n\n" + summary
+	// around the card: at most two lines before it and one after
+	out := capTexts(before, 2)
+	out = append(out, summary)
+	return append(out, capTexts(after, 1)...)
 }
 
 func holdingLine(language string) string {
@@ -455,6 +502,10 @@ func tidy(s string) string {
 	}
 	s = strings.Trim(s, "\"“”")
 	s = strings.ReplaceAll(s, "**", "")
+	// last line of defence against form language the prompt forbids
+	for _, phrase := range []string{" (house, street, area, city)", "10-digit ", "6-digit "} {
+		s = strings.ReplaceAll(s, phrase, "")
+	}
 	// models space sentences out like an email; a DM is typed in one block
 	for strings.Contains(s, "\n\n") {
 		s = strings.ReplaceAll(s, "\n\n", "\n")

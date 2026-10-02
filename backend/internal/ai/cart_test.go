@@ -182,13 +182,20 @@ func TestInr(t *testing.T) {
 	}
 }
 
-func TestWithSummaryPlacesTheCard(t *testing.T) {
-	got := withSummary("Ye raha aapka order 👇\n"+summaryToken+"\nConfirm kar dein?", "CARD")
-	if got != "Ye raha aapka order 👇\nCARD\nConfirm kar dein?" {
+func TestComposeSendsLinesAsSeparateMessages(t *testing.T) {
+	got := compose("Ye raha aapka order 👇\n"+summaryToken+"\nConfirm kar dein?", "CARD")
+	if strings.Join(got, "|") != "Ye raha aapka order 👇|CARD|Confirm kar dein?" {
 		t.Errorf("got %q", got)
 	}
-	if got := withSummary("Confirm karein?", "CARD"); got != "Confirm karein?\n\nCARD" {
-		t.Errorf("missing token must still show the card: %q", got)
+	if got := compose("Confirm karein?", "CARD"); strings.Join(got, "|") != "Confirm karein?|CARD" {
+		t.Errorf("missing token must still show the card last: %q", got)
+	}
+	got = compose("Haan ji, M available hai\nBahut soft cotton hai\nPack kar du?\nCOD bhi hai", "")
+	if len(got) != maxTexts || got[2] != "Pack kar du?\nCOD bhi hai" {
+		t.Errorf("lines beyond the cap must join the last message: %q", got)
+	}
+	if got := compose("Done!", ""); len(got) != 1 || got[0] != "Done!" {
+		t.Errorf("got %q", got)
 	}
 }
 

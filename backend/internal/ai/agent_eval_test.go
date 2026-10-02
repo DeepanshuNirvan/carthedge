@@ -28,12 +28,13 @@ import (
 type burst []string
 
 type scenario struct {
-	name      string
-	autoOrder bool
-	returning *Cart
-	orders    []OrderFact
-	bursts    []burst
-	check     func(t *testing.T, log []step)
+	name         string
+	vagueCatalog bool // product descriptions without colours, like a real seller's
+	autoOrder    bool
+	returning    *Cart
+	orders       []OrderFact
+	bursts       []burst
+	check        func(t *testing.T, log []step)
 }
 
 type step struct {
@@ -154,11 +155,28 @@ func TestAgentEval(t *testing.T) {
 		}},
 		{name: "returning buyer reuses address", returning: returning, orders: prevOrder, bursts: []burst{{"jhumka chahiye"}, {"haan same address", "cod"}}},
 		{name: "wants to pay online", bursts: []burst{{"kurti M chahiye, online pay karungi"}, {"Anjali 9812345678, 12 MG Road Bengaluru 560001"}}},
+		// replays a real chat: the catalog never says "pink", the buyer mixes
+		// English and Hinglish, confirms with "kardo", then bargains
+		{name: "real chat: vague pink kurti then bargaining", vagueCatalog: true, bursts: []burst{
+			{"Hi want a pink kurti", "Want COD"}, {"Size- M"}, {"Pink kurti confirm kardo"}, {"price kam nahi ho sakta?"},
+		}, check: func(t *testing.T, l []step) {
+			for _, s := range l {
+				if strings.Contains(s.reply, "10-digit") || strings.Contains(s.reply, "6-digit") || strings.Contains(s.reply, "house, street") {
+					t.Errorf("form language leaked: %q", s.reply)
+				}
+			}
+			if l[len(l)-1].action != ActHandoff {
+				t.Errorf("bargaining should go to the owner, got %s", l[len(l)-1].action)
+			}
+		}},
 	}
 
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
 			st := evalStore()
+			if sc.vagueCatalog {
+				st.Products[0].Description = "Hand-embroidered lucknowi chikankari on soft cotton."
+			}
 			var transcriptLines []ChatLine
 			var cart Cart
 			stage, hash := "open", ""
@@ -180,13 +198,13 @@ func TestAgentEval(t *testing.T) {
 				if err != nil {
 					t.Fatalf("turn failed: %v", err)
 				}
-				steps = append(steps, step{buyer: strings.Join(b, " / "), action: res.Action, reply: res.Reply, stage: res.Stage, cart: res.Cart})
+				steps = append(steps, step{buyer: strings.Join(b, " / "), action: res.Action, reply: strings.Join(res.Messages, "\n"), stage: res.Stage, cart: res.Cart})
 				fmt.Fprintf(&out, "  [%s → stage %s, intent %s%s]\n", res.Action, res.Stage, res.Intent, ifs(res.Handoff != "", ", handoff: "+res.Handoff))
-				if res.Reply != "" {
-					fmt.Fprintf(&out, "SHOP: %s\n", strings.ReplaceAll(res.Reply, "\n", "\n      "))
-					transcriptLines = append(transcriptLines, ChatLine{Who: "shop", Text: res.Reply})
-					if strings.Contains(strings.ToLower(res.Reply), "paise") {
-						t.Errorf("reply mentions paise: %q", res.Reply)
+				for _, m := range res.Messages {
+					fmt.Fprintf(&out, "SHOP: %s\n", strings.ReplaceAll(m, "\n", "\n      "))
+					transcriptLines = append(transcriptLines, ChatLine{Who: "shop", Text: m})
+					if strings.Contains(strings.ToLower(m), "paise") {
+						t.Errorf("reply mentions paise: %q", m)
 					}
 				}
 				if res.Action == ActPlace && sc.autoOrder {

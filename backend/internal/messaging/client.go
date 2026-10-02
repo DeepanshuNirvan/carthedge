@@ -161,6 +161,24 @@ func (c *Client) sendOne(ctx context.Context, channel, externalID, token, to, te
 	return out.MessageID, nil
 }
 
+// SenderAction shows typing_on / typing_off / mark_seen to the buyer.
+// Instagram only; WhatsApp ties its indicators to a specific message id.
+func (c *Client) SenderAction(ctx context.Context, channel, token, to, action string) error {
+	if channel != "instagram" || token == "" {
+		return nil
+	}
+	body, _ := json.Marshal(map[string]any{"recipient": map[string]string{"id": to}, "sender_action": action})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("https://graph.instagram.com/%s/me/messages", c.version), bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	var ignored map[string]any
+	return c.do(req, &ignored)
+}
+
 // chunks splits a long message at paragraph, then line, then rune boundaries.
 func chunks(text string, limit int) []string {
 	var out []string

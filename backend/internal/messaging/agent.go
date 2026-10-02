@@ -19,8 +19,9 @@ const (
 	// chatWindow is Meta's 24-hour messaging window, minus a safety margin.
 	chatWindow = 23*time.Hour + 45*time.Minute
 	// maxAIPerHour stops a runaway exchange (a buyer's own bot, a loop) and
-	// hands the chat to the seller instead.
-	maxAIPerHour = 15
+	// hands the chat to the seller instead. Counted in messages: a reply is
+	// usually two or three short ones, so this is roughly 15–20 replies.
+	maxAIPerHour = 40
 	nudgeSweep   = 5 * time.Minute
 	// a buyer who went quiet mid-order gets one follow-up in this window
 	nudgeAfter  = 4 * time.Hour
@@ -39,9 +40,13 @@ func (s *Service) handle(ctx context.Context, c dueConv) {
 		return
 	}
 	var autoReply, autoOrder, paused bool
-	if err := s.pool.QueryRow(ctx, `select b.ai_auto_reply, b.ai_auto_order, coalesce(c.ai_paused_until > now(), false)
-		from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).Scan(&autoReply, &autoOrder, &paused); err != nil {
+	var stage string
+	if err := s.pool.QueryRow(ctx, `select b.ai_auto_reply, b.ai_auto_order, coalesce(c.ai_paused_until > now(), false), c.stage
+		from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).Scan(&autoReply, &autoOrder, &paused, &stage); err != nil {
 		return
+	}
+	if paused && stage == "handoff" {
+		return // the owner is handling this chat personally; a draft card from it is noise
 	}
 	if !autoReply || paused || !s.can(ctx, c.biz, "aiReply") {
 		s.draftOnly(ctx, c)
@@ -60,6 +65,11 @@ func (s *Service) converse(ctx context.Context, c dueConv, autoOrder, nudge bool
 		return
 	}
 	in.AutoOrder, in.Nudge = autoOrder, nudge
+	if !nudge {
+		// what a person does on opening the chat: seen, then typing
+		s.senderAction(ctx, c.id, "mark_seen")
+		s.senderAction(ctx, c.id, "typing_on")
+	}
 
 	var recent int
 	s.pool.QueryRow(ctx, `select count(*) from conversation_messages
@@ -93,7 +103,7 @@ func (s *Service) converse(ctx context.Context, c dueConv, autoOrder, nudge bool
 			s.log.Warn("auto order failed, leaving a draft", "conversationId", c.id, "err", err)
 			_, draftID, err = s.ai.PlaceFromChat(ctx, in.Store, c.id, c.channel, res.Cart, res.Quote, false)
 			res.Stage = "awaiting_seller"
-			res.Reply = "Thank you! 🙏 Hum aapka order confirm karke yahin order link bhejte hain."
+			res.Messages = []string{"Thank you! 🙏 Hum aapka order confirm karke yahin order link bhejte hain."}
 		}
 		if err != nil {
 			s.log.Error("could not save the confirmed chat order", "conversationId", c.id, "err", err)
@@ -127,11 +137,66 @@ func (s *Service) converse(ctx context.Context, c dueConv, autoOrder, nudge bool
 	if nudge {
 		s.pool.Exec(ctx, `update conversations set nudged_at=now() where id=$1`, c.id)
 	}
-	if res.Reply != "" {
-		if err := s.send(ctx, c.id, "ai", res.Reply); err != nil {
-			s.log.Warn("dm reply not sent", "conversationId", c.id, "err", err)
+	if len(res.Messages) == 0 {
+		s.senderAction(ctx, c.id, "typing_off")
+	}
+	s.deliver(ctx, c.id, res.Messages)
+}
+
+// deliver sends a reply as the separate short messages a person types, with
+// a "typing…" pause between them that scales with the length of the next one.
+func (s *Service) deliver(ctx context.Context, convID string, msgs []string) {
+	for i, m := range msgs {
+		if i > 0 {
+			s.senderAction(ctx, convID, "typing_on")
+			pause := 700*time.Millisecond + time.Duration(len([]rune(m)))*25*time.Millisecond
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(min(pause, 3*time.Second)):
+			}
+		}
+		if err := s.send(ctx, convID, "ai", m); err != nil {
+			s.log.Warn("dm reply not sent", "conversationId", convID, "err", err)
+			return
 		}
 	}
+}
+
+// senderAction shows the buyer "seen" / "typing…" while a reply is written.
+// Best effort: a failure here changes nothing about the reply itself.
+func (s *Service) senderAction(ctx context.Context, convID, action string) {
+	ch, err := s.channelOf(ctx, convID)
+	if err != nil {
+		return
+	}
+	if err := s.client.SenderAction(ctx, ch.channel, ch.token, ch.contactID, action); err != nil {
+		s.log.Debug("sender action not shown", "action", action, "err", err)
+	}
+}
+
+// chatChannel is how to reach the buyer of one conversation.
+type chatChannel struct {
+	bizID, channel, contactID, externalID, token string
+}
+
+func (s *Service) channelOf(ctx context.Context, convID string) (chatChannel, error) {
+	var ch chatChannel
+	if err := s.pool.QueryRow(ctx, `select business_id, channel, contact_id from conversations where id=$1`, convID).
+		Scan(&ch.bizID, &ch.channel, &ch.contactID); err != nil {
+		return ch, err
+	}
+	var tokenEnc string
+	if err := s.pool.QueryRow(ctx, `select external_id, access_token from channel_connections
+		where business_id=$1 and channel=$2 and status='connected'`, ch.bizID, ch.channel).Scan(&ch.externalID, &tokenEnc); err != nil {
+		return ch, errNotConnected
+	}
+	token, err := s.cipher.Decrypt(tokenEnc)
+	if err != nil {
+		return ch, errNotConnected
+	}
+	ch.token = token
+	return ch, nil
 }
 
 // handOff pauses the assistant and tells the seller, without a model call.
@@ -210,26 +275,17 @@ func (s *Service) turnInput(ctx context.Context, c dueConv) (ai.TurnInput, error
 // Instagram's echo of it — which can arrive before Send returns — is
 // recognised as ours and not mistaken for the seller typing in the app.
 func (s *Service) send(ctx context.Context, convID, author, text string) error {
-	var bizID, channel, contactID string
-	if err := s.pool.QueryRow(ctx, `select business_id, channel, contact_id from conversations where id=$1`, convID).
-		Scan(&bizID, &channel, &contactID); err != nil {
+	ch, err := s.channelOf(ctx, convID)
+	if err != nil {
 		return err
 	}
-	var externalID, tokenEnc string
-	if err := s.pool.QueryRow(ctx, `select external_id, access_token from channel_connections
-		where business_id=$1 and channel=$2 and status='connected'`, bizID, channel).Scan(&externalID, &tokenEnc); err != nil {
-		return errNotConnected
-	}
-	token, err := s.cipher.Decrypt(tokenEnc)
-	if err != nil {
-		return errNotConnected
-	}
+	bizID, channel := ch.bizID, ch.channel
 	var msgID string
 	if err := s.pool.QueryRow(ctx, `insert into conversation_messages (conversation_id, direction, body, author)
 		values ($1,'out',$2,$3) returning id`, convID, text, author).Scan(&msgID); err != nil {
 		return err
 	}
-	metaID, err := s.client.Send(ctx, channel, externalID, token, contactID, text)
+	metaID, err := s.client.Send(ctx, channel, ch.externalID, ch.token, ch.contactID, text)
 	if err != nil {
 		// the raw error carries graph URLs and transport detail — logged, not shown
 		s.log.Error("channel send failed", "channel", channel, "businessId", bizID, "err", err)

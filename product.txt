@@ -1,25 +1,28 @@
 CartHedge — Complete Product Definition
 1. One-line
-CartHedge is an AI-powered order desk + instant storefront for Instagram/WhatsApp-first sellers in India — AI reads the DM and drafts the order, the seller shares one branded link, the buyer orders without signing up, and an automated COD-confirmation flow cuts RTO losses that are measured back to the seller in rupees saved per month.
+CartHedge is an AI sales assistant + order desk + instant storefront for Instagram/WhatsApp-first sellers in India — it replies to every buyer DM within seconds in the buyer's own language, answers from the seller's real catalog, collects the order and confirms it inside the chat, and keeps the buyer updated on the same chat; the seller shares one branded link for everything else, the buyer orders without signing up, and an automated COD-confirmation flow cuts RTO losses that are measured back to the seller in rupees saved per month.
 
 2. The problem
 Instagram/WhatsApp-first sellers (fashion, jewellery, home decor, boutiques) run real businesses inside chat threads:
 
 Orders live in DMs. Item, size, address and payment preference are scattered across a conversation in Hinglish. The seller retypes it into a notes app or a screenshot.
+Every DM wants an answer — now. "Price?", "M size hai?", "COD milega?", "kitne din me aayega?" — the same questions hundreds of times a week, often late at night. A buyer left on seen for an hour has usually bought somewhere else. The seller either lives in the inbox or loses sales, and cannot afford staff to reply all day.
 20–30% of COD orders are refused on delivery (RTO). The seller eats forward + reverse shipping, packaging and blocked inventory. A seller doing 150 COD orders/month at ₹800 AOV with 35% RTO loses roughly ₹8,000–15,000/month.
 Payments are chased manually. Bare UPI QR codes have no order context, no proof, no trust.
 "Bhaiya order kahan hai?" — status questions flood the DM inbox because the buyer has nowhere to track.
 No numbers. No revenue trend, no repeat rate, no best-seller list, no customer history, no invoices.
 Existing tools assume the buyer will leave Instagram. Storefront builders (Dukaan, DotPe) hand the seller a website. Buyers don't go there — the DM is the shop. Anything that breaks the conversation loses the sale.
 3. The insight
-Don't move the seller off chat. Instrument the chat.
+Don't move the seller off chat. Instrument the chat — then automate it.
 
 The order still starts in a DM. CartHedge sits behind it: AI turns the conversation into a structured order, one link carries the buyer from interest → details → payment → tracking without a signup, and everything lands on a single board with real analytics behind it. The storefront is a bonus surface, not the product.
+
+Most DMs are the same few questions and the same order details. An assistant that knows the catalog as well as the seller, talks like the seller, closes the order inside the conversation and knows when to hand over turns the inbox from a full-time job into a queue of ready orders.
 
 4. What the system actually is
 Three products fused into one platform, sold together and configurable per plan:
 
-AI order capture — parse the DM thread into a confirmed order.
+AI sales assistant + order capture — answers buyers in their DMs automatically, collects the order in the chat, confirms it and places it (or hands the seller a ready draft). A chat pasted from anywhere still becomes an order card in one tap.
 Zero-friction buyer link + storefront — one branded URL that handles browse, details, OTP, payment, COD confirmation and tracking. No buyer app, no buyer account.
 Seller business console — orders, catalog, inventory, customers, offers, broadcasts, invoices, analytics, billing.
 Plus a platform admin console for CartHedge staff to run it as a SaaS business.
@@ -35,7 +38,7 @@ Visitor	Prospect on the marketing site	None
 Public site that sells CartHedge: problem, core loop, feature tour, interactive RTO savings calculator, pricing, guides/FAQ, testimonials, contact. Drives free-trial signups. SEO-heavy.
 
 6.2 Seller app (post-login workspace)
-The daily driver. Dashboard, order board, products, links, customers, AI desk, insights, broadcasts, invoices, analytics, settings, billing.
+The daily driver. Dashboard, order board, products, links, customers, AI desk (the live DM inbox the assistant works from), insights, broadcasts, invoices, analytics, settings, billing.
 
 6.3 Buyer storefront + link checkout
 Mobile-first pages that open cleanly inside the Instagram/WhatsApp in-app browser. Two entry points:
@@ -47,14 +50,15 @@ Both end in the same checkout. No login ever.
 6.4 Admin console
 CartHedge's own control room: MRR/GMV, business management, plan CRUD, custom-pricing deals, subscription payments, editable website content.
 
-7. Core loop (the product in six steps)
-Buyer DMs the seller — "pink wali kurti M size, COD, 45 Civil Lines Delhi 110054, Priya 98…"
-AI parses the thread → drafts an order card: item matched to the seller's catalog, variant, quantity, customer name, phone, address, payment preference, plus a confidence score.
-Seller reviews and confirms in one tap (or edits any field first). Order created.
+7. Core loop (the product in seven steps)
+Buyer DMs the seller — "pink wali kurti hai? price?" — in Hinglish, Hindi or English, at any hour.
+The AI assistant answers within seconds, as the shop: price, sizes, stock, delivery time, COD — straight from the seller's catalog and notes. It sells like a good salesperson (one real product highlight, an in-stock alternative when something is out) and asks only for what is missing: size, then name, number and address, then payment. It never invents a price, discount or date; anything it cannot answer goes to the seller.
+Order summary in the chat: exact items, delivery charge and total — calculated by CartHedge, not by the AI. The buyer replies "haan" to confirm; any change gets a fresh summary.
+Order placed — instantly (auto-confirm on) or as a ready draft the seller approves in one tap (the default). The buyer gets the order code and a tracking/payment link in the same chat.
 Payment path splits:
 Prepaid → payment link in chat → buyer pays via UPI intent / card → order auto-confirmed.
-COD → automated confirmation flow: order summary → address confirm → intent re-confirm before dispatch → optional ₹50–100 UPI token. This is the RTO killer.
-Order moves on one kanban board — new → confirmed → packed → shipped → delivered (or rto / cancelled), with courier handoff and automatic buyer status updates.
+COD → the buyer's "yes" to the exact summary in chat is the confirmation, with an optional ₹50–100 UPI token; link and storefront orders run the automated confirmation flow (order summary → address confirm → intent re-confirm before dispatch). This is the RTO killer.
+Order moves on one kanban board — new → confirmed → packed → shipped → delivered (or rto / cancelled), with courier handoff and automatic buyer status updates on the same chat the order came from ("order kahan hai?" is answered by the assistant too).
 RTO savings meter shows "you saved ₹X this month" — the retention anchor, stated in rupees.
 Alternative entry: the seller skips the AI and just shares a link (product / cart / custom), or the buyer finds the item on the storefront and orders directly. All three paths converge on the same order board.
 
@@ -101,22 +105,37 @@ Segment: retail vs reseller (drives which price the buyer sees).
 Orders count, lifetime value, COD refusals count, risk flag, last order date.
 Detail view with full order history, editable segment and notes.
 Address autofill on repeat purchase, keyed to the phone number.
-8.7 Seller — messaging
+8.7 Seller — AI sales assistant (automated DMs)
+One-tap connect: the seller logs in with Instagram (official Instagram API — no password sharing, disconnect anytime). WhatsApp connect runs on the same pipeline next.
+Replies to every DM within seconds, 24×7, as the shop — short, warm, salesperson tone, in the buyer's own language and script (Hinglish, Hindi, English, regional scripts).
+Grounded answers only: prices, sizes, stock and product details from the catalog; delivery charge and COD/online options; the seller's own notes (delivery time, exchange policy, sizing). It never invents prices, discounts, stock or dates — anything unknown, it checks with the seller.
+Sells, not just answers: one genuine product highlight, an available alternative when an item or size is out of stock, the closest matches when the buyer is vague ("pink wali kurti"), and a soft close.
+Collects the order the way a person would: item → size → name, number and address together → payment. Returning buyers are offered their last address.
+Exact order summary card in the chat (computed by CartHedge, not the model); only a "yes" to that exact summary counts.
+Auto-confirm setting: off by default — the buyer's yes becomes a ready draft the seller approves in one tap; on — the order is placed instantly. Auto-reply can be switched off anytime (chats then only become drafts).
+After the order: order code + tracking/payment link in the same chat; answers "order kahan hai?" with live status, courier and tracking id; a repeat order starts fresh without re-adding old items.
+Knows when to step back: complaints, refunds/returns, cancelling a placed order, bargaining, bulk deals or a buyer asking for a person → hands the chat to the seller with a WhatsApp/email alert and stays out until the seller resumes it.
+The seller stays in control: replying themselves — from CartHedge or straight from the Instagram app — pauses the assistant on that chat; pause/resume per chat.
+One gentle follow-up if a buyer goes quiet mid-order; ignores "ok", emojis and spam; caps automatic replies per chat to stop loops.
+Honest by design: never claims to be human — asked "bot ho?", it says it is the shop's assistant and the owner also sees the chat.
+Live inbox on the AI desk: every chat with its state — needs you, confirm order, awaiting buyer, AI paused, order placed — and who wrote each message (buyer / AI / seller).
+Works inside Meta's rules: replies only within the 24-hour window after the buyer's message; human handover; data-deletion and deauthorize callbacks.
+8.8 Seller — messaging
 Broadcast drops: new-collection blasts to past buyers, segmented (all / retail / reseller / repeat). Schedule or send now, with sent counts.
-Auto status updates pushed to the buyer on shipped / out-for-delivery / delivered — kills the "order kahan hai" spam.
+Auto status updates pushed to the buyer on confirmed / shipped / delivered — on the same Instagram/WhatsApp chat the order came from (inside Meta's 24-hour window, WhatsApp after it) — kills the "order kahan hai" spam.
 COD confirmation sequence — the automated flow that re-confirms intent before dispatch.
-AI reply assistant — drafts answers to pre-sales questions (price, fabric, delivery time), which are ~80% of DM volume.
-8.8 Seller — money
+AI reply assistant — drafts answers to pre-sales questions (price, fabric, delivery time), which are ~80% of DM volume. In connected chats the sales assistant (8.7) answers them automatically; for any other chat, paste the question and get a ready reply.
+8.9 Seller — money
 GST-lite invoices: numbered, generated from orders, printable/downloadable.
 Payment settings: the seller connects their own Razorpay account — buyer money settles directly to the seller, never through CartHedge. Keys stored encrypted. Plus UPI ID, COD on/off, COD token amount, shipping fee.
 Subscription & billing: current plan, trial countdown, renew, cancel, request a custom plan.
-8.9 Buyer — storefront (no login)
+8.10 Buyer — storefront (no login)
 Business header: logo, name, city, socials.
 Trust strip: "Payments secured by Razorpay · Seller verified".
 Category chips, trending row, live offers, product grid.
 Real filtering: category, price range, in-stock, search, sort.
 Product detail: image gallery, variant picker, price + compare-at, stock state, waitlist if out of stock.
-8.10 Buyer — checkout (no login)
+8.11 Buyer — checkout (no login)
 Cart → address form with pincode validation + serviceability check (bad addresses are a top RTO cause) → autofill on repeat via phone.
 Phone OTP verification — the only identity step. No account, no password.
 Payment choice:
@@ -124,11 +143,11 @@ UPI intent (opens GPay/PhonePe directly),
 card,
 COD → triggers the confirmation flow, with an optional ₹50–100 token payment.
 Order confirmation with an order code.
-8.11 Buyer — after the order
+8.12 Buyer — after the order
 Order tracking at the same link: enter phone → live status timeline (confirmed → shipped → out for delivery → delivered), courier info, support contact.
 COD confirmation page: clean summary → confirm intent → optional token payment.
-WhatsApp status updates.
-8.12 Platform admin
+Order confirmation, payment link and status updates on the same Instagram/WhatsApp chat they ordered from — the buyer never has to ask.
+8.13 Platform admin
 Overview: total businesses, trials, paying, MRR, GMV, revenue this month/total, orders last 30 days, open plan requests, growth chart, recent signups.
 Businesses: searchable table (name, code, owner, plan, subscription status, ends-at, order count, status). Detail view with profile, subscription and usage. Actions: suspend / activate (instantly pauses their storefront and API), assign plan with a negotiated custom price and extended days.
 Plans: full CRUD — code, name, monthly price, order quota, per-order fee, feature list, custom flag, active flag — with live active-subscription counts.
@@ -136,17 +155,18 @@ Plan requests: pipeline of custom-plan enquiries (open → contacted → closed)
 Payments: subscription revenue ledger.
 Site content: editable contact, socials, tagline, announcement — read live by the marketing website.
 Account: change admin password.
-8.13 Platform-wide
+8.14 Platform-wide
 Per-business data isolation — one seller can never see another's data.
 Subscription gating: expired/suspended → seller APIs and the public storefront both stop, with a clear renew path (billing stays reachable so they can pay).
 Rate limiting on login, OTP, order creation, payments.
 Buyer identity is a short-lived token from OTP, consumed once at order creation.
 All money handled in paise (integers) — no floating-point rupee bugs.
+Channel tokens encrypted at rest and renewed automatically; every Meta webhook is signature-verified.
 9. Plans & pricing
 Plan	Price/month	Order quota	Per-order fee above quota	Includes
 Starter	₹499	100	₹3	Order links, order board, COD confirmation flow, customer ledger, WhatsApp status updates
-Growth	₹999	500	₹2.50	Everything in Starter + AI order capture from DMs, broadcast drops, offers & reseller pricing, invoices & reports
-Pro	₹1,999	2,000	₹2	Everything in Growth + courier handoff, back-in-stock waitlists, AI reply assistant, priority support
+Growth	₹999	500	₹2.50	Everything in Starter + AI order capture from DMs (connected chats become ready order drafts), broadcast drops, offers & reseller pricing, invoices & reports
+Pro	₹1,999	2,000	₹2	Everything in Growth + AI sales assistant (automatic DM replies, in-chat order summary & confirmation, optional auto-confirm), courier handoff, back-in-stock waitlists, priority support
 Custom	Negotiated	Negotiated	Negotiated	Requested in-app, priced by CartHedge staff, assigned from the admin console
 15-day free trial, no card required.
 Subscription billed via Razorpay on CartHedge's own account.
@@ -158,10 +178,11 @@ Per-order fee	₹2–5 per order above plan quota — cost scales with seller su
 Payment take-rate (later)	Small convenience margin on prepaid GMV via a licensed aggregator
 Courier margin (later)	Negotiated aggregator rates, keep the spread — ₹3–8/shipment
 RTO-protection premium (later)	Risk-scored COD guarantee, priced as a % of protected order value, once network data is deep enough
-ROI story: a seller doing 150 COD orders/month at ₹800 AOV with 35% RTO loses ~₹8–15k/month. Cutting RTO to ~20% saves more than the ₹999 plan every single month. The product sells itself in rupees, not features.
+ROI story: a seller doing 150 COD orders/month at ₹800 AOV with 35% RTO loses ~₹8–15k/month. Cutting RTO to ~20% saves more than the ₹999 plan every single month. On top of that, the assistant answers every DM in seconds, day or night — the sales lost to slow replies and the hours spent typing the same answers come back to the seller. The product sells itself in rupees, not features.
 
 11. Use cases
-Boutique owner, Jaipur — posts a kurti story, gets 40 DMs. AI drafts each order from the thread; she confirms in a tap and sends a link. No retyping, no screenshots.
+Boutique owner, Jaipur — posts a kurti story at night and gets 40 DMs. The assistant answers every one in Hinglish within seconds — price, sizes, delivery — collects the orders and shows each buyer their summary; she wakes up to ready drafts to approve in a tap (each buyer then gets their order link) and two chats marked "needs you". No retyping, no screenshots, no buyer left on seen.
+Repeat buyer — messages "ek aur chahiye" a month later; the assistant offers last time's address, shows the summary, and the order is done in a few messages.
 Jewellery seller with heavy COD — every COD order runs the confirmation flow before dispatch. Refusals drop; the savings meter shows ₹11,000 saved this month; she renews without being asked.
 Reseller hub — tags buyers as resellers; they see reseller pricing on the same storefront. One catalog, two price lists.
 Made-to-order seller — no catalog needed. Types item + price into a custom link and sends it in the chat in ten seconds.
@@ -170,6 +191,7 @@ Festive drop — schedules a broadcast to past buyers, and back-in-stock waitlis
 Buyer — clicks a link inside Instagram, picks a size, enters an address, verifies OTP, pays by UPI, and tracks the parcel at the same link. Never installs anything or creates an account.
 CartHedge sales — a seller with 5,000 orders/month requests a custom plan; staff price it in the admin console and assign it with extended days.
 12. What makes it different
+It sells in the DM, automatically. Not a chatbot menu — a catalog-grounded assistant that talks like the seller, answers in the buyer's language, closes the order inside the chat and knows when to hand over.
 The DM stays the shop. Competitors move the buyer to a website; CartHedge instruments the conversation and treats the storefront as an option.
 Sold in rupees saved, not features shipped. The RTO savings meter is the retention mechanic.
 Zero buyer friction. No signup, no app, no password — phone OTP only. Conversion beats a bare UPI QR because the buyer feels protected.
@@ -181,6 +203,8 @@ Couriers are rails, not competitors. Aggregators are integrated as a handoff ste
 Live-selling toolkit — comment-to-order during Instagram Lives (CommentSold built $4.4B lifetime GMV on exactly this; India's live-commerce wave is early).
 Network-level COD risk score — cross-seller buyer reputation.
 RTO protection / COD guarantee — priced insurance on protected order value.
-Deeper Meta integration — official Instagram/WhatsApp messaging APIs with seller-authorised OAuth (policy-compliant, no password sharing) for fully automatic thread ingestion.
+WhatsApp connect — Meta Embedded Signup with coexistence, so sellers keep the WhatsApp Business app on their phone (Instagram connect via the official API is live).
+Screenshot & story understanding — match "ye wala" photos and story replies to catalog products.
+Comment-to-DM — reply to "price?" comments on posts and Reels with a DM that starts the sale.
 Mini-catalog auto-built from tagged story/post products.
 Accounting exports — deeper GST and Tally-style reporting.

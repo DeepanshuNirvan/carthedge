@@ -22,7 +22,7 @@ import (
 // lull is how long a conversation must be quiet before its new messages are
 // handled together — buyers type in bursts, and one answer to the whole burst
 // reads like a person and costs one turn instead of five.
-const lull = 10 * time.Second
+const lull = 6 * time.Second
 
 // tokenSweep is how often connections are checked for an approaching expiry,
 // and tokenRenewLead how far ahead of it a token is renewed. The lead is wide
@@ -60,7 +60,9 @@ func NewService(pool *pgxpool.Pool, client *Client, aiSvc *ai.Service, bus *even
 // AI parse and become a draft.
 func (s *Service) Start(ctx context.Context) {
 	go func() {
-		t := time.NewTicker(5 * time.Second)
+		// a short tick keeps the reply ~7–10s after the buyer's last message:
+		// quick, but not the instant answer that gives a bot away
+		t := time.NewTicker(2 * time.Second)
 		defer t.Stop()
 		for {
 			select {
