@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { AlertTriangle, KanbanSquare, LayoutList, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, KanbanSquare, LayoutList, Search } from 'lucide-react';
 import type { Order, OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
+import { useQueryClient } from '@tanstack/react-query';
 import { useOrderBoard, useOrderMutations, useOrders } from '@/api/orders';
 import { PageHeader } from '../shell/PageHeader';
 import { OrderDrawer } from './OrderDrawer';
@@ -16,7 +17,8 @@ import { Tabs } from '@/ui/Tabs';
 import { Skeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 import { Modal } from '@/ui/Modal';
-import { Button } from '@/ui/Button';
+import { Button, IconButton } from '@/ui/Button';
+import { BulbString } from '@/ui/BulbString';
 
 const columnTitles: Record<OrderStatus, string> = {
   new: 'New',
@@ -51,11 +53,12 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+            'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold',
             order.paymentMethod === 'cod' ? 'bg-gold-400/14 text-gold-ink' : 'bg-jade-500/12 text-jade-ink',
           )}
         >
-          {order.paymentMethod === 'cod' ? (order.codConfirmedAt ? 'COD ✓' : 'COD') : 'Prepaid'}
+          {order.paymentMethod === 'cod' ? 'COD' : 'Prepaid'}
+          {order.paymentMethod === 'cod' && order.codConfirmedAt && <Check className="size-3" strokeWidth={3} aria-label="confirmed" />}
         </span>
         {order.riskFlagged && (
           <span className="inline-flex items-center gap-0.5 rounded-full bg-danger/12 px-2 py-0.5 text-[10px] font-semibold text-danger-ink">
@@ -68,6 +71,44 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
         <span className="ml-auto text-[10px] text-low">{timeAgo(order.createdAt)}</span>
       </div>
     </button>
+  );
+}
+
+/** Unlit bulbs: an empty lane is waiting, not broken. */
+function EmptyLane() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2.5 py-8" aria-label="No orders here">
+      <BulbString count={5} />
+      <span className="text-xs text-dim">Nothing here</span>
+    </div>
+  );
+}
+
+/**
+ * The board endpoint carries the last 60 days, while its counts are all-time.
+ * When a lane has a count but no cards, load its most recent orders from the
+ * list endpoint so the seller still sees real cards instead of an empty lane.
+ */
+function LaneFallback({
+  status,
+  filter,
+  onOpen,
+}: {
+  status: OrderStatus;
+  filter: (o: Order) => boolean;
+  onOpen: (id: string) => void;
+}) {
+  const { data, isLoading } = useOrders({ status, limit: 12 });
+  if (isLoading) return <Skeleton className="h-24 rounded-md" />;
+  const orders = (data ?? []).filter(filter);
+  if (orders.length === 0) return <EmptyLane />;
+  return (
+    <>
+      {orders.map((o) => (
+        <OrderCard key={o.id} order={o} onOpen={() => onOpen(o.id)} />
+      ))}
+      <p className="px-1 pt-1 text-center text-[11px] text-dim">Older than 60 days</p>
+    </>
   );
 }
 
@@ -85,6 +126,30 @@ export default function OrdersPage() {
     view === 'table' ? { search, payment, status: statusFilter, limit: 100 } : { limit: 0 },
   );
   const { setStatus } = useOrderMutations();
+  const qc = useQueryClient();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measureEdges = () => {
+    const el = boardRef.current;
+    if (!el) return;
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  };
+  useEffect(measureEdges, [board, view]);
+  useEffect(() => {
+    window.addEventListener('resize', measureEdges);
+    return () => window.removeEventListener('resize', measureEdges);
+  }, []);
+  const scrollBoard = (dir: 1 | -1) => boardRef.current?.scrollBy({ left: dir * 280, behavior: 'smooth' });
+
+  // a card may come from the board or from a lane's fallback list; find it in either
+  const findOrder = (id: string): Order | undefined =>
+    Object.values(board?.columns ?? {})
+      .flat()
+      .find((o) => o.id === id) ??
+    qc
+      .getQueriesData<unknown>({ queryKey: ['orders'] })
+      .flatMap(([, d]) => (d && typeof d === 'object' && 'orders' in d ? (d as { orders: Order[] }).orders : []))
+      .find((o) => o.id === id);
 
   const filterCard = (o: Order) => {
     if (payment && o.paymentMethod !== payment) return false;
@@ -121,7 +186,7 @@ export default function OrdersPage() {
     setDropTarget(null);
     const id = e.dataTransfer.getData('text/order-id');
     if (!id) return;
-    const order = Object.values(board?.columns ?? {}).flat().find((o) => o.id === id);
+    const order = findOrder(id);
     if (!order || order.status === status) return;
     if (riskyTargets.has(status)) {
       setPendingMove({ id, status, name: order.customerName });
@@ -138,16 +203,16 @@ export default function OrdersPage() {
         actions={
           <>
             <div className="relative basis-full sm:basis-auto">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" />
               <Input
                 placeholder="Search buyer, code, phone…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-11 pl-9 sm:h-10 sm:w-52"
+                className="h-11 rounded-full pl-10 sm:h-10 sm:w-52"
                 aria-label="Search orders"
               />
             </div>
-            <Select value={payment} onChange={(e) => setPayment(e.target.value)} className="h-11 sm:h-10 sm:w-32" aria-label="Payment filter">
+            <Select value={payment} onChange={(e) => setPayment(e.target.value)} className="h-11 rounded-full sm:h-10 sm:w-40" aria-label="Payment filter">
               <option value="">All payments</option>
               <option value="cod">COD</option>
               <option value="prepaid">Prepaid</option>
@@ -165,7 +230,25 @@ export default function OrdersPage() {
       />
 
       {view === 'board' ? (
-        <div className="rail -mx-4 flex snap-x snap-mandatory gap-3 px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0">
+        <>
+        {/* the board is wider than the screen: say so where the eye already is, not in a scrollbar below the fold */}
+        <div className="mb-2 hidden items-center justify-end gap-1 sm:flex">
+          <span className="mr-2 text-xs text-low">{orderStatuses.length} lanes</span>
+          <IconButton label="Scroll lanes left" disabled={!edges.left} onClick={() => scrollBoard(-1)} className="neu disabled:opacity-35">
+            <ChevronLeft className="size-4" />
+          </IconButton>
+          <IconButton label="Scroll lanes right" disabled={!edges.right} onClick={() => scrollBoard(1)} className="neu disabled:opacity-35">
+            <ChevronRight className="size-4" />
+          </IconButton>
+        </div>
+        <div
+          ref={boardRef}
+          onScroll={measureEdges}
+          className={cn(
+            'rail -mx-4 flex snap-x snap-mandatory gap-3 px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0 sm:[scrollbar-width:thin]',
+            edges.right && 'sm:[mask-image:linear-gradient(90deg,black_calc(100%-4rem),transparent)]',
+          )}
+        >
           {columns.map((col) => (
             <section
               key={col.status}
@@ -177,14 +260,15 @@ export default function OrdersPage() {
               onDragLeave={() => setDropTarget((t) => (t === col.status ? null : t))}
               onDrop={(e) => onDrop(col.status, e)}
               className={cn(
-                'flex w-[82vw] max-w-72 shrink-0 snap-start flex-col rounded-lg bg-surface-2/60 transition-shadow duration-micro sm:w-64',
+                'flex w-[82vw] max-w-72 shrink-0 snap-start flex-col rounded-lg bg-[rgb(var(--field)/0.035)] shadow-[inset_0_0_0_1px_rgb(var(--line)/var(--line-a))] transition-shadow duration-micro sm:w-64',
                 dropTarget === col.status && 'shadow-[inset_0_0_0_2px_rgb(var(--jade-500))]',
               )}
             >
               <header className="flex items-center justify-between px-3.5 py-3">
-                <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-mid">
+                <h2 className="flex items-center gap-2 text-[13px] font-semibold text-hi">
+                  <span className="bulb size-2" data-lit={col.orders.length > 0} />
                   {columnTitles[col.status]}
-                  <span className="rounded-full bg-surface-3 px-1.5 font-mono text-[10px] text-low tnum">
+                  <span className="rounded-full bg-[rgb(var(--field)/0.08)] px-1.5 text-[11px] font-medium text-low tnum">
                     {board?.counts[col.status] ?? 0}
                   </span>
                 </h2>
@@ -195,13 +279,18 @@ export default function OrdersPage() {
                     <Skeleton className="h-24" />
                     <Skeleton className="h-24" />
                   </>
-                ) : (
+                ) : col.orders.length > 0 ? (
                   col.orders.map((o) => <OrderCard key={o.id} order={o} onOpen={() => setOpenOrderId(o.id)} />)
+                ) : (board?.counts[col.status] ?? 0) > 0 ? (
+                  <LaneFallback status={col.status} filter={filterCard} onOpen={setOpenOrderId} />
+                ) : (
+                  <EmptyLane />
                 )}
               </div>
             </section>
           ))}
         </div>
+        </>
       ) : (
         <>
           <div className="mb-3">
@@ -244,7 +333,7 @@ export default function OrdersPage() {
                     <Td className="hidden max-w-52 truncate text-mid sm:table-cell">
                       {o.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}
                     </Td>
-                    <Td className="hidden text-xs uppercase text-mid sm:table-cell">{o.paymentMethod}</Td>
+                    <Td className="hidden text-xs text-mid sm:table-cell">{o.paymentMethod === 'cod' ? 'COD' : 'Prepaid'}</Td>
                     <Td>
                       <StatusChip status={o.status} />
                     </Td>

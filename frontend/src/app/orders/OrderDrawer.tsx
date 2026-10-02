@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BellRing, IndianRupee, Lock, MapPin, Phone, Truck } from 'lucide-react';
+import { BellRing, IndianRupee, Lock, MapPin, MessageCircle, Phone, Truck } from 'lucide-react';
 import type { OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
 import { useOrder, useOrderMutations } from '@/api/orders';
@@ -66,14 +66,37 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
           </div>
 
           {/* buyer */}
-          <section className="rounded-lg bg-surface-2 p-4">
-            <p className="text-sm font-semibold text-hi">{order.customerName}</p>
-            <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-mid">
-              <Phone className="size-3.5" /> {order.customerPhone}
-            </p>
+          <section className="rounded-xl bg-[rgb(var(--field)/0.045)] p-4 hairline">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold text-hi">{order.customerName}</p>
+                <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-mid">
+                  <Phone className="size-3.5" /> {order.customerPhone}
+                </p>
+              </div>
+              {/* the seller's next move is usually a message: one tap to the buyer's chat or phone */}
+              <div className="flex shrink-0 gap-1">
+                <a
+                  href={`https://wa.me/91${order.customerPhone.replace(/\D/g, '').slice(-10)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`WhatsApp ${order.customerName}`}
+                  className="flex size-10 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink transition-colors hover:bg-jade-500/20"
+                >
+                  <MessageCircle className="size-4" />
+                </a>
+                <a
+                  href={`tel:${order.customerPhone}`}
+                  aria-label={`Call ${order.customerName}`}
+                  className="flex size-10 items-center justify-center rounded-full bg-[rgb(var(--field)/0.08)] text-mid transition-colors hover:text-hi"
+                >
+                  <Phone className="size-4" />
+                </a>
+              </div>
+            </div>
             <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-mid">
               <MapPin className="mt-0.5 size-3.5 shrink-0" />
-              {order.address.line}, {order.address.city}, {order.address.state} — {order.address.pincode}
+              {order.address.line}, {order.address.city}, {order.address.state}, {order.address.pincode}
             </p>
           </section>
 
@@ -84,7 +107,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                 <li key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                   <span className="text-hi">
                     {item.qty}× {item.name}
-                    {item.variant && <span className="text-low"> · {item.variant}</span>}
+                    {item.variant && <span className="text-low">, {item.variant}</span>}
                   </span>
                   <MoneyText paise={item.price * item.qty} />
                 </li>
@@ -124,14 +147,14 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               Only the seller can see their own bank alert, so only they can
               settle it — CartHedge deliberately cannot. */}
           {order.paymentStatus === 'claimed' && (
-            <section className="rounded-lg bg-gold-400/10 p-4">
+            <section className="rounded-xl bg-gold-400/10 p-4 shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.22)]">
               <p className="flex items-center gap-2 text-sm font-medium text-gold-ink">
                 <IndianRupee className="size-4" aria-hidden /> Buyer reported a UPI payment
               </p>
               <p className="mt-1.5 text-xs leading-relaxed text-mid">
                 Reference <span className="font-mono text-hi">{order.paymentRef}</span> for{' '}
-                <MoneyText paise={order.total} className="text-xs" />. Check your bank or UPI app before you confirm —
-                confirming marks the order paid and messages the buyer.
+                <MoneyText paise={order.total} className="text-xs" />. Check your bank or UPI app before you confirm.
+                Confirming marks the order paid and messages the buyer.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
@@ -170,7 +193,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
           )}
 
           {/* actions */}
-          <section className="grid gap-4 rounded-lg bg-surface-2 p-4">
+          <section className="grid gap-4 rounded-xl bg-[rgb(var(--field)/0.045)] p-4 hairline">
             <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
               <Field label="Status">
                 <Select
@@ -251,7 +274,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
           {/* timeline */}
           {order.events && order.events.length > 0 && (
             <section>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-low">Timeline</h3>
+              <h3 className="mb-3 text-[13px] font-semibold text-mid">Timeline</h3>
               <ol className="relative flex flex-col gap-4 border-l pl-5">
                 {order.events.map((ev, i) => (
                   <li key={i} className="relative">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Podcast, Send, Trash2 } from 'lucide-react';
+import { CheckCheck, Podcast, Send, Trash2 } from 'lucide-react';
 import { useBroadcastMutations, useBroadcasts } from '@/api/broadcasts';
 import { toast } from '@/store/ui';
 import { formatDateTime, timeAgo } from '@/lib/date';
@@ -73,7 +73,7 @@ export default function BroadcastsPage() {
                 </Select>
               </Field>
             </div>
-            <Field label="Message" hint="Keep it personal — broadcasts that read like DMs convert best">
+            <Field label="Message" hint="Keep it personal, broadcasts that read like DMs convert best">
               <Textarea
                 rows={5}
                 placeholder={'Naya collection aa gaya! ✨\nPehle 20 orders pe free shipping.\n{{store link}}'}
@@ -101,14 +101,18 @@ export default function BroadcastsPage() {
         <Card className="lg:col-span-2">
           <CardHeader title="Preview" subtitle="How buyers see it" />
           <div className="p-5 pt-4">
-            <div className="rounded-lg bg-[#0b141a] p-4" data-theme="dark">
-              <div className="ml-auto w-fit max-w-full rounded-lg rounded-tr-none bg-[#005c4b] px-3 py-2 shadow">
-                <p className="whitespace-pre-wrap break-words text-sm text-[#e9edef]">
-                  {message || 'Your message shows here…'}
-                </p>
-                <p className="mt-1 text-right text-[10px] text-[#8696a0]">
-                  {new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })} ✓✓
-                </p>
+            <div className="mx-auto max-w-sm rounded-[2rem] bg-[linear-gradient(160deg,rgb(var(--ink-700)),rgb(var(--ink-950)))] p-2 shadow-float">
+              <div className="min-h-56 rounded-[1.6rem] bg-ink-950 p-4" data-theme="dark">
+                <p className="mb-4 text-center text-[11px] text-low">Today</p>
+                <div className="ml-auto w-fit max-w-[88%] rounded-[18px] rounded-br-md bg-jade-700 px-3.5 py-2 shadow-raised">
+                  <p className="whitespace-pre-wrap break-words text-sm text-white">
+                    {message || 'Your message shows here'}
+                  </p>
+                  <p className="mt-1 flex items-center justify-end gap-1 text-[10.5px] text-white/65">
+                    {new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
+                    <CheckCheck className="size-3.5" aria-hidden />
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -131,7 +135,7 @@ export default function BroadcastsPage() {
                   <span className="text-xs capitalize text-mid">{b.segment}</span>
                   <StatusChip status={b.status} />
                   <span className="text-xs text-low tnum">
-                    {b.sentCount > 0 && `${b.sentCount} sent · `}
+                    {b.sentCount > 0 && `${b.sentCount} sent, `}
                     {b.scheduledAt ? formatDateTime(b.scheduledAt) : timeAgo(b.createdAt)}
                   </span>
                   {b.status === 'draft' && (
@@ -170,7 +174,7 @@ export default function BroadcastsPage() {
             <EmptyState
               icon={<Podcast className="size-5" />}
               title="No broadcasts yet"
-              message="Your past buyers are your warmest audience — announce the next drop to them first."
+              message="Your past buyers are your warmest audience, announce the next drop to them first."
             />
           )}
         </div>

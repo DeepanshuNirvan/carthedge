@@ -1,48 +1,27 @@
-import { motion, useScroll, useTransform, useReducedMotion, useSpring } from 'framer-motion';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 
 /**
- * The product story told as light: jade (money confirmed) and gold (₹ saved)
- * aurora over a structured grid — messy chat resolving into structured orders.
- *
- * Perf: the blobs drift via CSS keyframes (compositor-only). Scroll adds ONE
- * cheap parallax transform on a single wrapper, not per-blob transforms, so we
- * never repaint the big blur layers each frame (that was the scroll lag).
+ * The lane at night (or by day): one warm wash falling from the strand
+ * overhead, and the ground deepening toward the edges. No floating blobs.
+ * The light is anchored to the top edge like a real lamp, and it drifts a
+ * few pixels with scroll so the page has depth without anything moving on
+ * its own.
  */
 export function MarketingBackground() {
   const reduced = useReducedMotion();
-  const { scrollYProgress } = useScroll();
-  // smooth the scroll value so the single parallax never stutters
-  const p = useSpring(scrollYProgress, { stiffness: 120, damping: 30, mass: 0.4 });
-  const y = useTransform(p, [0, 1], ['0%', '14%']);
-  const gridOpacity = useTransform(p, [0, 0.4, 1], [0.5, 0.85, 1]);
+  const { scrollY } = useScroll();
+  const y = useTransform(scrollY, [0, 1200], [0, -60]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      {/* Base wash: neutral. The colour belongs to the aurora layer alone —
-          tinting here too was double-dosing the same hue and turning the whole
-          viewport green, which is what read as a stock AI gradient. */}
-      <div className="absolute inset-0 bg-[radial-gradient(130%_100%_at_50%_-10%,rgb(var(--bg-2)),rgb(var(--bg))_58%)]" />
-
-      {/* aurora field — one wrapper carries the scroll parallax; blobs drift via CSS */}
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-bg">
       <motion.div
         style={reduced ? undefined : { y }}
-        className="absolute inset-0 will-change-transform [transform:translateZ(0)]"
+        className="absolute inset-x-0 top-0 h-[120vh] will-change-transform"
       >
-        <div className="cart-aurora cart-aurora--jade" />
-        <div className="cart-aurora cart-aurora--gold" />
-        <div className="cart-aurora cart-aurora--blue" />
+        <div className="absolute inset-0 bg-[radial-gradient(110%_55%_at_50%_-8%,rgb(var(--bulb)/0.085),transparent_62%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(70%_40%_at_82%_0%,rgb(var(--jade-500)/0.05),transparent_60%)]" />
       </motion.div>
-
-      {/* structure grid — chat noise becoming ordered rows/columns */}
-      <motion.div
-        style={reduced ? { opacity: 0.8 } : { opacity: gridOpacity }}
-        className="absolute inset-0"
-      >
-        <div className="cart-grid" />
-      </motion.div>
-
-      {/* vignette for depth — deeper edges make glass cards pop */}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_85%_at_50%_45%,transparent_38%,rgb(var(--bg))_98%)] opacity-80" />
+      <div className="absolute inset-0 bg-[radial-gradient(140%_100%_at_50%_30%,transparent_55%,rgb(var(--ink-950)/0.22)_100%)]" />
     </div>
   );
 }

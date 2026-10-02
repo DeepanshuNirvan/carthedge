@@ -5,7 +5,6 @@ import { HelmetProvider } from 'react-helmet-async';
 import { RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { router } from './router';
-import { CursorGlow } from './ui/CursorGlow';
 import { ApiError } from './api/http';
 import './theme/fonts.css';
 import './theme/tokens.css';
@@ -30,7 +29,6 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <RouterProvider router={router} />
-          <CursorGlow />
         </ThemeProvider>
       </QueryClientProvider>
     </HelmetProvider>

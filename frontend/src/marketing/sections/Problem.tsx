@@ -1,102 +1,94 @@
 import { useEffect, useRef } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { MessageSquareWarning, PackageX, Timer } from 'lucide-react';
-
-gsap.registerPlugin(ScrollTrigger);
-import { problem } from '@/strings/marketing';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { animate, motion, useInView, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import { Instagram } from 'lucide-react';
+import { problem, seededStatLabels } from '@/strings/marketing';
 import { useSite } from '@/api/site';
+import { Reveal } from '../Section';
 
-const icons = [PackageX, Timer, MessageSquareWarning];
-
-/** Pinned scene: chaos cards scatter in, loss numbers count up with scroll. */
-export function Problem() {
-  const root = useRef<HTMLDivElement>(null);
-  const reduced = usePrefersReducedMotion();
-  const stats = useSite().data?.stats ?? problem.stats;
-
+function CountUp({ to }: { to: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+  const reduced = useReducedMotion();
   useEffect(() => {
-    if (reduced || !root.current) return;
-    const ctx = gsap.context(() => {
-      const counters = gsap.utils.toArray<HTMLElement>('[data-count]');
-      const cards = gsap.utils.toArray<HTMLElement>('[data-chaos]');
+    if (!inView || reduced || !ref.current) return;
+    const node = ref.current;
+    const controls = animate(0, to, {
+      duration: 1.2,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (v) => (node.textContent = String(Math.round(v))),
+    });
+    return () => controls.stop();
+  }, [inView, to, reduced]);
+  return <span ref={ref}>{to}</span>;
+}
 
-      gsap.set(cards, {
-        y: (i) => 140 + i * 40,
-        rotate: (i) => (i % 2 ? 8 : -7),
-        opacity: 0,
-      });
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: root.current,
-          start: 'top top',
-          end: '+=120%',
-          pin: true,
-          scrub: 0.6,
-        },
-      });
-
-      tl.to(cards, { y: 0, rotate: 0, opacity: 1, stagger: 0.08, ease: 'power2.out' });
-      counters.forEach((el) => {
-        const target = Number(el.dataset.count);
-        const state = { n: 0 };
-        tl.to(
-          state,
-          {
-            n: target,
-            duration: 0.6,
-            ease: 'power1.out',
-            onUpdate: () => {
-              el.textContent = String(Math.round(state.n));
-            },
-          },
-          '<0.1',
-        );
-      });
-    }, root);
-    return () => ctx.revert();
-  }, [reduced]);
+/** The inbox at midnight: the same questions piling up like a lock screen nobody can clear. */
+export function Problem() {
+  const live = useSite().data?.stats;
+  // untouched seed placeholders are not measured numbers: use the figures from the product brief instead
+  const stats = !live || live.every((s) => seededStatLabels.includes(s.label)) ? problem.stats : live;
+  const reduced = useReducedMotion();
+  const pileRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: pileRef, offset: ['start end', 'end start'] });
+  const drift = useTransform(scrollYProgress, [0, 1], [40, -40]);
 
   return (
-    <section id="problem" ref={root} className="relative flex min-h-dvh items-center overflow-hidden">
-      <div className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8">
-        <div className="mb-14 text-center">
-          <span className="glass inline-flex rounded-full px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-danger-ink">
-            {problem.eyebrow}
-          </span>
-          <h2 className="mx-auto mt-4 max-w-2xl font-display text-d2 font-semibold text-hi">{problem.title}</h2>
-        </div>
+    <section id="problem" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+      <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+        <Reveal>
+          <h2 className="max-w-[16ch] text-d2 font-semibold text-hi">{problem.title}</h2>
+          <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-mid">{problem.copy}</p>
+        </Reveal>
 
-        <div className="grid gap-5 md:grid-cols-3">
-          {stats.map((stat, i) => {
-            const Icon = icons[i] ?? icons[icons.length - 1];
-            return (
-              <div
-                key={stat.label}
-                data-chaos
-                className="glass sheen relative overflow-hidden rounded-2xl p-7 shadow-float"
-              >
-                <div
-                  aria-hidden
-                  className="absolute -right-10 -top-10 size-28 rounded-full bg-danger/15 blur-2xl"
-                />
-                <span className="relative flex size-11 items-center justify-center rounded-md neu text-danger-ink">
-                  <Icon className="size-5" aria-hidden />
-                </span>
-                <p className="relative mt-5 font-display text-[3.25rem] font-semibold leading-none tracking-tight text-hi tnum">
-                  <span data-count={stat.value}>{reduced ? stat.value : 0}</span>
-                  <span className="text-danger-ink">{stat.suffix}</span>
+        <motion.div
+          ref={pileRef}
+          style={reduced ? undefined : { y: drift }}
+          className="relative mx-auto flex w-full max-w-sm flex-col gap-2"
+          initial={reduced ? false : 'hidden'}
+          whileInView="shown"
+          viewport={{ once: true, margin: '-80px' }}
+          variants={{ hidden: {}, shown: { transition: { staggerChildren: 0.11 } } }}
+          aria-label="Unanswered buyer messages"
+        >
+          {problem.pile.map((n, i) => (
+            <motion.div
+              key={n.from}
+              variants={{
+                hidden: { opacity: 0, y: -24, scale: 0.94 },
+                shown: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
+              }}
+              className="glass-nav sheen flex items-center gap-3 rounded-[22px] p-3"
+              style={{ marginLeft: `${(i % 3) * 10}px`, marginRight: `${((i + 1) % 3) * 8}px` }}
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[linear-gradient(135deg,rgb(var(--gold-400)),rgb(var(--danger))_55%,rgb(var(--info)))] text-white">
+                <Instagram className="size-[18px]" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-baseline justify-between gap-2 text-[12.5px]">
+                  <span className="truncate font-semibold text-hi">{n.from}</span>
+                  <span className="shrink-0 text-[11px] text-low">{i < 2 ? 'now' : `${i * 7}m ago`}</span>
                 </p>
-                <p className="relative mt-3 text-sm leading-relaxed text-mid">{stat.label}</p>
+                <p className="truncate text-[13px] text-mid">{n.text}</p>
               </div>
-            );
-          })}
-        </div>
-
-        <p className="mx-auto mt-14 max-w-2xl text-center text-lg leading-relaxed text-mid">{problem.copy}</p>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
+
+      {/* the cost, said as sentences rather than a row of big numbers */}
+      <ul className="mt-16 grid gap-x-10 gap-y-4 border-t pt-8 md:grid-cols-3">
+        {stats.map((stat, i) => (
+          <Reveal key={stat.label} delay={i * 0.06}>
+            <li className="text-[15px] leading-relaxed text-mid">
+              <span className="mr-1.5 text-[17px] font-semibold tnum text-hi">
+                <CountUp to={stat.value} />
+                {stat.suffix}
+              </span>
+              {stat.label}
+            </li>
+          </Reveal>
+        ))}
+      </ul>
     </section>
   );
 }

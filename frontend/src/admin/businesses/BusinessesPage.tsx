@@ -25,7 +25,7 @@ export default function BusinessesPage() {
         actions={
           <>
             <div className="relative basis-full sm:basis-auto">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" />
               <Input
                 placeholder="Name, code, email…"
                 value={search}
@@ -33,11 +33,11 @@ export default function BusinessesPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 pl-9 sm:h-10 sm:w-56"
+                className="h-11 rounded-full pl-10 sm:h-10 sm:w-56"
                 aria-label="Search businesses"
               />
             </div>
-            <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-11 sm:h-10 sm:w-36" aria-label="Status filter">
+            <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-11 rounded-full sm:h-10 sm:w-36" aria-label="Status filter">
               <option value="">All statuses</option>
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
@@ -75,7 +75,7 @@ export default function BusinessesPage() {
                     <p className="text-mid">{b.ownerName}</p>
                     <p className="text-xs text-low">{b.email}</p>
                   </Td>
-                  <Td className="hidden text-xs font-medium uppercase text-mid sm:table-cell">{b.planCode || '—'}</Td>
+                  <Td className="hidden text-xs font-medium capitalize text-mid sm:table-cell">{b.planCode || '-'}</Td>
                   <Td>
                     <StatusChip status={b.subscriptionStatus || 'none'} />
                   </Td>

@@ -6,7 +6,7 @@ import { useStore, useStoreProducts } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { formatPaise } from '@/lib/money';
 import { cn } from '@/lib/cn';
-import { StoreHeader } from './StoreHeader';
+import { StoreHeader, StoreProfile } from './StoreHeader';
 import { ProductCard } from './ProductCard';
 import { CartSheet } from '../cart/CartSheet';
 import { StoreFooter } from './StoreFooter';
@@ -15,6 +15,8 @@ import { Button } from '@/ui/Button';
 import { Skeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 import { Sheet } from '@/ui/Modal';
+import { LaneGround } from '@/ui/LaneGround';
+import { Switch } from '@/ui/Switch';
 
 type SortKey = 'featured' | 'priceLow' | 'priceHigh';
 
@@ -56,11 +58,22 @@ export default function StorePage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-3xl p-4">
-        <Skeleton className="h-16 w-full" />
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="aspect-[4/5]" />
+      <div className="mx-auto w-full max-w-5xl px-4 pt-[calc(4rem+env(safe-area-inset-top))]">
+        <div className="flex items-center gap-4">
+          <Skeleton className="size-20 rounded-full" />
+          <div className="flex-1 space-y-2.5">
+            <Skeleton className="h-6 w-2/3 rounded-full" />
+            <Skeleton className="h-3.5 w-1/3 rounded-full" />
+          </div>
+        </div>
+        <Skeleton className="mt-6 h-11 w-full rounded-full" />
+        <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i}>
+              <Skeleton className="aspect-[4/5] rounded-lg" />
+              <Skeleton className="mt-2.5 h-3 w-4/5 rounded-full" />
+              <Skeleton className="mt-2 h-3 w-1/3 rounded-full" />
+            </div>
           ))}
         </div>
       </div>
@@ -109,14 +122,16 @@ export default function StorePage() {
   return (
     <div className="grain min-h-dvh">
       <Seo
-        title={`${store.business.name} — Shop online`}
+        title={`${store.business.name} | Shop online`}
         description={`Shop ${store.business.name}${store.business.city ? ` from ${store.business.city}` : ''}. Secure checkout with UPI, cards${store.business.codEnabled ? ' and cash on delivery' : ''}. No signup needed.`}
         path={`/s/${businessCode}`}
         jsonLd={productJsonLd}
       />
-      <StoreHeader business={store.business} onCart={() => setCartOpen(true)} />
+      <LaneGround strand={false} />
+      <StoreHeader business={store.business} onCart={() => setCartOpen(true)} quietTop />
+      <StoreProfile business={store.business} />
 
-      <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-4">
+      <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-4">
         {store.offers.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -125,12 +140,12 @@ export default function StorePage() {
           >
             {store.offers.map((o) => (
               <span
-                key={o.id}
-                className="flex shrink-0 items-center gap-2 rounded-lg bg-gold-400/10 px-3.5 py-2.5 text-xs text-gold-ink"
+                key={o.code}
+                className="flex shrink-0 items-center gap-2 rounded-full bg-gold-400/12 px-4 py-2.5 text-xs text-gold-ink shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)]"
               >
                 <Ticket className="size-4" aria-hidden />
                 <span>
-                  <span className="font-mono font-semibold">{o.code}</span> ·{' '}
+                  <span className="font-mono font-semibold">{o.code}</span>,{' '}
                   {o.kind === 'percent' ? `${o.value}% off` : `${formatPaise(o.value)} off`}
                   {o.minAmount > 0 && ` above ${formatPaise(o.minAmount)}`}
                 </span>
@@ -142,12 +157,12 @@ export default function StorePage() {
         {/* search + filters */}
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" />
             <Input
-              placeholder="Search products…"
+              placeholder="Search this store"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="rounded-full pl-10"
               aria-label="Search products"
             />
           </div>
@@ -155,11 +170,11 @@ export default function StorePage() {
             variant="secondary"
             onClick={() => setFiltersOpen(true)}
             icon={<SlidersHorizontal className="size-4" />}
-            className="shrink-0"
+            className="h-11 shrink-0"
           >
             Filters
             {activeFilters > 0 && (
-              <span className="ml-0.5 flex size-5 items-center justify-center rounded-full bg-jade-500 font-mono text-[10px] text-white">
+              <span className="ml-0.5 flex size-5 items-center justify-center rounded-full bg-jade-500 text-[10px] font-bold text-[rgb(var(--text-on-accent))]">
                 {activeFilters}
               </span>
             )}
@@ -173,7 +188,7 @@ export default function StorePage() {
               className={cn(
                 'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95 sm:min-h-8',
                 category === ''
-                  ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
+                  ? 'bg-hi text-bg'
                   : 'neu text-mid hover:text-hi',
               )}
             >
@@ -186,7 +201,7 @@ export default function StorePage() {
                 className={cn(
                   'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95 sm:min-h-8',
                   category === c
-                    ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
+                    ? 'bg-hi text-bg'
                     : 'neu text-mid hover:text-hi',
                 )}
               >
@@ -199,10 +214,10 @@ export default function StorePage() {
         {/* trending row — only on the unfiltered view */}
         {!search && !category && store.trending.length > 0 && (
           <section className="mt-6">
-            <h2 className="mb-3 font-display text-lg font-semibold text-hi">Trending now</h2>
-            <div className="rail -mx-4 flex snap-x snap-mandatory gap-3 px-4 pb-2">
+            <h2 className="mb-3 text-lg font-semibold tracking-snug text-hi">Trending now</h2>
+            <div className="rail -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 px-4 pb-2">
               {store.trending.map((p, i) => (
-                <div key={p.id} className="w-40 shrink-0 snap-start">
+                <div key={p.id} className="w-[42vw] max-w-[12rem] shrink-0 snap-start">
                   <ProductCard product={p} businessCode={businessCode} index={i} />
                 </div>
               ))}
@@ -212,14 +227,14 @@ export default function StorePage() {
 
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-semibold text-hi">
+            <h2 className="text-lg font-semibold tracking-snug text-hi">
               {category || (search ? 'Results' : 'All products')}
             </h2>
             <Select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
               aria-label="Sort products"
-              className="h-10 w-auto shrink-0 text-xs sm:text-xs"
+              className="h-10 w-auto shrink-0 rounded-full text-xs sm:text-xs"
             >
               {sortOptions.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -230,13 +245,16 @@ export default function StorePage() {
           </div>
 
           {productsLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="aspect-[4/5]" />
+            <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }, (_, i) => (
+                <div key={i}>
+                  <Skeleton className="aspect-[4/5] rounded-lg" />
+                  <Skeleton className="mt-2.5 h-3 w-4/5 rounded-full" />
+                </div>
               ))}
             </div>
           ) : visible.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
               {visible.map((p, i) => (
                 <ProductCard key={p.id} product={p} businessCode={businessCode} index={i} />
               ))}
@@ -248,7 +266,7 @@ export default function StorePage() {
               message={
                 search || activeFilters
                   ? 'Try a different search or clear your filters.'
-                  : 'This seller is still adding products — check back soon.'
+                  : 'This seller is still adding products, check back soon.'
               }
               action={
                 (search || activeFilters) && (
@@ -286,25 +304,22 @@ export default function StorePage() {
               aria-label="Maximum price"
               className="slider w-full cursor-pointer"
               style={{
-                background: `linear-gradient(90deg, rgb(var(--jade-500)) ${
+                backgroundImage: `linear-gradient(90deg, rgb(var(--jade-500)) ${
                   priceCeiling > 0 ? ((maxPrice ?? priceCeiling) / priceCeiling) * 100 : 100
                 }%, rgb(var(--surface-3)) ${priceCeiling > 0 ? ((maxPrice ?? priceCeiling) / priceCeiling) * 100 : 100}%)`,
               }}
             />
-            <p className="mt-2 font-mono text-sm text-jade-ink tnum">
+            <p className="mt-2 text-sm font-semibold text-jade-ink tnum">
               Up to {formatPaise(maxPrice ?? priceCeiling)}
             </p>
           </div>
 
-          <label className="flex min-h-11 items-center justify-between text-sm text-hi">
+          <div className="flex min-h-11 items-center justify-between text-sm text-hi">
             In stock only
-            <input
-              type="checkbox"
-              checked={inStockOnly}
-              onChange={(e) => setInStockOnly(e.target.checked)}
-              className="size-6 accent-jade-500"
-            />
-          </label>
+            <span>
+              <Switch checked={inStockOnly} onChange={setInStockOnly} label="In stock only" />
+            </span>
+          </div>
 
           {store.categories.length > 0 && (
             <div>
@@ -317,7 +332,7 @@ export default function StorePage() {
                     className={cn(
                       'inline-flex min-h-10 items-center justify-center rounded-full px-4 py-2 text-xs font-medium transition-colors active:scale-95',
                       category === c
-                    ? 'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay'
+                    ? 'bg-hi text-bg'
                     : 'neu text-mid hover:text-hi',
                     )}
                   >

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, Link2, Plus, Store } from 'lucide-react';
+import { Check, ExternalLink, Link2, MousePointerClick, Plus, ShoppingBag, Store } from 'lucide-react';
 import type { ShareLink } from '@/api/types';
 import { useLinkMutations, useLinks } from '@/api/links';
 import { useProducts } from '@/api/products';
@@ -15,6 +15,8 @@ import { Modal } from '@/ui/Modal';
 import { MoneyText } from '@/ui/MoneyText';
 import { Switch } from '@/ui/Switch';
 import { Badge } from '@/ui/Badge';
+import { Tabs } from '@/ui/Tabs';
+import { cn } from '@/lib/cn';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
 
@@ -24,25 +26,23 @@ function StorefrontCard() {
   if (!business) return null;
   const url = storeUrl(business.code);
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-surface p-5 shadow-soft hairline">
-      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-jade-500/12 text-jade-ink">
+    <div className="panel relative mb-5 flex flex-wrap items-center gap-4 overflow-hidden rounded-xl p-5 sm:p-6">
+      <span className="grid size-12 shrink-0 place-items-center rounded-full bg-jade-500 text-[rgb(var(--text-on-accent))] clay">
         <Store className="size-5" aria-hidden />
       </span>
-      <div className="min-w-0 flex-1 basis-52">
-        <p className="text-sm font-medium text-hi">Your storefront</p>
-        <p className="mt-0.5 truncate font-mono text-xs text-low">{url}</p>
-        <p className="mt-1 text-xs text-mid">
-          Your full catalog on one link — put it in your Instagram bio and WhatsApp about.
-        </p>
+      <div className="min-w-0 flex-1 basis-60">
+        <p className="text-[15px] font-semibold tracking-snug text-hi">Your store link</p>
+        <p className="mt-1 truncate font-mono text-[13px] text-jade-ink">{url.replace(/^https?:\/\//, '')}</p>
+        <p className="mt-1.5 text-[13px] text-mid">Your whole catalog on one link. Put it in your Instagram bio and WhatsApp about.</p>
       </div>
-      <div className="flex items-center gap-1">
-        <ShareActions url={url} title={`${business.name} — shop the full collection`} />
+      <div className="flex items-center gap-1 rounded-full neu p-1">
+        <ShareActions url={url} title={`${business.name} | shop the full collection`} />
         <a
           href={url}
           target="_blank"
           rel="noreferrer"
           aria-label="Open storefront"
-          className="inline-flex size-9 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi"
+          className="inline-flex size-11 items-center justify-center rounded-full text-mid transition-colors hover:bg-[rgb(var(--field)/0.08)] hover:text-hi sm:size-10"
         >
           <ExternalLink className="size-4" />
         </a>
@@ -56,19 +56,26 @@ function LinkRow({ link }: { link: ShareLink }) {
   const url = link.url;
 
   return (
-    <li className="flex flex-wrap items-center gap-3 py-4">
+    <li className={cn('flex flex-wrap items-center gap-3 py-4 transition-opacity', !link.active && 'opacity-60')}>
+      <span className="bulb size-2.5 shrink-0" data-lit={link.active} />
       <div className="min-w-0 flex-1 basis-52">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-hi">{link.title || 'Untitled link'}</p>
-          <Badge tone={link.kind === 'custom' ? 'gold' : 'info'}>{link.kind}</Badge>
+          <p className="truncate text-[14.5px] font-medium text-hi">{link.title || 'Untitled link'}</p>
+          <Badge tone={link.kind === 'custom' ? 'gold' : link.kind === 'cart' ? 'jade' : 'info'} className="capitalize">
+            {link.kind}
+          </Badge>
         </div>
-        <p className="mt-0.5 truncate font-mono text-xs text-low">{url}</p>
+        <p className="mt-0.5 truncate font-mono text-xs text-low">{url.replace(/^https?:\/\//, '')}</p>
       </div>
-      <div className="flex items-center gap-4 text-xs text-mid tnum">
-        <span title="Clicks">{link.clicks} clicks</span>
-        <span title="Orders">{link.ordersCount} orders</span>
-        {link.amount ? <MoneyText paise={link.amount} className="text-xs" /> : null}
-        <span className="hidden sm:inline">{timeAgo(link.createdAt)}</span>
+      <div className="flex items-center gap-2 text-xs tnum">
+        <span title="Clicks" className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--field)/0.07)] px-2.5 py-1 text-mid">
+          <MousePointerClick className="size-3.5" aria-hidden /> {link.clicks}
+        </span>
+        <span title="Orders" className="inline-flex items-center gap-1 rounded-full bg-jade-500/12 px-2.5 py-1 font-semibold text-jade-ink">
+          <ShoppingBag className="size-3.5" aria-hidden /> {link.ordersCount}
+        </span>
+        {link.amount ? <MoneyText paise={link.amount} className="text-[13px] font-semibold text-hi" /> : null}
+        <span className="hidden text-low sm:inline">{timeAgo(link.createdAt)}</span>
       </div>
       <div className="flex items-center gap-1">
         <ShareActions url={url} title={link.title || 'Order here'} />
@@ -152,7 +159,7 @@ export default function LinksPage() {
       {isLoading ? (
         <SkeletonRows rows={4} />
       ) : links && links.length > 0 ? (
-        <ul className="divide-y rounded-lg bg-surface px-5 shadow-soft hairline">
+        <ul className="panel divide-y rounded-xl px-4 sm:px-5">
           {links.map((l) => (
             <LinkRow key={l.id} link={l} />
           ))}
@@ -172,13 +179,23 @@ export default function LinksPage() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="New share link">
         <div className="flex flex-col gap-4">
-          <Field label="Type">
-            <Select value={kind} onChange={(e) => setKind(e.target.value as ShareLink['kind'])}>
-              <option value="product">Single product</option>
-              <option value="cart">Cart (multiple products)</option>
-              <option value="custom">Custom amount</option>
-            </Select>
-          </Field>
+          <Tabs
+            className="w-full [&>button]:flex-1 [&>button]:justify-center"
+            value={kind}
+            onChange={(v) => setKind(v)}
+            tabs={[
+              { value: 'product', label: 'Product' },
+              { value: 'cart', label: 'Cart' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
+          <p className="-mt-1 text-xs text-low">
+            {kind === 'product'
+              ? 'One item. The buyer picks size and pays.'
+              : kind === 'cart'
+                ? 'Several items pre-loaded in one checkout.'
+                : 'Type what it is and the price. Made-to-order in ten seconds.'}
+          </p>
 
           {kind === 'product' && (
             <Field label="Product">
@@ -195,21 +212,37 @@ export default function LinksPage() {
 
           {kind === 'cart' && (
             <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-hi">Products</legend>
-              <div className="flex max-h-44 flex-col gap-1 overflow-y-auto rounded-md bg-surface-2 p-2 hairline">
-                {products?.map((p) => (
-                  <label key={p.id} className="flex items-center gap-2.5 rounded px-2 py-1.5 text-sm text-hi hover:bg-surface-3">
-                    <input
-                      type="checkbox"
-                      checked={cartIds.includes(p.id)}
-                      onChange={(e) =>
-                        setCartIds(e.target.checked ? [...cartIds, p.id] : cartIds.filter((id) => id !== p.id))
-                      }
-                      className="size-4 accent-jade-500"
-                    />
-                    {p.name}
-                  </label>
-                ))}
+              <legend className="mb-1.5 flex w-full justify-between text-[13px] font-medium text-hi">
+                Products <span className="text-low tnum">{cartIds.length} picked</span>
+              </legend>
+              <div className="flex max-h-56 flex-col gap-1 overflow-y-auto overscroll-contain rounded-lg bg-[rgb(var(--field)/0.04)] p-1.5 hairline">
+                {products?.map((p) => {
+                  const on = cartIds.includes(p.id);
+                  return (
+                    <button
+                      type="button"
+                      key={p.id}
+                      aria-pressed={on}
+                      onClick={() => setCartIds(on ? cartIds.filter((id) => id !== p.id) : [...cartIds, p.id])}
+                      className={cn(
+                        'flex min-h-11 items-center gap-3 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors',
+                        on ? 'bg-jade-500/12 text-hi' : 'text-mid hover:bg-[rgb(var(--field)/0.06)]',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'flex size-5 shrink-0 items-center justify-center rounded-full transition-colors',
+                          on ? 'bg-jade-500 text-[rgb(var(--text-on-accent))]' : 'shadow-[inset_0_0_0_1.5px_rgb(var(--line)/var(--line-strong-a))]',
+                        )}
+                      >
+                        {on && <Check className="size-3" strokeWidth={3} />}
+                      </span>
+                      {p.images?.[0] && <img src={p.images[0]} alt="" className="size-8 rounded-[8px] object-cover" />}
+                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                      <MoneyText paise={p.price} className="text-xs text-low" />
+                    </button>
+                  );
+                })}
               </div>
             </fieldset>
           )}
@@ -217,7 +250,7 @@ export default function LinksPage() {
           {kind === 'custom' ? (
             <>
               <Field label="What is it for?">
-                <Input placeholder="Custom kurti stitching — Priya" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <Input placeholder="Custom kurti stitching, Priya" value={title} onChange={(e) => setTitle(e.target.value)} />
               </Field>
               <Field label="Amount ₹">
                 <Input inputMode="decimal" placeholder="1499" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -229,7 +262,7 @@ export default function LinksPage() {
             </Field>
           )}
 
-          <Button onClick={submit} loading={create.isPending}>
+          <Button size="lg" onClick={submit} loading={create.isPending}>
             Create link
           </Button>
         </div>

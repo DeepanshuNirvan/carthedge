@@ -162,7 +162,7 @@ export default function PlansPage() {
                     {p.active === false && <Badge tone="danger">inactive</Badge>}
                   </span>
                 </Td>
-                <Td className="hidden text-right tnum md:table-cell">{p.activeSubscriptions ?? '—'}</Td>
+                <Td className="hidden text-right tnum md:table-cell">{p.activeSubscriptions ?? '-'}</Td>
                 <Td className="text-right">
                   <IconButton label={`Edit ${p.name}`} onClick={() => openFor(p)}>
                     <Pencil className="size-4" />
@@ -197,9 +197,9 @@ export default function PlansPage() {
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-hi">Included features</legend>
               <p className="mb-2 text-xs text-low">
-                Enforced by the API and by the seller app — unchecked features stay locked for everyone on this plan.
+                Enforced by the API and by the seller app, unchecked features stay locked for everyone on this plan.
               </p>
-              <div className="grid gap-1 rounded-md bg-surface-2 p-2 hairline sm:grid-cols-2">
+              <div className="grid gap-1 rounded-lg bg-[rgb(var(--field)/0.04)] p-2 hairline sm:grid-cols-2">
                 {allCapabilities.map((c) => (
                   <label key={c} className="flex items-start gap-2.5 rounded px-2 py-1.5 text-sm text-hi hover:bg-surface-3">
                     <input
@@ -218,7 +218,7 @@ export default function PlansPage() {
             </fieldset>
           </div>
           <div className="sm:col-span-2">
-            <Field label="Pricing page bullets" hint="One per line — marketing copy only, does not unlock anything">
+            <Field label="Pricing page bullets" hint="One per line, marketing copy only, does not unlock anything">
               <Textarea rows={4} value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} />
             </Field>
           </div>

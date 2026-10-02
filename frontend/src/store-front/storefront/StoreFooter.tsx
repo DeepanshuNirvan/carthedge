@@ -5,7 +5,7 @@ import { LogoMark } from '@/marketing/Wordmark';
 
 export function StoreFooter({ business }: { business: StoreBusiness }) {
   return (
-    <footer className="border-t bg-surface/40 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-8">
+    <footer className="mt-10 border-t px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 text-center">
         <Link
           to="/track"
@@ -24,7 +24,7 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
                 href={`https://instagram.com/${business.instagram.replace('@', '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm text-mid transition-colors hover:text-hi"
+                className="neu inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm text-mid transition-colors hover:text-hi"
               >
                 <Instagram className="size-4" aria-hidden /> DM on Instagram
               </a>
@@ -34,7 +34,7 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
                 href={`https://wa.me/91${business.whatsapp.replace(/\D/g, '').slice(-10)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm text-mid transition-colors hover:text-hi"
+                className="neu inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm text-mid transition-colors hover:text-hi"
               >
                 <MessageCircle className="size-4" aria-hidden /> Chat on WhatsApp
               </a>

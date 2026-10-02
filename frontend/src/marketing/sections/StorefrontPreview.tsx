@@ -1,99 +1,137 @@
+import { useRef } from 'react';
+import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from 'framer-motion';
 import { CheckCircle2, ShieldCheck } from 'lucide-react';
 import { storefrontPreview } from '@/strings/marketing';
-import { Section, SectionHead, Reveal } from '../Section';
 import { MoneyText } from '@/ui/MoneyText';
+import { SectionHead } from '../Section';
 import { demoCatalog } from '../demoCatalog';
 
-/** Real phone mockup of the buyer storefront with art-directed product photos. */
-export function StorefrontPreview() {
+function Float({
+  y,
+  className,
+  children,
+}: {
+  y: MotionValue<number> | undefined;
+  className: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Section id="storefront">
-      <div className="grid items-center gap-12 lg:grid-cols-2">
-        <div>
-          <SectionHead
-            align="left"
-            eyebrow={storefrontPreview.eyebrow}
-            title={storefrontPreview.title}
-            sub={storefrontPreview.copy}
-          />
-          <Reveal>
-            <ul className="-mt-6 flex flex-col gap-3">
-              {storefrontPreview.bullets.map((b) => (
-                <li key={b} className="flex items-center gap-2.5 text-sm text-mid">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-jade-500/14 text-jade-ink">
-                    <CheckCircle2 className="size-4" aria-hidden />
-                  </span>
-                  {b}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        </div>
+    <motion.div style={y ? { y } : undefined} className={className}>
+      {children}
+    </motion.div>
+  );
+}
 
-        <Reveal delay={0.12}>
-          {/* the glow is 48px wider than the phone on each side by design. On a
-              375px screen that is 15px of sideways scroll, so clip it there and
-              let it bleed again once the section has room. */}
-          <div className="relative mx-auto w-full max-w-[310px] overflow-x-clip sm:overflow-x-visible">
-            <div aria-hidden className="absolute -inset-12 rounded-full bg-jade-500/10 blur-3xl" />
-            {/* phone shell — double-bezel */}
-            <div className="relative rounded-[2.6rem] bg-gradient-to-b from-ink-800 to-ink-950 p-2 shadow-float">
-              <div className="overflow-hidden rounded-[2.1rem] bg-surface">
-                {/* store header */}
-                <div className="glass-nav flex items-center gap-2.5 px-4 py-3">
-                  <span
-                    className="size-8 rounded-full bg-gradient-to-br from-jade-500 to-gold-400 shadow-[inset_0_1px_1px_rgb(255_255_255/0.3)]"
-                    aria-hidden
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold text-hi">Ritika&apos;s Closet</p>
-                    <p className="font-mono text-[10px] text-low">/s/ritikas-closet</p>
-                  </div>
-                  <span className="ml-auto flex items-center gap-1 rounded-full bg-jade-500/14 px-2 py-0.5 text-[10px] font-semibold text-jade-ink">
-                    <ShieldCheck className="size-3" /> Verified
-                  </span>
-                </div>
-                <p className="border-b bg-surface-2/50 px-4 py-1.5 text-center text-[10px] text-low">
-                  Payments secured by Razorpay
-                </p>
-                {/* product grid */}
-                <div className="grid grid-cols-2 gap-2.5 p-3">
-                  {demoCatalog.map((p) => (
-                    <div key={p.name} className="group overflow-hidden rounded-lg panel">
-                      <div className="relative aspect-[3/4] overflow-hidden">
-                        <img
-                          src={p.img}
-                          alt={p.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="size-full object-cover transition-transform duration-expr ease-enter group-hover:scale-105"
-                        />
-                        {p.tag && (
-                          <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white backdrop-blur">
-                            {p.tag}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-2">
-                        <p className="truncate text-[11px] font-medium text-hi">{p.name}</p>
-                        <div className="flex items-baseline gap-1.5">
-                          <MoneyText paise={p.price} className="text-[11px] text-jade-ink" />
-                          {p.compareAt && <MoneyText paise={p.compareAt} strike className="text-[9px]" />}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-3 pb-4">
-                  <div className="flex h-10 items-center justify-center rounded-md bg-gradient-to-b from-jade-400 to-jade-500 text-xs font-semibold text-[rgb(var(--text-on-accent))] clay">
-                    Buy now · no signup
-                  </div>
-                </div>
+/** The buyer's side: the phone a buyer actually holds, with the catalogue's real photos at different depths around it. */
+export function StorefrontPreview() {
+  const reduced = useReducedMotion();
+  const stage = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: stage, offset: ['start end', 'end start'] });
+  const deep = useTransform(scrollYProgress, [0, 1], [120, -120]);
+  const mid = useTransform(scrollYProgress, [0, 1], [60, -70]);
+  const near = useTransform(scrollYProgress, [0, 1], [-30, 40]);
+  const v = (m: MotionValue<number>) => (reduced ? undefined : m);
+
+  return (
+    <section id="storefront" className="relative mx-auto w-full max-w-6xl px-5 pb-12 pt-20 sm:px-8 sm:pb-16 sm:pt-24">
+      <SectionHead title={storefrontPreview.title} sub={storefrontPreview.copy} />
+
+      <div ref={stage} className="relative mx-auto mt-4 flex max-w-4xl justify-center py-6 sm:py-12">
+        {/* real product photos, hung at three depths around the phone */}
+        <Float y={v(deep)} className="absolute left-0 top-6 hidden w-40 md:block lg:-left-6 lg:w-48">
+          <img src="/demo/jhumka.webp" alt="" aria-hidden loading="lazy" decoding="async" className="aspect-[4/5] w-full rounded-lg object-cover shadow-float" />
+        </Float>
+        <Float y={v(mid)} className="absolute bottom-10 left-10 hidden w-32 md:block lg:left-20 lg:w-36">
+          <img src="/demo/cushion.webp" alt="" aria-hidden loading="lazy" decoding="async" className="aspect-square w-full rounded-lg object-cover shadow-float" />
+        </Float>
+        <Float y={v(deep)} className="absolute right-0 top-20 hidden w-36 md:block lg:-right-4 lg:w-44">
+          <img src="/demo/juttis.webp" alt="" aria-hidden loading="lazy" decoding="async" className="aspect-[4/5] w-full rounded-lg object-cover shadow-float" />
+        </Float>
+
+        {/* notes, the closest layer */}
+        <Float y={v(near)} className="absolute left-[4%] top-[46%] z-20 hidden lg:block">
+          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium text-hi">
+            <CheckCircle2 className="size-4 text-jade-ink" aria-hidden /> {storefrontPreview.notes[0]}
+          </p>
+        </Float>
+        <Float y={v(near)} className="absolute right-[2%] top-[8%] z-20 hidden lg:block">
+          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium text-hi">
+            <CheckCircle2 className="size-4 text-jade-ink" aria-hidden /> {storefrontPreview.notes[1]}
+          </p>
+        </Float>
+        <Float y={v(mid)} className="absolute bottom-16 right-[6%] z-20 hidden lg:block">
+          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium text-hi">
+            <CheckCircle2 className="size-4 text-jade-ink" aria-hidden /> {storefrontPreview.notes[2]}
+          </p>
+        </Float>
+
+        {/* the phone */}
+        <div className="relative z-10 w-full max-w-[300px] rounded-[2.75rem] bg-[linear-gradient(160deg,rgb(var(--ink-700)),rgb(var(--ink-950)))] p-[9px] shadow-float">
+          <div className="relative overflow-hidden rounded-[2.2rem] bg-bg">
+            <div className="glass-bar flex items-center gap-2.5 border-b px-4 pb-3 pt-4">
+              <span className="flex size-8 items-center justify-center rounded-full bg-jade-500/15 text-[11px] font-semibold text-jade-ink">
+                RC
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-hi">Ritika&apos;s Closet</p>
+                <p className="font-mono text-[10px] text-low">/s/ritikas-closet</p>
               </div>
+              <span className="ml-auto flex items-center gap-1 rounded-full bg-jade-500/14 px-2 py-0.5 text-[10px] font-semibold text-jade-ink">
+                <ShieldCheck className="size-3" aria-hidden /> Verified
+              </span>
             </div>
+            <div className="grid grid-cols-2 gap-2 p-2.5">
+              {demoCatalog.map((p) => (
+                <div key={p.name} className="overflow-hidden rounded-[14px] panel">
+                  <img src={p.img} alt={p.name} loading="lazy" decoding="async" className="aspect-[4/5] w-full object-cover" />
+                  <div className="p-2">
+                    <p className="truncate text-[10.5px] font-medium text-hi">{p.name}</p>
+                    <div className="flex items-baseline gap-1.5">
+                      <MoneyText paise={p.price} className="text-[10.5px] font-semibold text-hi" />
+                      {p.compareAt && <MoneyText paise={p.compareAt} strike className="text-[9px]" />}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* checkout sheet rising over the grid: phone OTP, then UPI */}
+            <motion.div
+              initial={reduced ? false : { y: '100%' }}
+              whileInView={{ y: '0%' }}
+              viewport={{ once: true, margin: '-30%' }}
+              transition={{ type: 'spring', stiffness: 160, damping: 22, delay: 0.3 }}
+              className="glass-nav absolute inset-x-0 bottom-0 rounded-t-[1.6rem] px-4 pb-5 pt-2"
+            >
+              <span aria-hidden className="mx-auto mb-3 block h-1 w-9 rounded-full bg-low/35" />
+              <p className="text-[12.5px] font-semibold text-hi">Verify your number</p>
+              <p className="text-[10.5px] text-low">Sent to 98110 43210. No account needed.</p>
+              <div className="mt-2.5 flex gap-1.5" aria-hidden>
+                {['4', '8', '2', '9', '1', '6'].map((d, i) => (
+                  <span
+                    key={i}
+                    className="flex h-9 flex-1 items-center justify-center rounded-[10px] neu-inset font-mono text-[13px] font-semibold text-hi"
+                  >
+                    {d}
+                  </span>
+                ))}
+              </div>
+              <span className="mt-3 flex h-10 items-center justify-center rounded-full bg-[linear-gradient(180deg,rgb(var(--jade-400)),rgb(var(--jade-500)))] text-[12px] font-semibold text-[rgb(var(--text-on-accent))] clay">
+                Pay <MoneyText paise={149900} className="mx-1" /> with UPI
+              </span>
+            </motion.div>
           </div>
-        </Reveal>
+        </div>
       </div>
-    </Section>
+
+      {/* the same three notes, readable on phones where the floating layer is hidden */}
+      <ul className="mx-auto mt-10 flex max-w-md flex-col gap-2.5 lg:hidden">
+        {storefrontPreview.notes.map((n) => (
+          <li key={n} className="flex items-center gap-2.5 text-sm text-mid">
+            <CheckCircle2 className="size-4 shrink-0 text-jade-ink" aria-hidden /> {n}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

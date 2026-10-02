@@ -2,19 +2,19 @@ import { useRef, type HTMLAttributes, type PointerEvent, type ReactNode } from '
 import { cn } from '@/lib/cn';
 
 type CardProps = HTMLAttributes<HTMLDivElement> & {
-  /** frosted glass instead of the solid panel surface */
+  /** frosted glass instead of the opaque panel; for panes that float over imagery */
   glass?: boolean;
-  /** cursor-follow luminous edge on hover (adds to the default lift) */
+  /** pointer-lit edge plus a small lift: only for cards that are themselves a target */
   interactive?: boolean;
-  /** opt out of the hover lift — for chart/table containers */
+  /** kept for call sites that opted out of the old default lift; cards are still by default now */
   flat?: boolean;
 };
 
-export function Card({ glass, interactive, flat, className, ...rest }: CardProps) {
-  // .spotlight reads --mx/--my; without this the "luminous edge" never moved.
-  // The rect is measured once on enter, so the move handler stays a pure style
-  // write — reading getBoundingClientRect every pointermove would force layout
-  // on each frame and is what makes hover effects feel heavy.
+export function Card({ glass, interactive, className, ...props }: CardProps) {
+  const rest = { ...props };
+  delete rest.flat;
+  // .spotlight reads --mx/--my. The rect is measured once on enter so the move
+  // handler stays a pure style write rather than forcing layout per frame.
   const rect = useRef<DOMRect | null>(null);
 
   const onEnter = (e: PointerEvent<HTMLDivElement>) => {
@@ -33,10 +33,10 @@ export function Card({ glass, interactive, flat, className, ...rest }: CardProps
       onPointerEnter={interactive ? onEnter : undefined}
       onPointerMove={interactive ? onMove : undefined}
       className={cn(
-        'rounded-lg transition-[transform,box-shadow] duration-std ease-enter',
+        'rounded-lg',
         glass ? 'glass' : 'panel',
-        !flat && 'hover:-translate-y-0.5 hover:shadow-raised',
-        interactive && 'spotlight',
+        interactive &&
+          'spotlight transition-[transform,box-shadow] duration-std ease-enter [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-raised',
         className,
       )}
       {...rest}
@@ -58,8 +58,8 @@ export function CardHeader({
   return (
     <div className={cn('flex flex-wrap items-start justify-between gap-3 p-5 pb-0', className)}>
       <div className="min-w-0">
-        <h3 className="font-display text-base font-semibold tracking-tight text-hi">{title}</h3>
-        {subtitle && <p className="mt-1 text-sm text-mid">{subtitle}</p>}
+        <h3 className="text-[15px] font-semibold tracking-snug text-hi">{title}</h3>
+        {subtitle && <p className="mt-0.5 text-[13px] text-low">{subtitle}</p>}
       </div>
       {action}
     </div>

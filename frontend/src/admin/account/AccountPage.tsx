@@ -4,7 +4,7 @@ import { ApiError } from '@/api/http';
 import { toast } from '@/store/ui';
 import { PageHeader } from '@/app/shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
-import { Field, Input } from '@/ui/Input';
+import { Field, PasswordInput } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 
 export default function AccountPage() {
@@ -38,13 +38,13 @@ export default function AccountPage() {
         <CardHeader title="Change password" />
         <form onSubmit={submit} className="flex flex-col gap-4 p-5 pt-4">
           <Field label="Current password">
-            <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+            <PasswordInput autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
           </Field>
           <Field label="New password" hint="8+ characters">
-            <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+            <PasswordInput autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
           </Field>
           <Field label="Confirm new password">
-            <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <PasswordInput autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </Field>
           <Button type="submit" loading={busy}>
             Update password

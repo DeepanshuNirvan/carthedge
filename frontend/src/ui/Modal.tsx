@@ -24,7 +24,8 @@ function useEscape(open: boolean, onClose: () => void) {
   }, [open, onClose]);
 }
 
-const scrim = 'absolute inset-0 bg-bg/60 backdrop-blur-md';
+// dims and softly defocuses what is behind, so the sheet is the one thing in front
+const scrim = 'absolute inset-0 bg-ink-950/40 backdrop-blur-[6px]';
 
 /** Flick a sheet past the threshold (or fast enough) to dismiss it. */
 const shouldDismiss = (info: PanInfo, axis: 'x' | 'y') =>
@@ -39,7 +40,7 @@ function Grabber({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => 
       onPointerDown={onPointerDown}
       className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5 active:cursor-grabbing sm:hidden"
     >
-      <span className="h-1 w-9 rounded-full bg-low/40" />
+      <span className="h-[5px] w-10 rounded-full bg-low/35" />
     </div>
   );
 }
@@ -64,13 +65,13 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
             aria-modal
             aria-label={title}
             className={cn(
-              'glass sheen relative flex max-h-[92dvh] w-full flex-col rounded-t-xl shadow-float sm:rounded-xl',
+              'glass-nav sheen relative flex max-h-[92dvh] w-full flex-col rounded-t-xl shadow-float sm:rounded-xl',
               wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
             )}
-            initial={{ opacity: 0, y: 32, scale: 0.97 }}
+            initial={{ opacity: 0, y: 40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.98 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, y: 28, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.9 }}
             drag="y"
             dragListener={false}
             dragControls={drag}
@@ -80,8 +81,8 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
           >
             <Grabber onPointerDown={(e) => drag.start(e)} />
             {title && (
-              <div className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3 sm:py-4">
-                <h2 className="font-display text-lg font-semibold tracking-tight text-hi">{title}</h2>
+              <div className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3 sm:py-3.5">
+                <h2 className="text-[17px] font-semibold tracking-snug text-hi">{title}</h2>
                 <IconButton label="Close" onClick={onClose}>
                   <X className="size-[18px]" />
                 </IconButton>
@@ -126,15 +127,15 @@ export function Sheet({
             aria-modal
             aria-label={title}
             className={cn(
-              'glass sheen relative flex flex-col overflow-hidden shadow-float',
+              'glass-nav sheen relative flex flex-col overflow-hidden shadow-float',
               fromRight
-                ? 'h-dvh w-full max-w-xl sm:rounded-l-2xl'
-                : 'max-h-[94dvh] w-full max-w-2xl rounded-t-2xl',
+                ? 'h-dvh w-full max-w-xl sm:my-2 sm:mr-2 sm:h-[calc(100dvh-1rem)] sm:rounded-xl'
+                : 'max-h-[94dvh] w-full max-w-2xl rounded-t-xl',
             )}
             initial={fromRight ? { x: '100%' } : { y: '100%' }}
             animate={{ x: 0, y: 0 }}
             exit={fromRight ? { x: '100%' } : { y: '100%' }}
-            transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ type: 'spring', stiffness: 340, damping: 36 }}
             drag={fromRight ? 'x' : 'y'}
             dragListener={false}
             dragControls={drag}
@@ -146,11 +147,11 @@ export function Sheet({
             <div
               onPointerDown={(e) => fromRight && drag.start(e)}
               className={cn(
-                'flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4',
+                'flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3.5',
                 fromRight && 'touch-pan-y',
               )}
             >
-              <h2 className="truncate font-display text-lg font-semibold tracking-tight text-hi">{title}</h2>
+              <h2 className="truncate text-[17px] font-semibold tracking-snug text-hi">{title}</h2>
               <IconButton label="Close" onClick={onClose}>
                 <X className="size-[18px]" />
               </IconButton>

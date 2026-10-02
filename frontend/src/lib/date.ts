@@ -2,18 +2,18 @@ const dateFmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short
 const timeFmt = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' });
 
 export function formatDate(iso: string) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return dateFmt.format(new Date(iso));
 }
 
 export function formatDateTime(iso: string) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
   return `${dateFmt.format(d)}, ${timeFmt.format(d)}`;
 }
 
 export function timeAgo(iso: string) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 60) return 'just now';
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;

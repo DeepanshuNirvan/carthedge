@@ -34,7 +34,7 @@ export function Dropdown({ trigger, children, align = 'right' }: DropdownProps) 
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              'glass sheen absolute z-40 mt-2 min-w-44 overflow-hidden rounded-md p-1 shadow-float',
+              'glass-nav sheen absolute z-40 mt-2 min-w-48 overflow-hidden rounded-lg p-1.5 shadow-float',
               align === 'right' ? 'right-0' : 'left-0',
             )}
             onClick={() => setOpen(false)}
@@ -60,8 +60,8 @@ export function DropdownItem({
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors duration-micro',
-        danger ? 'text-danger-ink hover:bg-danger/12' : 'text-hi hover:bg-surface-2',
+        'flex min-h-10 w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors duration-micro',
+        danger ? 'text-danger-ink hover:bg-danger/12' : 'text-hi hover:bg-[rgb(var(--field)/0.08)]',
       )}
     >
       {children}

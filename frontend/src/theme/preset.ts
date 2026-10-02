@@ -32,6 +32,8 @@ export const carthedgePreset = {
       low: v('text-low'),
       dim: v('text-dim'),
       line: v('line'),
+      bulb: v('bulb'),
+      wire: v('wire'),
       success: v('success'),
       warning: v('warning'),
       danger: v('danger'),
@@ -40,14 +42,21 @@ export const carthedgePreset = {
       'info-ink': v('info-ink'),
     },
     fontFamily: {
-      display: ['"Clash Display"', 'system-ui', 'sans-serif'],
-      sans: ['Satoshi', 'system-ui', 'sans-serif'],
-      mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+      // one family: display and UI are the same Geist at different sizes,
+      // weights and tracking — the hierarchy is in the setting, not the face
+      display: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
     },
+    // preflight paints borders with this default; without it every border/divide falls back to currentColor
+    borderColor: ({ theme }: { theme: (path: string) => Record<string, string> }) => ({
+      ...theme('colors'),
+      DEFAULT: 'rgb(var(--line) / var(--line-a))',
+    }),
     extend: {
-      // env() through the spacing scale so pb-safe / h-safe work anywhere.
-      // 4.5/5.5 fill the gap Tailwind's default scale stops at (3.5) — size-4.5
-      // is the icon size this UI uses, and without it the class emits nothing.
+      // every whole step 1-99, so `bg-jade-500/14` works: Tailwind's default
+      // scale skips most of these and silently emits nothing for them
+      opacity: Object.fromEntries(Array.from({ length: 99 }, (_, i) => [String(i + 1), String((i + 1) / 100)])),
       spacing: {
         safe: 'env(safe-area-inset-bottom)',
         'safe-t': 'env(safe-area-inset-top)',
@@ -55,11 +64,15 @@ export const carthedgePreset = {
         5.5: '1.375rem',
       },
       fontSize: {
-        d0: ['clamp(3.25rem, 2.2rem + 5.4vw, 7.5rem)', { lineHeight: '0.96', letterSpacing: '-0.035em' }],
-        d1: ['clamp(2.75rem, 2rem + 4vw, 6rem)', { lineHeight: '1.0', letterSpacing: '-0.032em' }],
-        d2: ['clamp(2.25rem, 1.6rem + 2.6vw, 4rem)', { lineHeight: '1.05', letterSpacing: '-0.027em' }],
-        d3: ['clamp(1.75rem, 1.4rem + 1.6vw, 2.75rem)', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
-        d4: ['clamp(1.35rem, 1.2rem + 0.8vw, 1.75rem)', { lineHeight: '1.2', letterSpacing: '-0.012em' }],
+        d0: ['clamp(2.75rem, 1.6rem + 4.6vw, 5.75rem)', { lineHeight: '0.98', letterSpacing: '-0.04em' }],
+        d1: ['clamp(2.5rem, 1.7rem + 3.4vw, 4.75rem)', { lineHeight: '1.0', letterSpacing: '-0.04em' }],
+        d2: ['clamp(2rem, 1.5rem + 2.2vw, 3.5rem)', { lineHeight: '1.04', letterSpacing: '-0.035em' }],
+        d3: ['clamp(1.6rem, 1.3rem + 1.3vw, 2.4rem)', { lineHeight: '1.1', letterSpacing: '-0.028em' }],
+        d4: ['clamp(1.3rem, 1.15rem + 0.7vw, 1.65rem)', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
+      },
+      letterSpacing: {
+        tightest: '-0.04em',
+        snug: '-0.012em',
       },
       borderRadius: {
         xs: 'var(--r-xs)',
@@ -79,36 +92,34 @@ export const carthedgePreset = {
         soft: 'var(--shadow-soft)',
         raised: 'var(--shadow-raised)',
         float: 'var(--shadow-float)',
-        glow: '0 0 48px -8px rgb(var(--jade-500) / 0.45)',
-        'glow-gold': '0 0 48px -8px rgb(var(--gold-400) / 0.45)',
+        // a lit pane casts warm light downward, offset like a real lamp
+        glow: '0 18px 40px -18px rgb(var(--jade-500) / 0.55)',
+        'glow-gold': '0 18px 40px -18px rgb(var(--gold-400) / 0.55)',
       },
-      transitionDuration: { micro: '130ms', std: '240ms', expr: '480ms', cine: '720ms' },
+      transitionDuration: { micro: '140ms', std: '260ms', expr: '520ms', cine: '760ms' },
       transitionTimingFunction: {
         enter: 'cubic-bezier(0.16, 1, 0.3, 1)',
-        spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        spring: 'cubic-bezier(0.22, 1, 0.36, 1)',
         exit: 'cubic-bezier(0.7, 0, 0.84, 0)',
       },
       keyframes: {
-        shimmer: { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
         rise: {
-          from: { opacity: '0', transform: 'translateY(14px)' },
+          from: { opacity: '0', transform: 'translateY(12px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
-        floaty: {
-          '0%,100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-8px)' },
+        breathe: {
+          '0%,100%': { opacity: '0.55' },
+          '50%': { opacity: '1' },
         },
-        pulseRing: {
-          '0%': { boxShadow: '0 0 0 0 rgb(var(--jade-500) / 0.5)' },
-          '70%': { boxShadow: '0 0 0 12px rgb(var(--jade-500) / 0)' },
-          '100%': { boxShadow: '0 0 0 0 rgb(var(--jade-500) / 0)' },
+        marquee: {
+          from: { transform: 'translate3d(0,0,0)' },
+          to: { transform: 'translate3d(-50%,0,0)' },
         },
       },
       animation: {
-        shimmer: 'shimmer 1.8s linear infinite',
-        rise: 'rise 480ms cubic-bezier(0.16,1,0.3,1) both',
-        floaty: 'floaty 6s ease-in-out infinite',
-        pulseRing: 'pulseRing 2s cubic-bezier(0.16,1,0.3,1) infinite',
+        rise: 'rise 520ms cubic-bezier(0.16,1,0.3,1) both',
+        breathe: 'breathe 2.4s ease-in-out infinite',
+        marquee: 'marquee 60s linear infinite',
       },
     },
   },

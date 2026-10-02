@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
+import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'framer-motion';
+import { ArrowUpRight, Menu, X } from 'lucide-react';
 import { nav } from '@/strings/marketing';
 import { useSite } from '@/api/site';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -12,6 +12,7 @@ import { IconButton } from '@/ui/Button';
 import { Wordmark } from './Wordmark';
 import { SectionLink } from './SectionLink';
 
+/** A floating glass capsule. Transparent over the hero, frosted once the page moves under it. */
 export function MarketingNav() {
   const announcement = useSite().data?.site.announcement?.trim();
   const [scrolled, setScrolled] = useState(false);
@@ -19,74 +20,68 @@ export function MarketingNav() {
   const [hovered, setHovered] = useState<string | null>(null);
   useScrollLock(open);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 20));
 
   const linkCls =
-    'relative isolate rounded-lg px-3 py-1.5 text-sm text-mid transition-colors duration-micro hover:text-hi';
+    'relative isolate rounded-full px-3.5 py-2 text-[13.5px] font-medium text-mid transition-colors duration-micro hover:text-hi';
 
-  // One pill, shared across links via layoutId, so it glides from item to item
-  // instead of each link fading its own background in and out.
+  // one pill shared across links via layoutId, so it glides from item to item
   const pill = (
     <motion.span
       layoutId="navHover"
-      className="absolute inset-0 -z-10 rounded-lg bg-[rgb(var(--text-hi)/0.07)] hairline"
-      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+      className="absolute inset-0 -z-10 rounded-full bg-[rgb(var(--field)/0.08)]"
+      transition={{ type: 'spring', stiffness: 460, damping: 36 }}
     />
   );
 
-  const linkEl = (l: { label: string; href: string }) => (
-    <SectionLink
-      key={l.href}
-      href={l.href}
-      onPointerEnter={() => setHovered(l.href)}
-      className={linkCls}
-    >
-      {hovered === l.href && pill}
-      {l.label}
-    </SectionLink>
-  );
-
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+    <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-4">
       {/* set by CartHedge staff in the admin console; empty hides it */}
-      {announcement && (
-        <p className="line-clamp-2 max-w-6xl rounded-xl bg-gold-400/14 px-4 py-1.5 text-center text-xs font-medium leading-snug text-gold-ink backdrop-blur">
-          {announcement}
-        </p>
-      )}
+      {/* folds away once the page moves, so it never sits on top of content */}
+      <AnimatePresence initial={false}>
+        {announcement && !scrolled && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0, marginBottom: -8 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="glass-nav line-clamp-2 max-w-3xl overflow-hidden rounded-full px-4 py-1.5 text-center text-xs font-medium leading-snug text-gold-ink"
+          >
+            {announcement}
+          </motion.p>
+        )}
+      </AnimatePresence>
       <nav
         aria-label="Main"
         className={cn(
-          'flex w-full max-w-6xl items-center justify-between gap-4 rounded-2xl px-4 py-2.5 transition-all duration-std sm:px-5',
-          scrolled ? 'glass-nav sheen shadow-raised' : 'bg-transparent',
+          'flex w-full max-w-6xl items-center justify-between gap-3 rounded-full py-2 pl-4 pr-2 transition-[background-color,box-shadow,max-width] duration-std ease-enter sm:pl-5',
+          scrolled ? 'glass-nav sheen max-w-5xl' : 'bg-transparent',
         )}
       >
         <Link to="/" aria-label="CartHedge home" className="shrink-0">
           <Wordmark />
         </Link>
-        <div
-          className="hidden items-center gap-1 md:flex"
-          onPointerLeave={() => setHovered(null)}
-        >
-          {nav.links.map(linkEl)}
+        <div className="hidden items-center md:flex" onPointerLeave={() => setHovered(null)}>
+          {nav.links.map((l) => (
+            <SectionLink key={l.href} href={l.href} onPointerEnter={() => setHovered(l.href)} className={linkCls}>
+              {hovered === l.href && pill}
+              {l.label}
+            </SectionLink>
+          ))}
         </div>
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-1 md:flex">
           <ThemeToggle />
-          <Link to="/app/login" className={buttonLink('ghost')}>
+          <Link to="/app/login" className={cn(buttonLink('ghost'), 'h-10 px-4')}>
             {nav.login}
           </Link>
-          <Link to="/app/register" className={buttonLink('primary')}>
+          <Link to="/app/register" className={cn(buttonLink('primary'), 'h-10 px-4')}>
             {nav.cta}
           </Link>
         </div>
-        <div className="flex items-center gap-1 md:hidden">
+        <div className="flex items-center gap-0.5 md:hidden">
           <ThemeToggle />
-          <IconButton label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>
+          <IconButton label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </IconButton>
         </div>
@@ -98,26 +93,29 @@ export function MarketingNav() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain bg-bg/95 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(6rem+env(safe-area-inset-top))] backdrop-blur-xl md:hidden"
+            transition={{ duration: 0.2 }}
+            className="glass-bar fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5.5rem+env(safe-area-inset-top))] md:hidden"
           >
-            <div className="flex flex-col gap-2 px-7">
+            <div className="flex flex-col px-6">
               {nav.links.map((l, i) => (
                 <motion.div
                   key={l.href}
-                  initial={{ opacity: 0, x: -16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.05 * i, duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.04 * i, type: 'spring', stiffness: 380, damping: 32 }}
+                  className="border-b"
                 >
                   <SectionLink
                     href={l.href}
                     onClick={() => setOpen(false)}
-                    className="block py-3 font-display text-d3 font-semibold text-hi"
+                    className="flex items-center justify-between py-4 text-d4 font-semibold text-hi"
                   >
                     {l.label}
+                    <ArrowUpRight className="size-5 text-low" aria-hidden />
                   </SectionLink>
                 </motion.div>
               ))}
-              <div className="mt-6 flex flex-col gap-3">
+              <div className="mt-8 flex flex-col gap-3">
                 <Link to="/app/register" className={buttonLink('primary', 'lg')} onClick={() => setOpen(false)}>
                   {nav.cta}
                 </Link>

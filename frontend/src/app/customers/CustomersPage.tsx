@@ -41,22 +41,24 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-lg bg-surface-2 p-3">
-              <p className="font-display text-xl font-semibold tnum text-hi">{customer.ordersCount}</p>
+          <div className="grid grid-cols-3 divide-x rounded-xl bg-[rgb(var(--field)/0.04)] text-center hairline">
+            <div className="p-3.5">
+              <p className="text-xl font-semibold tracking-tight tnum text-hi">{customer.ordersCount}</p>
               <p className="text-xs text-low">orders</p>
             </div>
-            <div className="rounded-lg bg-surface-2 p-3">
-              <MoneyText paise={customer.totalSpent} compact className="font-display text-xl font-semibold text-jade-ink" />
+            <div className="p-3.5">
+              <MoneyText paise={customer.totalSpent} compact className="text-xl font-semibold tracking-tight text-jade-ink" />
               <p className="text-xs text-low">lifetime value</p>
             </div>
-            <div className="rounded-lg bg-surface-2 p-3">
-              <p className="font-display text-xl font-semibold tnum text-danger-ink">{customer.codRefusals}</p>
+            <div className="p-3.5">
+              <p className={`text-xl font-semibold tracking-tight tnum ${customer.codRefusals > 0 ? 'text-danger-ink' : 'text-hi'}`}>
+                {customer.codRefusals}
+              </p>
               <p className="text-xs text-low">COD refusals</p>
             </div>
           </div>
 
-          <div className="grid gap-4 rounded-lg bg-surface-2 p-4 sm:grid-cols-2">
+          <div className="grid gap-4 rounded-xl bg-[rgb(var(--field)/0.04)] p-4 hairline sm:grid-cols-2">
             <Field label="Segment">
               <Select
                 value={customer.segment}
@@ -89,14 +91,14 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
           </div>
 
           {customer.lastAddress.line && (
-            <p className="rounded-lg bg-surface-2 p-4 text-sm leading-relaxed text-mid">
-              {customer.lastAddress.line}, {customer.lastAddress.city}, {customer.lastAddress.state} —{' '}
+            <p className="rounded-xl bg-[rgb(var(--field)/0.04)] p-4 text-sm leading-relaxed text-mid hairline">
+              {customer.lastAddress.line}, {customer.lastAddress.city}, {customer.lastAddress.state},{' '}
               {customer.lastAddress.pincode}
             </p>
           )}
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-low">Order history</h3>
+            <h3 className="mb-2 text-[13px] font-semibold text-mid">Order history</h3>
             {orders && orders.length > 0 ? (
               <ul className="divide-y">
                 {orders.map((o) => (
@@ -133,16 +135,16 @@ export default function CustomersPage() {
         actions={
           <>
             <div className="relative basis-full sm:basis-auto">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" />
               <Input
                 placeholder="Name or phone…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-11 pl-9 sm:h-10 sm:w-52"
+                className="h-11 rounded-full pl-10 sm:h-10 sm:w-52"
                 aria-label="Search customers"
               />
             </div>
-            <Select value={segment} onChange={(e) => setSegment(e.target.value)} className="h-11 sm:h-10 sm:w-32" aria-label="Segment filter">
+            <Select value={segment} onChange={(e) => setSegment(e.target.value)} className="h-11 rounded-full sm:h-10 sm:w-40" aria-label="Segment filter">
               <option value="">All segments</option>
               <option value="retail">Retail</option>
               <option value="reseller">Reseller</option>
@@ -186,7 +188,7 @@ export default function CustomersPage() {
                 </Td>
                 <Td className="hidden text-right tnum sm:table-cell">{c.codRefusals}</Td>
                 <Td>{c.riskFlagged && <AlertTriangle className="size-4 text-danger-ink" aria-label="Risk flagged" />}</Td>
-                <Td className="hidden text-xs text-low sm:table-cell">{c.lastOrderAt ? timeAgo(c.lastOrderAt) : '—'}</Td>
+                <Td className="hidden text-xs text-low sm:table-cell">{c.lastOrderAt ? timeAgo(c.lastOrderAt) : '-'}</Td>
               </Tr>
             ))}
           </tbody>
@@ -195,7 +197,7 @@ export default function CustomersPage() {
         <EmptyState
           icon={<Users className="size-5" />}
           title="No customers yet"
-          message="Every order automatically builds your ledger — LTV, repeat rate and COD behaviour included."
+          message="Every order automatically builds your ledger, LTV, repeat rate and COD behaviour included."
         />
       )}
 

@@ -7,6 +7,7 @@ import { capabilityLabels } from '@/strings/capabilities';
 import { Card } from '@/ui/Card';
 import { Skeleton } from '@/ui/Skeleton';
 import { buttonLink } from '@/ui/buttonLink';
+import { BulbString } from '@/ui/BulbString';
 import { cn } from '@/lib/cn';
 
 /**
@@ -21,13 +22,14 @@ export function FeatureGate({ capability, children }: { capability: Capability; 
 
   const meta = capabilityLabels[capability];
   return (
-    <Card className="mx-auto flex max-w-lg flex-col items-center p-6 text-center sm:p-8">
-      <span className="grid size-12 place-items-center rounded-full bg-gold-400/14 text-gold-ink">
-        <Lock className="size-5" aria-hidden />
+    <Card className="mx-auto mt-6 flex max-w-lg flex-col items-center p-6 text-center sm:mt-12 sm:p-10">
+      <span className="grid size-14 place-items-center rounded-full bg-gold-400/14 text-gold-ink">
+        <Lock className="size-6" aria-hidden />
       </span>
-      <h2 className="mt-4 font-display text-lg font-semibold text-hi">{meta.label} is not on your plan</h2>
+      <BulbString count={5} className="mt-4" />
+      <h2 className="mt-4 text-d4 font-semibold text-hi">{meta.label} is not on your plan</h2>
       <p className="mt-2 text-sm leading-relaxed text-mid">
-        {meta.blurb}. {planName ? `Your ${planName} plan does not include it — ` : ''}upgrade to switch it on right away.
+        {meta.blurb}. {planName ? `Your ${planName} plan does not include it, ` : ''}upgrade to switch it on right away.
       </p>
       <Link to="/app/billing" className={cn('mt-6', buttonLink('primary'))}>
         See plans

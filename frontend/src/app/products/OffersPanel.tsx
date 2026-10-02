@@ -26,7 +26,7 @@ export function OffersPanel() {
           <Lock className="size-4 shrink-0 text-gold-ink" aria-hidden />
           <p className="flex-1 text-sm text-mid">Discount codes and reseller pricing are not on your plan.</p>
           <Link to="/app/billing" className="text-sm font-medium text-jade-ink hover:underline">
-            See plans →
+            See plans
           </Link>
         </div>
       </Card>

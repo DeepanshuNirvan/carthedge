@@ -73,9 +73,9 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
   };
 
   return (
-    <div className="neu-inset rounded-lg p-4">
+    <div className="rounded-xl bg-[rgb(var(--field)/0.04)] p-4 hairline">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface-2 text-hi">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface text-hi shadow-soft">
           <Icon className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1 basis-40">
@@ -84,7 +84,7 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
             {!existing
               ? 'Not connected'
               : broken
-                ? 'Access expired — reconnect to keep capturing DMs'
+                ? 'Access expired, reconnect to keep capturing DMs'
                 : `Connected · ${existing.displayName || `id ${existing.externalId}`}`}
           </p>
         </div>
@@ -156,7 +156,7 @@ function ChannelsSection() {
 
   return (
     <Card>
-      <CardHeader title="Connected channels" subtitle="Auto-capture orders from Instagram & WhatsApp DMs — no copy-paste" />
+      <CardHeader title="Connected channels" subtitle="Instagram and WhatsApp DMs become orders, no copy-paste" />
       <div className="flex flex-col gap-3 p-5 pt-4">
         <ChannelRow channel="whatsapp" />
         <ChannelRow channel="instagram" />
@@ -220,8 +220,8 @@ function ProfileSection() {
     <Card>
       <CardHeader
         title="Business profile"
-        subtitle="Your name, contact and address — buyers see this on every link"
-        action={<ShareActions url={storeUrl(business.code)} title={`${business.name} — shop the full collection`} />}
+        subtitle="Your name, contact and address. Buyers see this on every link."
+        action={<ShareActions url={storeUrl(business.code)} title={`${business.name} | shop the full collection`} />}
       />
       <form
         onSubmit={handleSubmit((data) =>
@@ -313,10 +313,10 @@ function AiAssistantSection() {
       />
       <div className="flex flex-col gap-5 p-5 pt-4">
         {!canReply.allowed && !canReply.isLoading && (
-          <p className="flex flex-wrap items-center gap-2 rounded-md bg-surface-2 p-3 text-xs text-low">
-            <Lock className="size-3.5" /> Automatic replies need a higher plan — chats still become order drafts.
+          <p className="flex flex-wrap items-center gap-2 rounded-lg bg-gold-400/10 p-3 text-xs text-mid shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.22)]">
+            <Lock className="size-3.5" /> Automatic replies need a higher plan, chats still become order drafts.
             <Link to="/app/billing" className="font-medium text-jade-ink hover:underline">
-              See plans →
+              See plans
             </Link>
           </p>
         )}
@@ -358,7 +358,7 @@ function AiAssistantSection() {
         </div>
         <Field
           label="What the assistant should know"
-          hint="Delivery time, exchange or return policy, sizing, fabric care. It never makes these up — anything not here, it checks with you."
+          hint="Delivery time, exchange or return policy, sizing, fabric care. It never makes these up; anything not here, it checks with you."
         >
           <Textarea
             rows={4}
@@ -405,8 +405,8 @@ function PaymentsSection() {
   const mode = business.razorpayConfigured ? 'gateway' : business.upiId ? 'upi' : 'none';
   const modeNote = {
     gateway: 'Buyers pay by UPI or card through Razorpay and the order confirms itself.',
-    upi: 'Buyers pay your UPI ID directly from GPay/PhonePe/Paytm and send you the reference. You confirm each one from the order card — add Razorpay later if you want that to be automatic.',
-    none: 'Buyers can only choose cash on delivery. Add a UPI ID below to start taking prepaid orders — that alone is enough, Razorpay is optional.',
+    upi: 'Buyers pay your UPI ID directly from GPay/PhonePe/Paytm and send you the reference. You confirm each one from the order card. Add Razorpay later if you want that to be automatic.',
+    none: 'Buyers can only choose cash on delivery. Add a UPI ID below to start taking prepaid orders. That alone is enough; Razorpay is optional.',
   }[mode];
 
   return (
@@ -425,8 +425,8 @@ function PaymentsSection() {
       <div className="flex flex-col gap-6 p-5 pt-4">
         <p
           className={cn(
-            'rounded-md p-3 text-xs leading-relaxed',
-            mode === 'none' ? 'bg-gold-400/10 text-gold-ink' : 'bg-surface-2 text-mid',
+            'rounded-lg p-3.5 text-xs leading-relaxed',
+            mode === 'none' ? 'bg-gold-400/10 text-gold-ink' : 'bg-[rgb(var(--field)/0.05)] text-mid hairline',
           )}
         >
           {modeNote}
@@ -448,11 +448,11 @@ function PaymentsSection() {
           className="grid gap-4 sm:grid-cols-2"
         >
           <div className="sm:col-span-2">
-            <Field label="UPI ID" hint="Enough on its own — no gateway account needed. GPay, PhonePe, Paytm and every UPI app can pay it.">
+            <Field label="UPI ID" hint="Enough on its own, no gateway account needed. GPay, PhonePe, Paytm and every UPI app can pay it.">
               <Input placeholder="you@okhdfcbank" {...register('upiId')} />
             </Field>
           </div>
-          <Field label="Razorpay Key ID" optional hint="rzp_live_… — adds cards and auto-confirmation">
+          <Field label="Razorpay Key ID" optional hint="rzp_live_…, adds cards and auto-confirmation">
             <Input {...register('razorpayKeyId')} autoComplete="off" />
           </Field>
           <Field label="Razorpay Key Secret" optional hint="Stored AES-encrypted, never shown again">
@@ -498,7 +498,7 @@ function PaymentsSection() {
               }}
             />
           </Field>
-          <Field label="Baseline RTO %" hint="Used by your savings meter — industry default 25">
+          <Field label="Baseline RTO %" hint="Used by your savings meter, industry default 25">
             <Input
               inputMode="numeric"
               defaultValue={String(business.baselineRtoPercent)}
@@ -520,13 +520,13 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="flex max-w-3xl flex-col gap-4">
+      <div className="flex max-w-3xl flex-col gap-5">
         <ProfileSection />
         <ChannelsSection />
         <AiAssistantSection />
         <PaymentsSection />
         <p className="flex items-center gap-2 px-1 text-xs text-low">
-          <Landmark className="size-3.5" /> CartHedge never holds your money — Razorpay and UPI settle straight to you.
+          <Landmark className="size-3.5" /> CartHedge never holds your money, Razorpay and UPI settle straight to you.
           <Store className="ml-3 size-3.5" /> Store pauses automatically if your subscription lapses.
         </p>
       </div>

@@ -97,7 +97,7 @@ export default function BusinessDetailPage() {
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between gap-4">
                 <dt className="text-low">{label}</dt>
-                <dd className="truncate text-right text-mid">{value || '—'}</dd>
+                <dd className="truncate text-right text-mid">{value || '-'}</dd>
               </div>
             ))}
           </dl>

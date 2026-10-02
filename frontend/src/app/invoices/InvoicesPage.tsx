@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FileText, Printer } from 'lucide-react';
 import type { Invoice } from '@/api/types';
 import { useInvoices } from '@/api/invoices';
 import { useBusiness } from '@/api/business';
+import { useOrder } from '@/api/orders';
+import { InvoiceDocument } from './InvoiceDocument';
 import { formatDate } from '@/lib/date';
 import { PageHeader } from '../shell/PageHeader';
-import { LogoMark } from '@/marketing/Wordmark';
 import { Table, Td, Th, Tr } from '@/ui/Table';
 import { MoneyText } from '@/ui/MoneyText';
 import { Modal } from '@/ui/Modal';
@@ -15,67 +17,26 @@ import { EmptyState } from '@/ui/EmptyState';
 
 function InvoiceView({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
   const { data: business } = useBusiness();
+  const { data: order, isLoading: orderLoading } = useOrder(invoice?.orderId);
+  const doc = invoice && (
+    <InvoiceDocument invoice={invoice} business={business} order={order} orderLoading={orderLoading} />
+  );
   return (
-    <Modal open={!!invoice} onClose={onClose} title={`Invoice ${invoice?.invoiceNumber ?? ''}`} wide>
-      {invoice && (
-        <>
-          {/* print-friendly premium layout */}
-          <div id="invoice-print" className="rounded-lg bg-surface-2 p-5 sm:p-8">
-            <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-              <div>
-                <p className="font-display text-xl font-semibold text-hi">{business?.name}</p>
-                {business?.gstin && <p className="mt-1 font-mono text-xs text-mid">GSTIN {business.gstin}</p>}
-                <p className="mt-1 text-xs leading-relaxed text-low">
-                  {business?.address && `${business.address}, `}
-                  {business?.city} {business?.pincode}
-                </p>
-              </div>
-              <div className="sm:text-right">
-                <p className="font-mono text-sm font-semibold text-jade-ink">{invoice.invoiceNumber}</p>
-                <p className="mt-1 text-xs text-low">{formatDate(invoice.createdAt)}</p>
-                <p className="mt-1 font-mono text-xs text-low">Order #{invoice.orderCode}</p>
-              </div>
-            </div>
-            <p className="mt-5 text-sm text-mid">
-              Billed to <span className="font-medium text-hi">{invoice.customerName}</span>
-            </p>
-            <dl className="mt-5 flex flex-col gap-2 text-sm">
-              <div className="flex justify-between text-mid">
-                <dt>Subtotal</dt>
-                <dd><MoneyText paise={invoice.subtotal} /></dd>
-              </div>
-              {invoice.discount > 0 && (
-                <div className="flex justify-between text-mid">
-                  <dt>Discount</dt>
-                  <dd>-<MoneyText paise={invoice.discount} /></dd>
-                </div>
-              )}
-              <div className="flex justify-between text-mid">
-                <dt>Shipping</dt>
-                <dd><MoneyText paise={invoice.shipping} /></dd>
-              </div>
-              {invoice.gstRate > 0 && (
-                <div className="flex justify-between text-mid">
-                  <dt>GST @ {invoice.gstRate}%</dt>
-                  <dd><MoneyText paise={invoice.gstAmount} /></dd>
-                </div>
-              )}
-              <div className="flex justify-between border-t pt-3 text-base font-semibold text-hi">
-                <dt>Total</dt>
-                <dd><MoneyText paise={invoice.total} /></dd>
-              </div>
-            </dl>
-            <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-low">
-              <LogoMark size={14} />
-              Generated with CartHedge · carthedge.in
-            </p>
-          </div>
-          <Button variant="secondary" className="mt-4" icon={<Printer className="size-4" />} onClick={() => window.print()}>
-            Print / save PDF
+    <>
+      <Modal open={!!invoice} onClose={onClose} title={`Invoice ${invoice?.invoiceNumber ?? ''}`} wide>
+        {doc}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button icon={<Printer className="size-4" />} onClick={() => window.print()}>
+            Print or save PDF
           </Button>
-        </>
-      )}
-    </Modal>
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </Modal>
+      {/* print copy: a direct child of <body>, so the print stylesheet can show it alone at full page */}
+      {doc && createPortal(<div id="invoice-print" className="hidden print:block">{doc}</div>, document.body)}
+    </>
   );
 }
 
@@ -87,7 +48,7 @@ export default function InvoicesPage() {
     <>
       <PageHeader
         title="Invoices"
-        subtitle="GST-lite invoices from delivered orders — create them from the order drawer"
+        subtitle="GST-lite invoices from your orders. Create one from the order drawer; numbering is automatic."
       />
       {isLoading ? (
         <Skeleton className="h-64" />
@@ -120,7 +81,7 @@ export default function InvoicesPage() {
         <EmptyState
           icon={<FileText className="size-5" />}
           title="No invoices yet"
-          message="Open a delivered order and tap 'Generate invoice' — numbering is automatic."
+          message="Open a delivered order and tap Generate invoice. Numbering is automatic."
         />
       )}
       <InvoiceView invoice={viewing} onClose={() => setViewing(null)} />

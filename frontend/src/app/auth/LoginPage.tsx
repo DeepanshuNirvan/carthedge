@@ -9,9 +9,9 @@ import { login, forgotPassword } from '@/api/auth';
 import { ApiError } from '@/api/http';
 import { toast } from '@/store/ui';
 import { AuthLayout } from './AuthLayout';
-import { Field, Input } from '@/ui/Input';
+import { Field, Input, PasswordInput } from '@/ui/Input';
 import { Button } from '@/ui/Button';
-import { MoneyText } from '@/ui/MoneyText';
+import { Bell, Check } from 'lucide-react';
 
 const loginSchema = z.object({ email: emailSchema, password: z.string().min(1, 'Password is required') });
 type LoginForm = z.infer<typeof loginSchema>;
@@ -19,14 +19,19 @@ type LoginForm = z.infer<typeof loginSchema>;
 function AsidePitch() {
   return (
     <div className="max-w-md">
-      <p className="font-display text-d3 font-semibold text-[#F5F3EE]">
-        Welcome back. Your orders kept moving.
-      </p>
-      <div className="mt-8 w-fit rounded-lg bg-white/[0.06] p-5 backdrop-blur hairline">
-        <p className="text-xs uppercase tracking-wider text-[#A9A6A0]">Saved from RTO this month</p>
-        <p className="mt-1 font-display text-3xl font-semibold text-jade-ink">
-          <MoneyText paise={3124000} />
-        </p>
+      <p className="text-d2 font-semibold text-hi">Welcome back. The stall stayed open.</p>
+      <div className="mt-8 flex flex-col gap-2">
+        {[
+          { icon: Check, text: 'The assistant answered while you were away' },
+          { icon: Bell, text: 'Orders are waiting for your approval' },
+        ].map((n) => (
+          <div key={n.text} className="glass-nav sheen flex w-fit items-center gap-3 rounded-[20px] py-2.5 pl-2.5 pr-4">
+            <span className="flex size-8 items-center justify-center rounded-full bg-jade-500 text-[rgb(var(--text-on-accent))]">
+              <n.icon className="size-4" strokeWidth={2.5} aria-hidden />
+            </span>
+            <span className="text-[13.5px] font-medium text-hi">{n.text}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -66,25 +71,25 @@ export default function LoginPage() {
 
   return (
     <AuthLayout aside={<AsidePitch />}>
-      <Seo title="Log in — CartHedge" description="Sign in to your CartHedge seller workspace." path="/app/login" noIndex />
-      <h1 className="font-display text-d3 font-semibold text-hi">Log in</h1>
-      <p className="mt-2 text-sm text-mid">The order desk missed you.</p>
+      <Seo title="Log in | CartHedge" description="Sign in to your CartHedge seller workspace." path="/app/login" noIndex />
+      <h1 className="text-d3 font-semibold text-hi">Log in</h1>
+      <p className="mt-2 text-[15px] text-mid">Pick up where the assistant left off.</p>
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 flex flex-col gap-5" noValidate>
         <Field label="Email" error={errors.email?.message}>
           <Input type="email" autoComplete="email" {...register('email')} />
         </Field>
         <Field label="Password" error={errors.password?.message}>
-          <Input type="password" autoComplete="current-password" {...register('password')} />
+          <PasswordInput autoComplete="current-password" {...register('password')} />
         </Field>
-        <Button type="submit" size="lg" loading={busy}>
-          Sign in
+        <Button type="submit" size="lg" loading={busy} className="mt-1">
+          Log in
         </Button>
       </form>
-      <div className="mt-5 flex items-center justify-between text-sm">
-        <button onClick={onForgot} className="text-mid transition-colors hover:text-hi">
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <button onClick={onForgot} className="min-h-11 text-mid transition-colors hover:text-hi">
           Forgot password?
         </button>
-        <Link to="/app/register" className="font-medium text-jade-ink hover:underline">
+        <Link to="/app/register" className="flex min-h-11 items-center font-medium text-jade-ink hover:underline">
           Start free trial
         </Link>
       </div>

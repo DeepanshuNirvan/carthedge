@@ -1,126 +1,149 @@
 import { Link } from 'react-router-dom';
 import { motion, useSpring, useTransform } from 'framer-motion';
-import { AlertTriangle, IndianRupee, KanbanSquare, Repeat, ShieldCheck, ShoppingBag, TrendingDown } from 'lucide-react';
+import { useEffect } from 'react';
+import { AlertTriangle, ArrowUpRight, KanbanSquare, Link2, Repeat, ShieldCheck } from 'lucide-react';
 import { useDashboard, useSales, useTopProducts } from '@/api/analytics';
 import { useOrders } from '@/api/orders';
+import { useAuth } from '@/store/auth';
 import { formatPaise } from '@/lib/money';
 import { timeAgo } from '@/lib/date';
 import { cn } from '@/lib/cn';
 import { PageHeader } from '../shell/PageHeader';
 import { SalesAreaChart, TopProductsChart } from '../analytics/charts';
-import { StatTile } from '@/ui/StatTile';
 import { Card, CardHeader } from '@/ui/Card';
 import { MoneyText } from '@/ui/MoneyText';
 import { StatusChip } from '@/ui/Badge';
 import { Progress } from '@/ui/Progress';
 import { Skeleton, SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
+import { buttonLink } from '@/ui/buttonLink';
 
-function SavedAmount({ paise }: { paise: number }) {
-  const spring = useSpring(0, { stiffness: 60, damping: 20 });
-  spring.set(paise);
+function Rupees({ paise }: { paise: number }) {
+  const spring = useSpring(0, { stiffness: 70, damping: 20 });
+  useEffect(() => spring.set(paise), [paise, spring]);
   const text = useTransform(spring, (v) => formatPaise(Math.round(v)));
-  return <motion.span className="font-display tnum">{text}</motion.span>;
+  return <motion.span className="tnum">{text}</motion.span>;
 }
+
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+};
 
 /** Below this many settled COD orders the rate is noise, not a trend. */
 const minCodOutcomes = 5;
 
-/** The emotional hero of the whole app — money the seller kept, in rupees. */
-function RtoMeterHero() {
+/** Money kept from refused COD deliveries this month, with the rate against baseline. */
+function RtoMeter() {
   const { data, isLoading } = useDashboard();
   const meter = data?.rtoMeter;
   const baseline = meter?.baselinePercent ?? 30;
   const actual = meter?.actualPercent ?? 8;
-  // one refusal swings the rate by a hundred points, so a handful of COD
-  // outcomes is noise, not a trend — say so instead of quoting it as fact
   const outcomes = meter?.codOutcomes ?? 0;
   const enoughData = !meter || outcomes >= minCodOutcomes;
-  const reduction = baseline > 0 ? Math.round(((baseline - actual) / baseline) * 100) : 0;
   const improved = actual <= baseline;
 
   return (
-    <Card glass className="relative overflow-hidden rounded-2xl p-5 shadow-float sm:p-8">
-      <div aria-hidden className="absolute -right-20 -top-24 size-64 rounded-full bg-jade-500/20 blur-[90px]" />
-      <div aria-hidden className="absolute -left-16 bottom-[-6rem] size-52 rounded-full bg-gold-400/12 blur-[80px]" />
-      <div className="relative grid items-center gap-6 sm:gap-8 md:grid-cols-[1.35fr_1fr]">
+    <Card className="flex flex-col p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-[13px] font-medium text-mid">
+          <ShieldCheck className="size-4 text-gold-ink" aria-hidden /> Kept from refused COD this month
+        </p>
+      </div>
+      {isLoading ? (
+        <Skeleton className="mt-3 h-10 w-40 rounded-full" />
+      ) : (
+        <p className="mt-2 text-[2.25rem] font-semibold leading-none tracking-tightest text-gold-ink">
+          <Rupees paise={meter?.savedThisMonth ?? 0} />
+        </p>
+      )}
+      <div className="mt-5 space-y-3">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
-            <ShieldCheck className="size-3.5" /> RTO shield · this month
-          </span>
-          {isLoading ? (
-            <Skeleton className="mt-4 h-14 w-56" />
-          ) : (
-            <p className="mt-4 font-display text-[3rem] font-semibold leading-none tracking-tight text-brand-grad sm:text-[3.75rem]">
-              <SavedAmount paise={meter?.savedThisMonth ?? 0} />
-            </p>
-          )}
-          {enoughData ? (
-            <p className="mt-3 text-sm text-mid">
-              You kept this from refused deliveries. RTO is{' '}
-              {improved ? 'down to ' : 'running at '}
-              <span className={cn('font-semibold', improved ? 'text-jade-ink' : 'text-danger-ink')}>{actual}%</span>{' '}
-              {improved ? 'from a ' : 'against a '}
-              <span className="font-semibold text-danger-ink">{baseline}%</span> baseline
-              {meter ? ` · ${outcomes} COD outcomes` : ''}.
-            </p>
-          ) : (
-            <p className="mt-3 text-sm text-mid">
-              Still measuring — {outcomes} of {minCodOutcomes} COD deliveries settled this month. Your rate lands
-              here once there is enough to trust, against a{' '}
-              <span className="font-semibold text-danger-ink">{baseline}%</span> baseline.
-            </p>
-          )}
+          <div className="flex justify-between text-xs text-mid">
+            <span>Baseline refusals</span>
+            <span className="tnum text-danger-ink">{baseline}%</span>
+          </div>
+          <div className="mt-1.5 h-1.5 rounded-full bg-danger/70" />
         </div>
-
-        {/* the reduction, visualised */}
-        <div className="rounded-xl neu p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-hi">
-              <TrendingDown className={cn('size-4', improved ? 'text-jade-ink' : 'text-danger-ink')} />
-              {improved ? 'RTO cut' : 'Above baseline'}
-            </span>
-            <span
-              className={cn(
-                'font-display text-2xl font-semibold tnum',
-                improved ? 'text-jade-ink' : 'text-danger-ink',
-              )}
-            >
-              {enoughData ? `${Math.abs(reduction)}%` : '—'}
+        <div>
+          <div className="flex justify-between text-xs text-mid">
+            <span>Yours this month</span>
+            <span className={cn('tnum', improved ? 'text-jade-ink' : 'text-danger-ink')}>
+              {enoughData ? `${actual}%` : 'Measuring'}
             </span>
           </div>
-          <div className="mt-4 space-y-3">
-            <div>
-              <div className="flex justify-between text-xs text-mid">
-                <span>Baseline</span>
-                <span className="tnum text-danger-ink">{baseline}%</span>
-              </div>
-              <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
-                <div className="h-full rounded-full bg-gradient-to-r from-danger to-[rgb(210_78_66)]" style={{ width: '100%' }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs text-mid">
-                <span>With CartHedge</span>
-                <span className={cn('tnum', improved ? 'text-jade-ink' : 'text-danger-ink')}>{actual}%</span>
-              </div>
-              <div className="mt-1 h-2.5 overflow-hidden rounded-full neu-inset">
-                <motion.div
-                  className={cn(
-                    'h-full rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]',
-                    improved
-                      ? 'bg-gradient-to-r from-jade-400 to-jade-500'
-                      : 'bg-gradient-to-r from-danger to-[rgb(210_78_66)]',
-                  )}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${baseline > 0 ? Math.min((actual / baseline) * 100, 100) : 0}%` }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                />
-              </div>
-            </div>
-          </div>
+          <motion.div
+            className={cn('mt-1.5 h-1.5 rounded-full', improved ? 'bg-jade-500' : 'bg-danger')}
+            initial={{ width: 0 }}
+            animate={{ width: `${baseline > 0 ? Math.max(3, Math.min((actual / baseline) * 100, 100)) : 0}%` }}
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          />
         </div>
       </div>
+      <p className="mt-4 text-xs leading-relaxed text-low">
+        {enoughData
+          ? `${outcomes} COD deliveries settled this month.`
+          : `${outcomes} of ${minCodOutcomes} COD deliveries settled. The rate shows once there is enough to trust.`}
+      </p>
+    </Card>
+  );
+}
+
+function NeedsYou() {
+  const { data: dash, isLoading } = useDashboard();
+  const rows = [
+    {
+      to: '/app/orders',
+      icon: KanbanSquare,
+      label: 'Pending orders',
+      hint: 'New and confirmed',
+      value: dash?.pendingOrders ?? 0,
+      tone: 'text-hi',
+    },
+    {
+      to: '/app/customers',
+      icon: AlertTriangle,
+      label: 'COD at risk',
+      hint: 'Unconfirmed or flagged',
+      value: dash?.codAtRisk ?? 0,
+      tone: dash && dash.codAtRisk > 0 ? 'text-danger-ink' : 'text-hi',
+    },
+    {
+      to: '/app/customers',
+      icon: Repeat,
+      label: 'Repeat customers',
+      hint: `Of ${dash?.totalCustomers ?? 0} buyers`,
+      value: `${dash?.repeatRatePercent ?? 0}%`,
+      tone: 'text-hi',
+    },
+  ];
+  return (
+    <Card className="flex flex-col">
+      <CardHeader title="Needs you" subtitle="What to look at next" />
+      <ul className="mt-2 flex flex-1 flex-col divide-y px-2 pb-2">
+        {rows.map((r) => (
+          <li key={r.label}>
+            <Link
+              to={r.to}
+              className="group flex items-center gap-3 rounded-md px-3 py-3.5 transition-colors hover:bg-[rgb(var(--field)/0.05)]"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--field)/0.07)] text-mid">
+                <r.icon className="size-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium text-hi">{r.label}</span>
+                <span className="block text-xs text-low">{r.hint}</span>
+              </span>
+              {isLoading ? (
+                <Skeleton className="h-6 w-10 rounded-full" />
+              ) : (
+                <span className={cn('text-xl font-semibold tracking-tight tnum', r.tone)}>{r.value}</span>
+              )}
+              <ArrowUpRight className="size-4 text-low opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
@@ -130,65 +153,79 @@ export default function DashboardPage() {
   const { data: sales } = useSales(30);
   const { data: topProducts } = useTopProducts();
   const { data: recentOrders, isLoading: ordersLoading } = useOrders({ limit: 6 });
+  const businessName = useAuth((s) => s.businessName);
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Today at a glance" />
+      <PageHeader
+        title={`${greeting()}${businessName ? `, ${businessName}` : ''}`}
+        subtitle={today}
+        actions={
+          <>
+            <Link to="/app/links" className={buttonLink('secondary')}>
+              <Link2 className="size-4" aria-hidden /> New link
+            </Link>
+            <Link to="/app/orders" className={buttonLink('primary')}>
+              <KanbanSquare className="size-4" aria-hidden /> Order board
+            </Link>
+          </>
+        }
+      />
 
-      <RtoMeterHero />
+      <div className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
+        {/* today, with the month's revenue line under it */}
+        <Card className="flex flex-col overflow-hidden">
+          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 p-5 pb-0 sm:p-6 sm:pb-0">
+            <div>
+              <p className="text-[13px] font-medium text-mid">Today&apos;s sales</p>
+              {isLoading ? (
+                <Skeleton className="mt-2 h-11 w-44 rounded-full" />
+              ) : (
+                <p className="mt-1 text-[2.75rem] font-semibold leading-none tracking-tightest text-hi">
+                  <Rupees paise={dash?.todayRevenue ?? 0} />
+                </p>
+              )}
+              <p className="mt-2 text-sm text-low">
+                {dash?.todayOrders ?? 0} {dash?.todayOrders === 1 ? 'order' : 'orders'} today
+              </p>
+            </div>
+            <div className="flex gap-8">
+              <div>
+                <p className="text-xs text-low">This month</p>
+                <p className="mt-0.5 text-lg font-semibold tracking-tight text-hi">
+                  <MoneyText paise={dash?.monthRevenue ?? 0} />
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-low">Orders</p>
+                <p className="mt-0.5 text-lg font-semibold tracking-tight tnum text-hi">{dash?.monthOrders ?? 0}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-auto px-2 pb-2 pt-4">
+            {sales ? <SalesAreaChart series={sales} height={220} /> : <Skeleton className="m-3 h-52" />}
+          </div>
+        </Card>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatTile
-          label="Today's sales"
-          value={<MoneyText paise={dash?.todayRevenue ?? 0} />}
-          hint={`${dash?.todayOrders ?? 0} orders today`}
-          icon={<IndianRupee className="size-4.5" />}
-          accent="jade"
-          loading={isLoading}
-        />
-        <StatTile
-          label="This month"
-          value={<MoneyText paise={dash?.monthRevenue ?? 0} />}
-          hint={`${dash?.monthOrders ?? 0} orders`}
-          icon={<ShoppingBag className="size-4.5" />}
-          loading={isLoading}
-        />
-        <StatTile
-          label="Pending orders"
-          value={dash?.pendingOrders ?? 0}
-          hint="new + confirmed"
-          icon={<KanbanSquare className="size-4.5" />}
-          loading={isLoading}
-        />
-        <StatTile
-          label="COD at risk"
-          value={dash?.codAtRisk ?? 0}
-          hint="unconfirmed or flagged"
-          icon={<AlertTriangle className="size-4.5" />}
-          accent={dash && dash.codAtRisk > 0 ? 'danger' : undefined}
-          loading={isLoading}
-        />
-        <StatTile
-          label="Repeat customers"
-          value={`${dash?.repeatRatePercent ?? 0}%`}
-          hint={`of ${dash?.totalCustomers ?? 0} buyers`}
-          icon={<Repeat className="size-4.5" />}
-          loading={isLoading}
-        />
+        <div className="grid gap-4">
+          <NeedsYou />
+          <RtoMeter />
+        </div>
       </div>
 
       {dash?.quota && (
         <Card className="mt-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-hi">
-              Plan usage — <span className="capitalize">{dash.quota.plan}</span>
+              Plan usage <span className="text-low">·</span> <span className="capitalize">{dash.quota.plan}</span>
             </p>
             <p className="text-xs text-mid tnum">
-              {dash.quota.used}/{dash.quota.included} orders
+              {dash.quota.used} of {dash.quota.included} orders
               {dash.quota.overageOrders > 0 && (
                 <span className="text-gold-ink">
                   {' '}
-                  · {dash.quota.overageOrders} over · <MoneyText paise={dash.quota.overageFee} /> fee
+                  ({dash.quota.overageOrders} over, <MoneyText paise={dash.quota.overageFee} /> fee)
                 </span>
               )}
             </p>
@@ -202,15 +239,9 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
-          <CardHeader title="Revenue" subtitle="Last 30 days" />
-          <div className="p-3 pt-4">
-            {sales ? <SalesAreaChart series={sales} /> : <Skeleton className="m-2 h-60" />}
-          </div>
-        </Card>
-        <Card className="lg:col-span-2">
-          <CardHeader title="Top products" subtitle="By revenue" />
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <Card>
+          <CardHeader title="Top products" subtitle="By revenue, last 30 days" />
           <div className="p-3 pt-4">
             {topProducts && topProducts.length > 0 ? (
               <TopProductsChart products={topProducts} />
@@ -221,50 +252,52 @@ export default function DashboardPage() {
             )}
           </div>
         </Card>
-      </div>
 
-      <Card className="mt-4">
-        <CardHeader
-          title="Recent orders"
-          action={
-            <Link to="/app/orders" className="text-sm font-medium text-jade-ink hover:underline">
-              View board →
-            </Link>
-          }
-        />
-        <div className="p-5 pt-4">
-          {ordersLoading ? (
-            <SkeletonRows rows={4} />
-          ) : recentOrders && recentOrders.length > 0 ? (
-            <ul className="divide-y">
-              {recentOrders.map((o) => (
-                <li key={o.id} className="flex items-center gap-3 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-hi">
-                      {o.customerName} <span className="font-mono text-xs text-low">#{o.code}</span>
-                    </p>
-                    <p className="text-xs text-low">
-                      {o.items.length} item{o.items.length !== 1 && 's'} · {timeAgo(o.createdAt)}
-                    </p>
-                  </div>
-                  <StatusChip status={o.status} />
-                  <MoneyText paise={o.total} className="w-20 shrink-0 text-right text-sm sm:w-24" />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              title="No orders yet"
-              message="Share your storefront link or paste a DM into the AI desk to create your first order."
-              action={
-                <Link to="/app/links" className="text-sm font-medium text-jade-ink hover:underline">
-                  Create a share link →
-                </Link>
-              }
-            />
-          )}
-        </div>
-      </Card>
+        <Card>
+          <CardHeader
+            title="Recent orders"
+            action={
+              <Link to="/app/orders" className="flex min-h-9 items-center gap-1 text-sm font-medium text-jade-ink hover:underline">
+                View board <ArrowUpRight className="size-3.5" aria-hidden />
+              </Link>
+            }
+          />
+          <div className="px-2 pb-2 pt-3">
+            {ordersLoading ? (
+              <SkeletonRows rows={5} className="px-3" />
+            ) : recentOrders && recentOrders.length > 0 ? (
+              <ul className="divide-y">
+                {recentOrders.map((o) => (
+                  <li key={o.id} className="flex items-center gap-3 rounded-md px-3 py-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--field)/0.07)] text-[12px] font-semibold text-mid">
+                      {o.customerName?.[0]?.toUpperCase() ?? '?'}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-hi">{o.customerName}</p>
+                      <p className="truncate text-xs text-low">
+                        <span className="font-mono">#{o.code}</span> · {o.items.length} item{o.items.length !== 1 && 's'},{' '}
+                        {timeAgo(o.createdAt)}
+                      </p>
+                    </div>
+                    <StatusChip status={o.status} className="hidden sm:inline-flex" />
+                    <MoneyText paise={o.total} className="w-20 shrink-0 text-right text-sm font-semibold sm:w-24" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                title="No orders yet"
+                message="Share your store link, or connect Instagram and let the assistant start taking orders."
+                action={
+                  <Link to="/app/links" className={buttonLink('secondary')}>
+                    Create a share link
+                  </Link>
+                }
+              />
+            )}
+          </div>
+        </Card>
+      </div>
     </>
   );
 }

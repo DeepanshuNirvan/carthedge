@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Bot, Check, Inbox as InboxIcon, Lock, MessageSquareText, Pause, Play, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
-import type { AiDraft, ChatCart, ConversationSummary, DraftData } from '@/api/types';
+import type { AiDraft, ChatCart, ConversationMessage, ConversationSummary, DraftData } from '@/api/types';
 import { useAiMutations, useDrafts } from '@/api/ai';
 import { useConversation, useConversations, useChannelMutations } from '@/api/messaging';
 import { useCan } from '@/api/plans';
@@ -33,7 +34,7 @@ const chatState = (c: Pick<ConversationSummary, 'stage' | 'draftId' | 'aiPaused'
     : c.draftId
       ? { label: 'Confirm order', tone: 'gold' as const }
       : c.stage === 'confirming'
-        ? { label: 'Awaiting buyer', tone: 'info' as const }
+        ? { label: 'Awaiting buyer', tone: 'neutral' as const }
         : c.aiPaused
           ? { label: 'AI paused', tone: 'neutral' as const }
           : null;
@@ -50,6 +51,10 @@ function cartLine(cart: ChatCart | undefined) {
   return parts.join(' · ');
 }
 
+/** a buyer wrote moments ago and the assistant is on: it is composing the answer */
+const replyingNow = (c: ConversationSummary) =>
+  !c.aiPaused && c.stage !== 'handoff' && c.unread > 0 && Date.now() - new Date(c.lastMessageAt).getTime() < 90_000;
+
 function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
   const { data: convos, isLoading } = useConversations();
   return (
@@ -59,31 +64,54 @@ function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
         {isLoading ? (
           <SkeletonRows rows={3} />
         ) : convos && convos.length > 0 ? (
-          <ul className="divide-y">
+          <ul className="-mx-2 divide-y">
             {convos.map((c) => {
               const b = sourceBadge(c.channel);
               const state = chatState(c);
               return (
-                <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3">
-                  <button className="min-w-0 flex-1 basis-full text-left sm:basis-0" onClick={() => onOpen(c.id)}>
-                    <p className="flex items-center gap-2 text-sm font-medium text-hi">
-                      {c.contactName || c.contactId}
+                <li key={c.id}>
+                  <button
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-[rgb(var(--field)/0.05)]"
+                    onClick={() => onOpen(c.id)}
+                  >
+                    <span className="relative flex size-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--field)/0.08)] text-sm font-semibold text-mid">
+                      {(c.contactName || c.contactId || '?')[0]?.toUpperCase()}
                       {c.unread > 0 && (
-                        <span className="rounded-full bg-jade-500/20 px-1.5 text-[10px] font-semibold text-jade-ink">
-                          {c.unread} new
+                        <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-jade-500 px-1 text-[10px] font-bold text-[rgb(var(--text-on-accent))] ring-2 ring-[rgb(var(--surface))]">
+                          {c.unread}
                         </span>
                       )}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-low">{c.preview}</p>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className={cn('truncate text-sm text-hi', c.unread > 0 ? 'font-semibold' : 'font-medium')}>
+                          {c.contactName || c.contactId}
+                        </span>
+                        <span className="shrink-0 text-[11.5px] text-low">{timeAgo(c.lastMessageAt)}</span>
+                      </span>
+                      {replyingNow(c) ? (
+                        <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-jade-ink">
+                          <span className="flex items-center gap-0.5" aria-hidden>
+                            <span className="typing-dot !size-[5px]" />
+                            <span className="typing-dot !size-[5px]" />
+                            <span className="typing-dot !size-[5px]" />
+                          </span>
+                          Assistant replying
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 block truncate text-xs text-low">{c.preview}</span>
+                      )}
+                      <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {b && <Badge tone={b.tone}>{b.label}</Badge>}
+                        {state && <Badge tone={state.tone}>{state.label}</Badge>}
+                        {c.lastOrderCode && (
+                          <Badge tone="jade">
+                            {c.lastOrderCode}, {c.lastOrderStatus}
+                          </Badge>
+                        )}
+                      </span>
+                    </span>
                   </button>
-                  {b && <Badge tone={b.tone}>{b.label}</Badge>}
-                  {state && <Badge tone={state.tone}>{state.label}</Badge>}
-                  {c.lastOrderCode && (
-                    <Badge tone="jade">
-                      {c.lastOrderCode} · {c.lastOrderStatus}
-                    </Badge>
-                  )}
-                  <span className="hidden text-xs text-low sm:inline">{timeAgo(c.lastMessageAt)}</span>
                 </li>
               );
             })}
@@ -92,11 +120,69 @@ function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
           <EmptyState
             icon={<InboxIcon className="size-5" />}
             title="No conversations yet"
-            message="Connect Instagram or WhatsApp in Settings — buyer DMs then appear here as order drafts, automatically."
+            message="Connect Instagram or WhatsApp in Settings. Buyer DMs then appear here as order drafts, automatically."
           />
         )}
       </div>
     </Card>
+  );
+}
+
+/** The chat as the buyer sees it, newest at the bottom. When the last word is the
+ *  buyer's and the assistant is on, it shows the assistant composing: replies land
+ *  within seconds of the buyer going quiet. */
+function Thread({ messages, replying }: { messages: ConversationMessage[]; replying: boolean }) {
+  const end = useRef<HTMLDivElement>(null);
+  const last = messages[messages.length - 1];
+  const composing =
+    replying && last?.direction === 'in' && Date.now() - new Date(last.createdAt).getTime() < 90_000;
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'end' });
+  }, [messages.length, composing]);
+
+  return (
+    <div className="flex max-h-[22rem] flex-col gap-1.5 overflow-y-auto overscroll-contain rounded-lg bg-[rgb(var(--field)/0.04)] p-3 hairline">
+      {messages.map((m, i) => {
+        const prev = messages[i - 1];
+        const showAuthor = m.direction === 'out' && authorLabel[m.author] && prev?.author !== m.author;
+        return (
+          <div key={i} className={cn('flex max-w-[85%] flex-col gap-0.5', m.direction === 'in' ? '' : 'ml-auto items-end')}>
+            {showAuthor && <span className="px-1 pt-1.5 text-[11px] font-medium text-low">{authorLabel[m.author]}</span>}
+            <div
+              className={cn(
+                'whitespace-pre-wrap rounded-[18px] px-3.5 py-2 text-sm text-hi',
+                m.direction === 'in'
+                  ? 'rounded-bl-md bg-[rgb(var(--field)/0.09)]'
+                  : m.author === 'seller'
+                    ? 'rounded-br-md bg-info/14'
+                    : 'rounded-br-md bg-jade-500/16',
+              )}
+            >
+              {m.body}
+            </div>
+          </div>
+        );
+      })}
+      <AnimatePresence>
+        {composing && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="ml-auto flex items-center gap-2"
+            aria-live="polite"
+          >
+            <span className="text-[11px] text-low">Assistant is replying</span>
+            <span className="flex items-center gap-1 rounded-[18px] rounded-br-md bg-jade-500/16 px-3.5 py-3 text-jade-ink">
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div ref={end} />
+    </div>
   );
 }
 
@@ -149,26 +235,10 @@ function ConversationModal({
           </div>
           {conv.stage === 'handoff' && (
             <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-hi">
-              The assistant stepped back — this buyer needs you. Reply below; resume the assistant when you are done.
+              The assistant stepped back because this buyer needs you. Reply below, then resume the assistant when you are done.
             </p>
           )}
-          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-md bg-surface-2 p-3">
-            {conv.messages.map((m, i) => (
-              <div key={i} className={cn('flex max-w-[85%] flex-col gap-0.5', m.direction === 'in' ? '' : 'ml-auto items-end')}>
-                {m.direction === 'out' && authorLabel[m.author] && (
-                  <span className="px-1 text-[10px] font-medium uppercase tracking-wider text-low">{authorLabel[m.author]}</span>
-                )}
-                <div
-                  className={cn(
-                    'whitespace-pre-wrap rounded-lg px-3 py-2 text-sm text-hi',
-                    m.direction === 'in' ? 'bg-surface-3' : 'bg-jade-500/15',
-                  )}
-                >
-                  {m.body}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Thread messages={conv.messages} replying={!conv.aiPaused && conv.stage !== 'handoff'} />
           {building && !draft && (
             <p className="mt-3 text-xs text-low">
               Order being built: <span className="text-mid">{building}</span>
@@ -176,7 +246,7 @@ function ConversationModal({
           )}
           {draft && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-jade-500/30 bg-jade-500/10 p-3">
-              <p className="text-sm text-hi">AI drafted an order from this chat · {draft.confidence}% confident</p>
+              <p className="text-sm text-hi">The assistant drafted an order from this chat. Check it before it is placed.</p>
               <Button size="sm" onClick={() => onReview(draft)}>
                 Review &amp; confirm
               </Button>
@@ -250,8 +320,8 @@ function DraftReview({ draft, onClose }: { draft: AiDraft | null; onClose: () =>
         </div>
       </div>
 
-      <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-low">Items</h3>
-      <ul className="divide-y rounded-md bg-surface-2 px-4">
+      <h3 className="mb-2 mt-5 text-[13px] font-semibold text-mid">Items</h3>
+      <ul className="divide-y rounded-lg bg-[rgb(var(--field)/0.04)] px-4 hairline">
         {data.items.map((item, i) => (
           <li key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
             <span className="text-hi">
@@ -348,13 +418,9 @@ export default function AiDeskPage() {
             aria-hidden
             className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-jade-400 to-transparent"
           />
-          <div
-            aria-hidden
-            className="absolute -right-16 -top-16 size-40 rounded-full bg-jade-500/12 blur-3xl"
-          />
           <CardHeader
             title="Parse a DM thread"
-            subtitle="Hinglish works — item, size, address, payment"
+            subtitle="Hinglish works: item, size, address, payment"
             action={
               <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
                 <Sparkles className="size-4.5" />
@@ -404,15 +470,15 @@ export default function AiDeskPage() {
               <p className="flex flex-wrap items-center gap-2 text-xs text-low">
                 <Lock className="size-3.5" /> The reply assistant needs a higher plan.
                 <Link to="/app/billing" className="font-medium text-jade-ink hover:underline">
-                  See plans →
+                  See plans
                 </Link>
               </p>
             )}
             {reply && (
-              <div className="rounded-md bg-surface-2 p-4">
+              <div className="rounded-lg bg-[rgb(var(--field)/0.04)] p-4 hairline">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-hi">{reply}</p>
                 <Button variant="ghost" size="sm" className="mt-2" onClick={() => copy(reply)}>
-                  {copied ? 'Copied ✓' : 'Copy reply'}
+                  {copied ? 'Copied' : 'Copy reply'}
                 </Button>
               </div>
             )}
@@ -423,7 +489,7 @@ export default function AiDeskPage() {
       <Inbox onOpen={setOpenConvId} />
 
       <Card className="mt-4">
-        <CardHeader title="Pending drafts" subtitle="Parsed orders waiting for your one-tap confirm — from DMs or paste" />
+        <CardHeader title="Pending drafts" subtitle="Parsed orders from DMs or a paste, waiting for your one-tap confirm" />
         <div className="p-5 pt-4">
           {isLoading ? (
             <SkeletonRows rows={3} />
@@ -431,15 +497,23 @@ export default function AiDeskPage() {
             <ul className="divide-y">
               {pending.map((d) => (
                 <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5">
-                  <div className="min-w-0 flex-1 basis-full sm:basis-0">
-                    <p className="truncate text-sm font-medium text-hi">
-                      {d.draft.customerName || 'Unknown buyer'} ·{' '}
-                      {d.draft.items.map((i) => `${i.qty}× ${i.name}`).join(', ') || 'no items matched'}
+                  {/* lit only where the seller is needed (unsure, or nothing matched). The draft is the AI's reading, so it is set in hairline
+                      (dotted) type until confirmed; how sure it is reads as words, not a score pill. */}
+                  <span className="bulb size-2 shrink-0" data-lit={d.confidence < 80 || d.draft.items.length === 0} />
+                  <div className="min-w-0 flex-1 basis-[80%] sm:basis-0">
+                    <p className="truncate text-sm text-hi">
+                      <span className="font-medium">{d.draft.customerName || 'Unknown buyer'}</span>
+                      <span className="text-low">, </span>
+                      <span className="text-mid underline decoration-dotted decoration-[rgb(var(--text-low)/0.6)] underline-offset-[3px]">
+                        {d.draft.items.map((i) => `${i.qty}x ${i.name}`).join(', ') || 'no items matched'}
+                      </span>
                     </p>
                     <p className="mt-0.5 truncate text-xs text-low">{d.conversation.slice(0, 90)}…</p>
                   </div>
                   {sourceBadge(d.source) && <Badge tone={sourceBadge(d.source)!.tone}>{sourceBadge(d.source)!.label}</Badge>}
-                  <Badge tone={d.confidence >= 80 ? 'jade' : 'gold'}>{d.confidence}%</Badge>
+                  <span className={cn('text-xs font-medium', d.confidence >= 80 ? 'text-jade-ink' : 'text-gold-ink')}>
+                    {d.confidence >= 80 ? 'AI is sure' : d.confidence >= 50 ? 'Check details' : 'Needs a closer look'}
+                  </span>
                   <span className="hidden text-xs text-low sm:inline">{timeAgo(d.createdAt)}</span>
                   <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setReviewing(d)}>
                     Review

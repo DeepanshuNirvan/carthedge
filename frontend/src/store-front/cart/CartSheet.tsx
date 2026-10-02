@@ -48,10 +48,10 @@ export function CartSheet({
         <EmptyState
           icon={<ShoppingBag className="size-5" />}
           title="Your cart is empty"
-          message="Add something you love — checkout takes under a minute."
+          message="Add something you love. Checkout takes under a minute."
           action={
             <Link to={`/s/${businessCode}`} onClick={close} className="text-sm font-medium text-jade-ink hover:underline">
-              Browse products →
+              Browse products
             </Link>
           }
         />
@@ -60,19 +60,19 @@ export function CartSheet({
           <ul className="divide-y">
             {items.map((item) => (
               <li key={`${item.productId}:${item.variantId ?? ''}`} className="flex gap-3 py-3">
-                <div className="size-16 shrink-0 overflow-hidden rounded-md bg-surface-2">
+                <div className="h-20 w-16 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-soft">
                   {item.image && <img src={item.image} alt="" className="size-full object-cover" loading="lazy" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-hi">{item.name}</p>
                   {item.variantName && <p className="text-xs text-low">{item.variantName}</p>}
-                  <MoneyText paise={item.price} className="text-sm text-mid" />
+                  <MoneyText paise={item.price} className="text-sm font-semibold text-hi" />
                 </div>
                 <div className="flex flex-col items-end justify-between">
                   <IconButton label="Remove item" onClick={() => remove(item.productId, item.variantId)}>
                     <Trash2 className="size-4" />
                   </IconButton>
-                  <div className="flex items-center rounded-md bg-surface-2 hairline">
+                  <div className="flex items-center rounded-full neu">
                     <button
                       aria-label="Decrease quantity"
                       onClick={() => setQty(item.productId, item.variantId, item.qty - 1)}
@@ -80,7 +80,7 @@ export function CartSheet({
                     >
                       <Minus className="size-3.5" />
                     </button>
-                    <span className="w-7 text-center font-mono text-sm tnum">{item.qty}</span>
+                    <span className="w-7 text-center text-sm font-semibold tnum">{item.qty}</span>
                     <button
                       aria-label="Increase quantity"
                       onClick={() => setQty(item.productId, item.variantId, item.qty + 1)}
@@ -94,7 +94,7 @@ export function CartSheet({
             ))}
           </ul>
 
-          <dl className="flex flex-col gap-1.5 rounded-lg bg-surface-2 p-4 text-sm">
+          <dl className="flex flex-col gap-1.5 rounded-lg bg-[rgb(var(--field)/0.05)] p-4 text-sm hairline">
             <div className="flex justify-between text-mid">
               <dt>Subtotal</dt>
               <dd><MoneyText paise={subtotal} /></dd>

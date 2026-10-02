@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, useSpring, useTransform } from 'framer-motion';
 import { calculator } from '@/strings/marketing';
-import { Section, SectionHead, Reveal } from '../Section';
 import { formatPaise } from '@/lib/money';
+import { Reveal } from '../Section';
 
-const CARTHEDGE_RTO = 8; // avg post-confirmation RTO across sellers
+const CARTHEDGE_RTO = 8; // refusal rate assumed after COD confirmation
 const GROWTH_PLAN_PAISE = 99900;
 
 function Slider({
@@ -28,8 +28,8 @@ function Slider({
   return (
     <div>
       <p className="flex items-baseline justify-between text-sm">
-        <span className="font-medium text-hi">{label}</span>
-        <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-jade-ink tnum">{format(value)}</span>
+        <span className="font-medium text-mid">{label}</span>
+        <span className="text-[15px] font-semibold tnum text-hi">{format(value)}</span>
       </p>
       <input
         type="range"
@@ -39,9 +39,9 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="slider mt-2 w-full cursor-pointer"
+        className="slider mt-1 w-full cursor-pointer"
         style={{
-          background: `linear-gradient(90deg, rgb(var(--jade-500)) ${pct}%, rgb(var(--surface-3)) ${pct}%)`,
+          backgroundImage: `linear-gradient(90deg, rgb(var(--jade-500)) ${pct}%, rgb(var(--field) / 0.12) ${pct}%)`,
         }}
       />
     </div>
@@ -50,12 +50,12 @@ function Slider({
 
 function AnimatedRupees({ paise }: { paise: number }) {
   const spring = useSpring(paise, { stiffness: 90, damping: 22 });
-  spring.set(paise);
+  useEffect(() => spring.set(paise), [paise, spring]);
   const text = useTransform(spring, (v) => formatPaise(Math.round(v)));
-  return <motion.span className="font-mono tnum">{text}</motion.span>;
+  return <motion.span className="tnum">{text}</motion.span>;
 }
 
-/** The conversion centerpiece — live rupee savings from the seller's own numbers. */
+/** One instrument: the seller's own numbers in, rupees kept out. */
 export function RtoCalculator() {
   const [orders, setOrders] = useState(200);
   const [aovRupees, setAovRupees] = useState(1200);
@@ -73,21 +73,15 @@ export function RtoCalculator() {
   const maxBar = Math.max(lossNow, 1);
 
   return (
-    <Section id="calculator">
-      <SectionHead eyebrow={calculator.eyebrow} title={calculator.title} sub={calculator.sub} tone="gold" />
+    <section id="calculator" className="relative mx-auto w-full max-w-4xl px-5 py-16 sm:px-8 sm:py-20">
+      <Reveal className="mb-8">
+        <h2 className="text-d3 font-semibold text-hi">{calculator.title}</h2>
+        <p className="mt-3 max-w-[52ch] text-base leading-relaxed text-mid">{calculator.sub}</p>
+      </Reveal>
       <Reveal>
-        <div className="glass sheen mx-auto grid max-w-4xl gap-6 rounded-2xl p-5 shadow-float sm:gap-8 sm:p-7 lg:grid-cols-[1fr_1.05fr]">
-          {/* the seller's numbers */}
-          <div className="flex flex-col gap-6">
-            <Slider
-              label={calculator.orders}
-              value={orders}
-              min={20}
-              max={2000}
-              step={10}
-              format={(v) => String(v)}
-              onChange={setOrders}
-            />
+        <div className="panel grid overflow-hidden rounded-xl lg:grid-cols-[1fr_1.1fr]">
+          <div className="flex flex-col gap-5 p-5 sm:p-8">
+            <Slider label={calculator.orders} value={orders} min={20} max={2000} step={10} format={String} onChange={setOrders} />
             <Slider
               label={calculator.aov}
               value={aovRupees}
@@ -97,77 +91,43 @@ export function RtoCalculator() {
               format={(v) => `₹${v.toLocaleString('en-IN')}`}
               onChange={setAovRupees}
             />
-            <Slider
-              label={calculator.rto}
-              value={rtoPct}
-              min={5}
-              max={50}
-              step={1}
-              format={(v) => `${v}%`}
-              onChange={setRtoPct}
-            />
+            <Slider label={calculator.rto} value={rtoPct} min={5} max={50} step={1} format={(v) => `${v}%`} onChange={setRtoPct} />
             <p className="text-xs leading-relaxed text-low">{calculator.assumption}</p>
           </div>
 
-          {/* the money */}
-          <div className="relative flex flex-col justify-center gap-5 overflow-hidden rounded-xl panel p-5 sm:p-6">
-            <div aria-hidden className="absolute -right-16 -top-16 size-44 rounded-full bg-jade-500/12 blur-3xl" />
-
-            <div className="relative">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-jade-ink">
-                {calculator.savedLabel}
-              </p>
-              {/* tabular + nowrap: a rupee figure must never wrap mid-number,
-                  which is exactly what break-all was doing here */}
-              <p className="mt-1.5 whitespace-nowrap font-display text-[clamp(2rem,1.2rem+2.4vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-brand-grad">
+          <div className="flex flex-col justify-center gap-6 border-t bg-[rgb(var(--field)/0.03)] p-5 sm:p-8 lg:border-l lg:border-t-0">
+            <div>
+              <p className="text-sm font-medium text-mid">{calculator.savedLabel}</p>
+              <p className="mt-1 whitespace-nowrap text-[clamp(2.2rem,1.6rem+2vw,3.25rem)] font-semibold leading-none tracking-tightest text-gold-ink">
                 <AnimatedRupees paise={saved} />
               </p>
             </div>
 
-            {/* One track, not two. The full width is today's loss; the jade part
-                is the share CartHedge removes. Two separate bars made the reader
-                do the subtraction themselves — this shows the cut directly. */}
-            <div className="relative">
-              <div className="flex items-baseline justify-between text-xs">
-                <span className="text-mid">{calculator.lossNow}</span>
-                <span className="font-mono tnum text-danger-ink">{formatPaise(lossNow)}</span>
+            <div className="flex flex-col gap-3" role="img" aria-label={`${formatPaise(lossNow)} lost today, ${formatPaise(lossWith)} with COD confirmation`}>
+              <div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-mid">{calculator.lossNow}</span>
+                  <span className="font-semibold tnum text-danger-ink">{formatPaise(lossNow)}</span>
+                </div>
+                <div className="mt-1.5 h-2 w-full rounded-full bg-danger/70" />
               </div>
-
-              <div
-                className="mt-2 flex h-3 overflow-hidden rounded-full neu-inset"
-                role="img"
-                aria-label={`${formatPaise(saved)} of ${formatPaise(lossNow)} recovered`}
-              >
+              <div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-mid">{calculator.withUs}</span>
+                  <span className="font-semibold tnum text-hi">{formatPaise(lossWith)}</span>
+                </div>
                 <motion.div
-                  className="h-full bg-[linear-gradient(90deg,rgb(var(--jade-400)),rgb(var(--jade-600)))] shadow-[inset_0_1px_0_rgb(255_255_255/0.28)]"
-                  animate={{ width: `${(saved / maxBar) * 100}%` }}
+                  className="mt-1.5 h-2 rounded-full bg-jade-500"
+                  animate={{ width: `${Math.max(2, (lossWith / maxBar) * 100)}%` }}
                   transition={{ type: 'spring', stiffness: 120, damping: 20 }}
                 />
-                <motion.div
-                  className="h-full bg-[linear-gradient(90deg,rgb(var(--danger)/0.85),rgb(var(--danger)/0.6))]"
-                  animate={{ width: `${(lossWith / maxBar) * 100}%` }}
-                  transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-                />
-              </div>
-
-              <div className="mt-2 flex items-baseline justify-between text-xs">
-                <span className="flex items-center gap-1.5 text-jade-ink">
-                  <span className="size-2 rounded-full bg-jade-500" aria-hidden />
-                  recovered
-                </span>
-                <span className="text-mid">
-                  {calculator.withUs}{' '}
-                  <span className="font-mono tnum text-hi">{formatPaise(lossWith)}</span> still lost
-                </span>
               </div>
             </div>
 
-            <p className="relative border-l-2 border-gold-400/60 pl-4 text-sm font-medium text-gold-ink">
-              {calculator.paysFor(paysFor)}
-            </p>
+            <p className="text-sm font-medium text-mid">{calculator.paysFor(paysFor)}</p>
           </div>
         </div>
       </Reveal>
-    </Section>
+    </section>
   );
 }

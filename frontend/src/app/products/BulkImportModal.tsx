@@ -72,7 +72,7 @@ export function BulkImportModal({ open, onClose }: { open: boolean; onClose: () 
 
   return (
     <Modal open={open} onClose={onClose} title="Bulk import" wide>
-      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center text-sm text-mid transition-colors hover:border-jade-500 hover:text-jade-ink">
+      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed bg-[rgb(var(--field)/0.03)] p-8 text-center text-sm text-mid transition-colors hover:border-jade-500 hover:bg-jade-500/5 hover:text-jade-ink">
         <FileUp className="size-6" />
         Drop a CSV or JSON file, or click to choose
         <span className="text-xs text-low">CSV columns: name, category, price₹, resellerPrice₹, comparePrice₹, sku, description, inStock</span>

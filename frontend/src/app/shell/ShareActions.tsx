@@ -18,10 +18,11 @@ function QrModal({ url, title, onClose }: { url: string; title: string; onClose:
   return (
     <Modal open onClose={onClose} title={title}>
       <div className="flex flex-col items-center gap-4">
-        <div className="rounded-lg bg-white p-3">
+        <div className="rounded-xl bg-white p-4 shadow-raised">
           <canvas ref={canvasRef} aria-label="QR code" />
         </div>
-        <p className="break-all text-center font-mono text-xs text-mid">{url}</p>
+        <p className="break-all text-center font-mono text-xs text-mid">{url.replace(/^https?:\/\//, '')}</p>
+        <p className="text-center text-xs text-low">Print it on packaging, a counter card or your story.</p>
       </div>
     </Modal>
   );
@@ -29,7 +30,7 @@ function QrModal({ url, title, onClose }: { url: string; title: string; onClose:
 
 /** Copy · QR · share — every shareable URL in the app goes out through this.
     On a phone that means the OS share sheet (Instagram, WhatsApp, Telegram,
-    Messages — wherever the seller's buyers actually are); on desktop, where
+    Messages, wherever the seller's buyers actually are); on desktop, where
     there is no sheet, it falls back to the WhatsApp web hand-off. */
 export function ShareActions({ url, title, className }: { url: string; title: string; className?: string }) {
   const { copied, copy } = useCopy();
@@ -63,7 +64,7 @@ export function ShareActions({ url, title, className }: { url: string; title: st
           target="_blank"
           rel="noreferrer"
           aria-label="Share on WhatsApp"
-          className="inline-flex size-11 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi sm:size-10"
+          className="inline-flex size-11 items-center justify-center rounded-full text-mid transition-colors hover:bg-[rgb(var(--field)/0.08)] hover:text-hi sm:size-10"
         >
           <MessageCircle className="size-4" />
         </a>

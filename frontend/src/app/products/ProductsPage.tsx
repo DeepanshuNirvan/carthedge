@@ -33,42 +33,42 @@ function ProductCard({
   const { setStock, setTrending } = useProductMutations();
   const [shareOpen, setShareOpen] = useState(false);
   return (
-    <article className="panel group overflow-hidden rounded-lg transition-transform duration-std ease-enter hover:-translate-y-0.5 hover:shadow-raised">
-      <div className="relative aspect-[4/3] bg-surface-2">
+    <article className="panel group overflow-hidden rounded-xl transition-[transform,box-shadow] duration-std ease-enter [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-raised">
+      <div className="relative aspect-[4/3] overflow-hidden bg-surface-2">
         {product.images[0] ? (
-          <img src={product.images[0]} alt={product.name} loading="lazy" className="size-full object-cover" />
+          <img src={product.images[0]} alt={product.name} loading="lazy" className="size-full object-cover transition-transform duration-expr ease-enter [@media(hover:hover)]:group-hover:scale-[1.03]" />
         ) : (
           <div className="flex size-full items-center justify-center text-low">
             <Package className="size-8" aria-hidden />
           </div>
         )}
         {product.trending && (
-          <Badge tone="gold" className="absolute left-2.5 top-2.5">
+          <Badge tone="gold" className="absolute left-2.5 top-2.5 bg-[rgb(var(--surface)/0.85)] backdrop-blur-md">
             <Flame className="size-3" /> Trending
           </Badge>
         )}
         {!product.inStock && (
-          <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-semibold text-white">
+          <span className="absolute inset-x-2.5 bottom-2.5 rounded-full bg-ink-950/70 py-1.5 text-center text-xs font-semibold text-white backdrop-blur-md">
             Out of stock
           </span>
         )}
         {/* always reachable on touch; reveals on hover only where a cursor exists */}
         <div className="absolute right-2 top-2 flex gap-1 transition-opacity duration-micro [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
           {businessCode && (
-            <IconButton label={`Share ${product.name}`} className="glass" onClick={() => setShareOpen((v) => !v)}>
+            <IconButton label={`Share ${product.name}`} className="glass-nav text-hi" onClick={() => setShareOpen((v) => !v)}>
               <Share2 className="size-4" />
             </IconButton>
           )}
-          <IconButton label="Edit product" className="glass" onClick={onEdit}>
+          <IconButton label="Edit product" className="glass-nav text-hi" onClick={onEdit}>
             <Pencil className="size-4" />
           </IconButton>
-          <IconButton label="Delete product" className="glass" onClick={onDelete}>
+          <IconButton label="Delete product" className="glass-nav text-danger-ink" onClick={onDelete}>
             <Trash2 className="size-4" />
           </IconButton>
         </div>
       </div>
       <div className="p-3 sm:p-3.5">
-        <p className="truncate text-sm font-medium text-hi">{product.name}</p>
+        <p className="truncate text-[14px] font-semibold tracking-snug text-hi">{product.name}</p>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-sm">
           <MoneyText paise={product.price} className="font-semibold text-hi" />
           {product.comparePrice > product.price && <MoneyText paise={product.comparePrice} strike className="text-xs" />}
@@ -80,7 +80,7 @@ function ProductCard({
         </p>
         <p className="mt-0.5 truncate text-xs text-low">
           {product.category}
-          {product.variants.length > 0 && ` · ${product.variants.length} variants`}
+          {product.variants.length > 0 && `, ${product.variants.length} variants`}
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
           <span className="flex items-center gap-2 text-xs text-mid">
@@ -119,7 +119,7 @@ function LowStockStrip({ onEdit }: { onEdit: (product: Product) => void }) {
   const { data: low } = useLowStock();
   if (!low || low.length === 0) return null;
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-gold-400/10 p-4">
+    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-gold-400/10 p-4 shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.22)]">
       <span className="flex items-center gap-2 text-sm font-medium text-gold-ink">
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
         Running low
@@ -129,9 +129,9 @@ function LowStockStrip({ onEdit }: { onEdit: (product: Product) => void }) {
           <li key={p.id}>
             <button
               onClick={() => onEdit(p)}
-              className="rounded-full bg-surface px-2.5 py-1 text-xs text-hi shadow-soft transition-colors hover:bg-surface-2"
+              className="min-h-9 rounded-full bg-surface px-3 py-1.5 text-xs text-hi shadow-soft transition-colors hover:bg-surface-2"
             >
-              {p.name} · <span className="tnum text-gold-ink">{p.stockQty} left</span>
+              {p.name}, <span className="font-semibold tnum text-gold-ink">{p.stockQty} left</span>
             </button>
           </li>
         ))}
@@ -175,12 +175,12 @@ export default function ProductsPage() {
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <div className="relative basis-full sm:basis-auto">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-low" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" />
           <Input
-            placeholder="Search products…"
+            placeholder="Search products"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-11 pl-9 sm:h-10 sm:w-56"
+            className="h-11 rounded-full pl-10 sm:h-10 sm:w-60"
             aria-label="Search products"
           />
         </div>
@@ -188,7 +188,7 @@ export default function ProductsPage() {
           onClick={() => setCategory('')}
           className={cn(
             'inline-flex min-h-10 items-center justify-center rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro sm:min-h-8',
-            category === '' ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid hover:text-hi',
+            category === '' ? 'bg-hi text-bg' : 'neu text-mid hover:text-hi',
           )}
         >
           All
@@ -199,7 +199,7 @@ export default function ProductsPage() {
             onClick={() => setCategory(c === category ? '' : c)}
             className={cn(
               'inline-flex min-h-10 items-center justify-center rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors duration-micro sm:min-h-8',
-              category === c ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid hover:text-hi',
+              category === c ? 'bg-hi text-bg' : 'neu text-mid hover:text-hi',
             )}
           >
             {c}
@@ -216,7 +216,13 @@ export default function ProductsPage() {
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }, (_, i) => (
-            <Skeleton key={i} className="h-72" />
+            <div key={i} className="panel overflow-hidden rounded-xl">
+              <Skeleton className="aspect-[4/3] rounded-none" />
+              <div className="space-y-2 p-3.5">
+                <Skeleton className="h-3.5 w-3/4 rounded-full" />
+                <Skeleton className="h-3 w-1/3 rounded-full" />
+              </div>
+            </div>
           ))}
         </div>
       ) : products && products.length > 0 ? (
@@ -238,7 +244,7 @@ export default function ProductsPage() {
           message={
             search || category
               ? 'Try a different search or category.'
-              : 'Add your first product — it goes live on your storefront instantly.'
+              : 'Add your first product. It goes live on your storefront instantly.'
           }
           action={
             <Button icon={<Plus className="size-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>

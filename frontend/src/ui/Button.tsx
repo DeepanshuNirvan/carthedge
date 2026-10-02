@@ -5,22 +5,28 @@ import { Spinner } from './Spinner';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'glass';
 type Size = 'sm' | 'md' | 'lg';
 
-const variants: Record<Variant, string> = {
+// Controls are capsules everywhere (the shape lock); cards and sheets carry
+// the larger radii. Shared with buttonLink so <a> and <button> never drift.
+export const buttonVariants: Record<Variant, string> = {
   primary:
-    'bg-gradient-to-b from-jade-400 to-jade-500 text-[rgb(var(--text-on-accent))] clay hover:from-jade-300 hover:to-jade-400 disabled:opacity-50',
-  gold: 'bg-gradient-to-b from-gold-300 to-gold-400 text-ink-950 shadow-soft hover:from-gold-400 hover:to-gold-500 disabled:opacity-50',
-  secondary: 'panel text-hi hover:bg-surface-2 disabled:opacity-50',
-  glass: 'glass sheen text-hi hover:brightness-110 disabled:opacity-50',
-  ghost: 'text-mid hover:text-hi hover:bg-surface-2 disabled:opacity-50',
-  danger:
-    'bg-gradient-to-b from-danger to-[rgb(210_78_66)] text-white shadow-soft hover:brightness-110 disabled:opacity-50',
+    'bg-[linear-gradient(180deg,rgb(var(--jade-400)),rgb(var(--jade-500)))] text-[rgb(var(--text-on-accent))] clay hover:brightness-[1.07]',
+  gold: 'bg-[linear-gradient(180deg,rgb(var(--gold-300)),rgb(var(--gold-400)))] text-ink-950 shadow-soft hover:brightness-[1.05]',
+  secondary: 'neu text-hi hover:bg-surface-3',
+  glass: 'glass sheen text-hi hover:bg-[rgb(var(--glass-bg)/0.8)]',
+  ghost: 'text-mid hover:bg-[rgb(var(--field)/0.07)] hover:text-hi',
+  danger: 'bg-[rgb(var(--danger-fill))] text-white shadow-soft hover:brightness-110',
 };
 
-const sizes: Record<Size, string> = {
-  sm: 'h-9 px-4 text-sm gap-1.5 rounded-sm',
-  md: 'h-11 px-5 text-sm gap-2 rounded-md',
-  lg: 'h-[3.25rem] px-7 text-base gap-2.5 rounded-lg',
+export const buttonSizes: Record<Size, string> = {
+  sm: 'h-9 gap-1.5 px-4 text-[13px]',
+  md: 'h-11 gap-2 px-5 text-sm',
+  lg: 'h-[3.25rem] gap-2.5 px-7 text-[15px]',
 };
+
+export const buttonBase =
+  'relative inline-flex select-none items-center justify-center whitespace-nowrap rounded-full font-semibold tracking-snug ' +
+  'transition-[transform,filter,background-color,box-shadow] duration-micro ease-spring ' +
+  'active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -37,14 +43,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       disabled={disabled || loading}
-      className={cn(
-        'relative inline-flex select-none items-center justify-center overflow-hidden whitespace-nowrap font-semibold',
-        'transition-[transform,filter,background-color] duration-micro ease-spring',
-        'hover:-translate-y-px active:translate-y-0 active:scale-[0.97] disabled:pointer-events-none',
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      aria-busy={loading || undefined}
+      className={cn(buttonBase, buttonVariants[variant], buttonSizes[size], className)}
       {...rest}
     >
       {loading ? <Spinner className="size-4" /> : icon}
@@ -64,9 +64,9 @@ export const IconButton = forwardRef<
       title={label}
       className={cn(
         // 44px on touch, 40px where a cursor can be precise
-        'inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-all duration-micro ease-spring sm:size-10',
-        'hover:bg-surface-2 hover:text-hi active:scale-90 disabled:opacity-50',
-        active ? 'bg-surface-2 text-hi hairline' : 'text-mid',
+        'inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color,color] duration-micro ease-spring sm:size-10',
+        'hover:bg-[rgb(var(--field)/0.08)] hover:text-hi active:scale-90 disabled:opacity-45',
+        active ? 'bg-[rgb(var(--field)/0.08)] text-hi' : 'text-mid',
         className,
       )}
       {...rest}

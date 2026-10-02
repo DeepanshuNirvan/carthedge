@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Loader2, PartyPopper, Smartphone, X } from 'lucide-react';
+import { Check, Smartphone, X } from 'lucide-react';
 import type { StoreCodeStatus } from '@/api/types';
 import { Seo } from '@/lib/seo';
 import { emailSchema, phoneSchema, pincodeSchema, storeCodeSchema, storeCodeSlug } from '@/lib/validators';
@@ -12,9 +12,11 @@ import { checkStoreCode, register as apiRegister, sendSignupOtp, verifySignupOtp
 import { ApiError } from '@/api/http';
 import { toast } from '@/store/ui';
 import { AuthLayout } from './AuthLayout';
-import { Field, Input } from '@/ui/Input';
+import { Field, Input, PasswordInput } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 import { Stepper } from '@/ui/Stepper';
+import { SuccessMark } from '@/ui/SuccessMark';
+import { Spinner } from '@/ui/Spinner';
 
 const registerSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
@@ -79,8 +81,8 @@ function StoreLinkField({
       <p id="storeCodeState" aria-live="polite" className="mt-1.5 flex items-start gap-1.5 text-xs">
         {checking ? (
           <>
-            <Loader2 className="mt-px size-3.5 shrink-0 animate-spin text-low" aria-hidden />
-            <span className="text-low">Checking…</span>
+            <Spinner className="mt-px size-3.5 shrink-0 text-low" />
+            <span className="text-low">Checking</span>
           </>
         ) : status?.available ? (
           <>
@@ -98,7 +100,7 @@ function StoreLinkField({
             <span className="text-danger-ink">{hint === 'already taken' ? 'That link is already taken' : hint}</span>
           </>
         ) : (
-          <span className="text-low">Buyers see this in every link you share — it cannot be changed later.</span>
+          <span className="text-low">Buyers see this in every link you share. It cannot be changed later.</span>
         )}
       </p>
 
@@ -124,13 +126,16 @@ function StoreLinkField({
 function AsidePitch() {
   return (
     <div className="max-w-md">
-      <p className="font-display text-d3 font-semibold text-[#F5F3EE]">
-        Two minutes from now, your DMs become an order desk.
-      </p>
-      <ul className="mt-6 flex flex-col gap-2.5 text-sm text-[#A9A6A0]">
-        <li>· 15-day free trial, no card</li>
-        <li>· Storefront link the moment you finish</li>
-        <li>· AI order capture from any chat</li>
+      <p className="text-d2 font-semibold text-hi">A few minutes from now, your DMs start becoming orders.</p>
+      <ul className="mt-7 flex flex-col gap-3 text-[15px] text-mid">
+        {['15-day free trial, no card', 'Your store link the moment you finish', 'An assistant that answers from your catalog'].map(
+          (t) => (
+            <li key={t} className="flex items-center gap-3">
+              <span className="bulb size-2" data-lit="true" />
+              {t}
+            </li>
+          ),
+        )}
       </ul>
     </div>
   );
@@ -257,8 +262,8 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout aside={<AsidePitch />}>
-      <Seo title="Start your free trial — CartHedge" description="Create your CartHedge business in two minutes." path="/app/register" noIndex />
-      <h1 className="font-display text-d3 font-semibold text-hi">Start your free trial</h1>
+      <Seo title="Start your free trial | CartHedge" description="Create your CartHedge business in two minutes." path="/app/register" noIndex />
+      <h1 className="text-d3 font-semibold text-hi">Start your free trial</h1>
       <p className="mt-2 text-sm text-mid">15 days on us. No credit card.</p>
       <div className="mt-7">
         <Stepper steps={steps} current={step} />
@@ -298,7 +303,7 @@ export default function RegisterPage() {
                 <Input type="tel" autoComplete="tel" placeholder="98xxxxxxx0" {...register('phone')} />
               </Field>
               <Field label="Password" error={errors.password?.message} hint="8+ characters">
-                <Input type="password" autoComplete="new-password" {...register('password')} />
+                <PasswordInput autoComplete="new-password" {...register('password')} />
               </Field>
               <Button type="button" size="lg" loading={busy} onClick={next}>
                 Continue
@@ -334,7 +339,7 @@ export default function RegisterPage() {
                   maxLength={6}
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className="text-center font-mono text-xl tracking-[0.5em]"
+                  className="h-14 text-center text-2xl font-semibold tracking-[0.55em] tnum"
                 />
               </Field>
               <Button type="button" size="lg" loading={busy} disabled={otp.length < 4} onClick={confirmOtp}>
@@ -399,11 +404,9 @@ export default function RegisterPage() {
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col items-center gap-4 py-10 text-center"
             >
-              <span className="flex size-16 items-center justify-center rounded-full bg-jade-500/15">
-                <PartyPopper className="size-8 text-jade-ink" />
-              </span>
-              <h2 className="font-display text-d3 font-semibold text-hi">You're in!</h2>
-              <p className="text-sm text-mid">Trial started — taking you to your dashboard…</p>
+              <SuccessMark />
+              <h2 className="text-d3 font-semibold text-hi">You&apos;re in</h2>
+              <p className="text-sm text-mid">Your trial has started. Taking you to your dashboard.</p>
             </motion.div>
           )}
         </AnimatePresence>

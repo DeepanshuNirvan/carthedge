@@ -8,3 +8,4 @@ uploads/
 .env.local
 .claude/
 .agents/
+.impeccable/

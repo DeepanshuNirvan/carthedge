@@ -1,48 +1,15 @@
+/* One family, two cuts. Geist is a neo-grotesque with squared terminals: it
+   holds -0.04em tracking at display sizes and stays legible at 11px in a
+   phone's in-app browser. Variable files, so every weight is one request. */
 @font-face {
-  font-family: 'Clash Display';
-  src: url('/fonts/clash-display-500.woff2') format('woff2');
-  font-weight: 500;
+  font-family: 'Geist';
+  src: url('/fonts/geist-variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Clash Display';
-  src: url('/fonts/clash-display-600.woff2') format('woff2');
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Clash Display';
-  src: url('/fonts/clash-display-700.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Satoshi';
-  src: url('/fonts/satoshi-400.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Satoshi';
-  src: url('/fonts/satoshi-500.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Satoshi';
-  src: url('/fonts/satoshi-700.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/jetbrains-mono-500.woff2') format('woff2');
-  font-weight: 500;
+  font-family: 'Geist Mono';
+  src: url('/fonts/geist-mono-variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
   font-display: swap;
 }

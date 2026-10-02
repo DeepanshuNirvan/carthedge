@@ -52,7 +52,7 @@ export default function ContactPage() {
   return (
     <div>
       <Seo
-        title="Contact CartHedge — Talk to a human"
+        title="Contact CartHedge | Talk to a human"
         description="Questions about CartHedge plans, migrations or custom volume pricing? We reply within a working day."
         path="/contact"
       />
@@ -60,20 +60,20 @@ export default function ContactPage() {
       <MarketingNav />
       <main className="mx-auto grid min-h-dvh w-full max-w-6xl gap-10 px-5 pb-20 pt-[calc(7.5rem+env(safe-area-inset-top))] sm:gap-12 sm:px-8 sm:pb-24 lg:grid-cols-[1.2fr_1fr]">
         <div>
-          <h1 className="font-display text-d2 font-semibold text-hi">{contact.title}</h1>
-          <p className="mt-3 max-w-md text-mid">{contact.sub}</p>
+          <h1 className="text-d1 font-semibold text-hi">{contact.title}</h1>
+          <p className="mt-4 max-w-md text-lg leading-relaxed text-mid">{contact.sub}</p>
 
           {sent ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="glass sheen mt-10 flex items-center gap-3 rounded-2xl p-5 text-jade-ink shadow-float"
+              className="panel mt-10 flex items-center gap-3 rounded-xl p-5 text-jade-ink"
             >
               <CheckCircle2 className="size-6 shrink-0" />
               <p className="text-sm font-medium">{contact.form.success}</p>
             </motion.div>
           ) : (
-            <form onSubmit={handleSubmit(onSubmit)} className="mt-10 grid gap-5 sm:grid-cols-2" noValidate>
+            <form onSubmit={handleSubmit(onSubmit)} className="panel mt-10 grid gap-5 rounded-xl p-5 sm:grid-cols-2 sm:p-7" noValidate>
               <Field label={contact.form.name} error={errors.name?.message}>
                 <Input {...register('name')} autoComplete="name" />
               </Field>
@@ -98,16 +98,29 @@ export default function ContactPage() {
           )}
         </div>
 
-        <aside className="flex flex-col gap-4 lg:pt-16">
-          <div className="glass sheen rounded-2xl p-6 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
-            <Mail className="size-5 text-jade-ink" aria-hidden />
-            <p className="mt-3 text-sm font-medium text-hi">{site?.contact.email || 'hello@carthedge.in'}</p>
-            <p className="mt-1 text-xs text-low">Best for detailed questions</p>
-          </div>
-          <div className="glass sheen rounded-2xl p-6 shadow-float transition-transform duration-std ease-enter hover:-translate-y-1">
-            <Clock className="size-5 text-gold-ink" aria-hidden />
-            <p className="mt-3 text-sm font-medium text-hi">{site?.contact.supportHours}</p>
-            <p className="mt-1 text-xs text-low">We reply within a working day</p>
+        <aside className="flex flex-col gap-6 lg:pt-28">
+          <a
+            href={`mailto:${site?.contact.email || 'hello@carthedge.in'}`}
+            className="group flex items-start gap-4 border-b pb-6"
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink">
+              <Mail className="size-5" aria-hidden />
+            </span>
+            <span>
+              <span className="block text-[15px] font-semibold text-hi group-hover:underline">
+                {site?.contact.email || 'hello@carthedge.in'}
+              </span>
+              <span className="mt-0.5 block text-sm text-low">Best for detailed questions</span>
+            </span>
+          </a>
+          <div className="flex items-start gap-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gold-400/14 text-gold-ink">
+              <Clock className="size-5" aria-hidden />
+            </span>
+            <span>
+              <span className="block text-[15px] font-semibold text-hi">{site?.contact.supportHours}</span>
+              <span className="mt-0.5 block text-sm text-low">We reply within a working day</span>
+            </span>
           </div>
         </aside>
       </main>

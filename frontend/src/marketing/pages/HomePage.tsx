@@ -3,17 +3,19 @@ import { guides } from '@/strings/marketing';
 import { useLenis } from '../useLenis';
 import { MarketingBackground } from '../MarketingBackground';
 import { MarketingNav } from '../MarketingNav';
+import { Strand } from '../Strand';
 import { Footer } from '../Footer';
 import { Hero } from '../sections/Hero';
 import { Problem } from '../sections/Problem';
-import { CoreLoop } from '../sections/CoreLoop';
-import { AiDemo } from '../sections/AiDemo';
-import { RtoCalculator } from '../sections/RtoCalculator';
-import { FeaturesBento } from '../sections/FeaturesBento';
+import { Autopilot } from '../sections/Autopilot';
+import { Languages } from '../sections/Languages';
+import { OrderJourney } from '../sections/OrderJourney';
 import { StorefrontPreview } from '../sections/StorefrontPreview';
+import { FeaturesBento } from '../sections/FeaturesBento';
+import { RtoCalculator } from '../sections/RtoCalculator';
 import { Pricing } from '../sections/Pricing';
-import { Trust, Guides } from '../sections/TrustAndGuides';
 import { Testimonials } from '../sections/Testimonials';
+import { Guides } from '../sections/TrustAndGuides';
 import { FinalCta } from '../sections/FinalCta';
 
 const faqJsonLd = {
@@ -31,25 +33,26 @@ export default function HomePage() {
   return (
     <div className="grain">
       <Seo
-        title="CartHedge — The AI order desk for Instagram & WhatsApp sellers"
-        description="CartHedge reads your DMs, drafts orders, cuts COD losses with RTO protection, and gives every seller a no-signup storefront. 15-day free trial."
+        title="CartHedge | AI sales assistant and order desk for Instagram & WhatsApp sellers"
+        description="CartHedge answers every buyer DM in seconds from your catalog, closes the order in the chat, and gives you a no-signup storefront, order board and COD confirmation. 15-day free trial."
         path="/"
         jsonLd={[organizationJsonLd, faqJsonLd]}
       />
       <MarketingBackground />
       <MarketingNav />
+      <Strand />
       <main>
         <Hero />
         <Problem />
-        <CoreLoop />
-        <AiDemo />
-        <RtoCalculator />
-        <FeaturesBento />
+        <Autopilot />
+        <Languages />
+        <OrderJourney />
         <StorefrontPreview />
+        <FeaturesBento />
+        <RtoCalculator />
         <Pricing />
-        <Trust />
-        <Guides />
         <Testimonials />
+        <Guides />
         <FinalCta />
       </main>
       <Footer />

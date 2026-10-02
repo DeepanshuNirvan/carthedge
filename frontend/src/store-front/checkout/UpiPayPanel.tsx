@@ -35,7 +35,7 @@ export function UpiPayPanel({ info, onClaimed }: { info: CheckoutInfo; onClaimed
       await claimUpiPayment(info.orderCode, reference.trim());
       setDone(true);
       onClaimed?.();
-      toast('success', 'Thanks — payment reported', `${info.businessName} will confirm it shortly.`);
+      toast('success', 'Thanks, payment reported', `${info.businessName} will confirm it shortly.`);
     } catch (e) {
       toast('error', 'Could not submit', e instanceof Error ? e.message : undefined);
     } finally {
@@ -52,19 +52,19 @@ export function UpiPayPanel({ info, onClaimed }: { info: CheckoutInfo; onClaimed
         <p className="mt-1 text-xs leading-relaxed text-mid">
           {info.businessName} is checking their bank for reference{' '}
           <span className="font-mono text-hi">{reference.trim().toUpperCase()}</span>. Your order moves to packing as
-          soon as they confirm — track it any time with your order code.
+          soon as they confirm, track it any time with your order code.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg bg-surface-2 p-4 text-left">
+    <div className="flex flex-col gap-4 rounded-lg bg-[rgb(var(--field)/0.05)] p-4 text-left hairline">
       <div>
         <p className="text-sm font-medium text-hi">
           Pay <MoneyText paise={info.amount} className="font-semibold" /> to {info.businessName}
         </p>
-        <p className="mt-0.5 text-xs text-low">Straight to their UPI ID — CartHedge never holds your money.</p>
+        <p className="mt-0.5 text-xs text-low">Straight to their UPI ID | CartHedge never holds your money.</p>
       </div>
 
       <a
@@ -74,7 +74,7 @@ export function UpiPayPanel({ info, onClaimed }: { info: CheckoutInfo; onClaimed
         <Smartphone className="size-4" aria-hidden /> Open GPay / PhonePe / Paytm
       </a>
 
-      <div className="flex items-center gap-3 rounded-md bg-surface p-3 hairline">
+      <div className="flex items-center gap-3 rounded-md bg-surface p-3 shadow-soft hairline">
         <span className="min-w-0 flex-1">
           <span className="block text-xs text-low">UPI ID</span>
           <span className="block break-all font-mono text-sm text-hi">{info.upiId}</span>
@@ -83,7 +83,7 @@ export function UpiPayPanel({ info, onClaimed }: { info: CheckoutInfo; onClaimed
           type="button"
           onClick={() => copy(info.upiId ?? '')}
           aria-label={copied ? 'Copied' : 'Copy UPI ID'}
-          className="flex size-10 shrink-0 items-center justify-center rounded-md text-mid transition-colors hover:bg-surface-2 hover:text-hi"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-mid transition-colors hover:bg-surface-2 hover:text-hi"
         >
           {copied ? <Check className="size-4 text-jade-ink" /> : <Copy className="size-4" />}
         </button>
@@ -101,7 +101,7 @@ export function UpiPayPanel({ info, onClaimed }: { info: CheckoutInfo; onClaimed
       <div className="border-t pt-3">
         <Field
           label="Payment reference / UTR"
-          hint="Your UPI app shows it on the success screen — the seller checks it against their bank"
+          hint="Your UPI app shows it on the success screen, the seller checks it against their bank"
         >
           <Input
             value={reference}

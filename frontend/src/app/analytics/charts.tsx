@@ -17,7 +17,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 // tokens, not hardcoded colors — charts follow the active theme
 const jade = 'rgb(var(--jade-500))';
 const grid = 'rgb(var(--line) / var(--line-a))';
-const tickStyle = { fill: 'rgb(var(--text-low))', fontSize: 11, fontFamily: '"JetBrains Mono", monospace' };
+const tickStyle = { fill: 'rgb(var(--text-low))', fontSize: 11, fontFamily: 'Geist, sans-serif', fontVariantNumeric: 'tabular-nums' };
 
 function ChartTooltip({
   active,
@@ -32,10 +32,10 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md bg-surface px-3 py-2 text-xs shadow-raised hairline">
+    <div className="glass-nav rounded-md px-3 py-2 text-xs shadow-float">
       <p className="text-low">{label}</p>
       {payload.map((p) => (
-        <p key={p.name} className="mt-0.5 font-mono font-medium text-hi tnum">
+        <p key={p.name} className="mt-0.5 text-[13px] font-semibold text-hi tnum">
           {money ? formatPaise(p.value) : p.value.toLocaleString('en-IN')}
         </p>
       ))}
@@ -101,7 +101,7 @@ export function TopProductsChart({ products, height = 260 }: { products: TopProd
           type="category"
           dataKey="name"
           width={mobile ? 76 : 120}
-          tick={{ ...tickStyle, fontFamily: 'Satoshi, sans-serif', fill: 'rgb(var(--text-mid))' }}
+          tick={{ ...tickStyle, fontFamily: 'Geist, sans-serif', fill: 'rgb(var(--text-mid))' }}
           axisLine={false}
           tickLine={false}
         />

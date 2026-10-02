@@ -1,188 +1,174 @@
-/* CartHedge design tokens — two fully-tuned premium themes.
-   Every component reads these variables; switching data-theme restyles the
-   whole app instantly. Values map to the product: jade = money/confirmed,
-   gold = the ₹-saved hero metric, ink/paper = the chat-to-order surface. */
+/* CartHedge design tokens.
+   The world: a stall that never closes. Night is smoked obsidian glass, day is
+   frosted porcelain glass, both on cool neutrals (no warm paper, no cream).
+   Jade = answered / confirmed / money in. Bulb-gold = live, now, the light on
+   the strand. Every component reads these variables; data-theme swaps them. */
 
 :root {
-  /* brand (theme-invariant) */
-  --jade-300: 74 222 160;
-  --jade-400: 34 201 133;
+  /* brand ramps (theme-invariant fills) */
+  --jade-300: 92 226 168;
+  --jade-400: 38 204 136;
   --jade-500: 15 176 108;
-  --jade-600: 11 143 86;
-  --jade-700: 9 112 68;
-  --gold-300: 244 206 133;
-  --gold-400: 233 185 96;
-  --gold-500: 214 158 62;
-  --gold-600: 176 124 42;
+  --jade-600: 10 140 86;
+  --jade-700: 8 106 66;
+  --gold-300: 248 214 146;
+  --gold-400: 240 190 98;
+  --gold-500: 220 162 64;
+  --gold-600: 178 124 40;
 
-  --ink-700: 42 42 52;
-  --ink-800: 30 30 38;
-  --ink-850: 22 22 28;
-  --ink-900: 16 16 21;
-  --ink-950: 11 11 14;
-  --paper-50: 251 249 244;
-  --paper-100: 244 241 233;
-  --paper-200: 233 228 216;
+  --ink-700: 40 46 52;
+  --ink-800: 26 31 36;
+  --ink-850: 18 22 26;
+  --ink-900: 12 15 18;
+  --ink-950: 7 9 11;
+  --paper-50: 250 252 252;
+  --paper-100: 241 244 245;
+  --paper-200: 228 233 234;
 
   --success: 24 190 120;
-  --warning: 233 185 96;
-  --danger: 233 96 84;
-  --info: 96 156 226;
+  --warning: 240 190 98;
+  --danger: 236 92 80;
+  --info: 92 154 232;
+  /* white text on this clears 5.8:1; --danger itself is for tints only */
+  --danger-fill: 196 52 42;
 
-  /* radius scale */
+  /* shape lock: controls are capsules, fields 14, cards 20, sheets 28 */
   --r-xs: 8px;
   --r-sm: 11px;
   --r-md: 14px;
-  --r-lg: 18px;
-  --r-xl: 26px;
-  --r-2xl: 34px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-2xl: 36px;
 
-  /* blur scale */
-  --blur-sm: 8px;
-  --blur-md: 18px;
-  --blur-lg: 32px;
-  --blur-xl: 56px;
+  --blur-sm: 10px;
+  --blur-md: 22px;
+  --blur-lg: 34px;
+  --blur-xl: 60px;
 
-  /* motion */
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
-  --dur-micro: 130ms;
-  --dur-std: 240ms;
-  --dur-expr: 480ms;
-  --dur-cine: 720ms;
+  --dur-micro: 140ms;
+  --dur-std: 260ms;
+  --dur-expr: 520ms;
+  --dur-cine: 760ms;
 }
 
-/* ============================ DARK ============================ */
+/* ============================ NIGHT ============================ */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: 9 10 13;
-  --bg-2: 13 15 19;
-  --surface: 18 20 25;
-  --surface-2: 25 28 35;
-  --surface-3: 36 40 49;
+  --bg: 7 9 11;
+  --bg-2: 11 14 17;
+  --surface: 16 20 24;
+  --surface-2: 24 29 34;
+  --surface-3: 35 41 47;
 
-  /* text — tuned for AA+ on every surface, secondary/muted lifted so nothing washes out */
-  --text-hi: 247 248 251;
-  --text-mid: 189 193 202;
-  --text-low: 148 153 164;
-  --text-dim: 108 113 124;
-  --text-on-accent: 8 16 11;
+  /* AA on --bg and --surface-2: hi 17:1, mid 11:1, low 7:1, dim 4.7:1 */
+  --text-hi: 240 244 243;
+  --text-mid: 188 197 196;
+  --text-low: 150 160 160;
+  --text-dim: 128 138 138;
+  --text-on-accent: 4 20 12;
 
-  /* ink = the brand hue tuned for TEXT/ICONS on a surface, as opposed to the
-     ramp above which is tuned for fills. On dark these match the ramp step the
-     UI already used, so dark is unchanged; light needs far darker values to
-     clear 4.5:1 — a jade-400 label on white paper is 2.15:1 and unreadable. */
-  --jade-ink: 34 201 133;
-  --gold-ink: 214 158 62;
-  --danger-ink: 233 96 84;
-  --info-ink: 96 156 226;
+  /* ink = the hue tuned for text/icons, separate from the fill ramp */
+  --jade-ink: 52 214 148;
+  --gold-ink: 240 192 104;
+  --danger-ink: 244 118 106;
+  --info-ink: 120 172 240;
 
-  /* logo mark — one step brighter than the ink pair so the icon keeps its
-     presence at 16px; light theme drops both a step to stay legible on paper */
-  --brand-mark: 34 201 133;
-  --brand-coin: 233 185 96;
+  --brand-mark: 38 204 136;
+  --brand-coin: 240 190 98;
 
-  /* accent-type gradient endpoints (see .text-brand-grad) */
-  --grad-from: 108 232 176;
-  --grad-to: 22 168 108;
+  /* legacy endpoints for .text-brand-grad, now a solid ink */
+  --grad-from: 52 214 148;
+  --grad-to: 52 214 148;
+
+  /* the strand: warm bulb light and the wire it hangs on */
+  --bulb: 246 200 112;
+  --bulb-off: 58 66 72;
+  --wire: 255 255 255;
+  --wire-a: 0.16;
 
   --line: 255 255 255;
-  --line-a: 0.09;
-  --line-strong-a: 0.16;
+  --line-a: 0.08;
+  --line-strong-a: 0.15;
 
-  /* glass — frosted panel over aurora/3D (lower fill = more see-through frost) */
-  --glass-bg: 20 24 30;
-  --glass-a: 0.48;
-  --glass-hi: 255 255 255; /* inner top highlight */
-  --glass-hi-a: 0.14;
-  --glass-lo: 0 0 0; /* bottom edge — the shadowed side of the pane */
-  --glass-lo-a: 0.34;
-  --glass-border-a: 0.2;
-  --glass-tint: 255 255 255; /* refraction sheen colour */
+  /* smoked obsidian glass: dark tint, cool rim, deep shadow underneath */
+  --glass-bg: 20 25 30;
+  --glass-a: 0.56;
+  --glass-thick-a: 0.78;
+  --glass-hi: 255 255 255;
+  --glass-hi-a: 0.13;
+  --glass-rim-a: 0.1;
+  --glass-lo: 0 0 0;
+  --glass-lo-a: 0.45;
+  --glass-sat: 1.6;
 
-  /* neumorphic control (dark = subtle raised plastic) */
-  --neu-light: 255 255 255;
-  --neu-light-a: 0.05;
-  --neu-dark: 0 0 0;
-  --neu-dark-a: 0.45;
+  --field: 255 255 255;
+  --field-a: 0.05;
 
-  /* Aurora = one brand light source, not a mesh of hues. Three saturated blobs
-     at high alpha is the stock "AI gradient" look; a single deep jade wash with
-     a faint warm bounce reads as considered lighting instead. */
-  --aurora-1: 16 122 84;    /* jade, deepened — glow, not paint */
-  --aurora-2: 150 112 52;   /* warm bounce, desaturated */
-  --aurora-3: 18 74 66;     /* deep teal shadow, same family as jade */
-  --aurora-a: 0.22;
-  --grid-a: 0.05;
-
-  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 34px -14px rgb(0 0 0 / 0.62);
-  --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 30px 70px -24px rgb(0 0 0 / 0.72);
-  --shadow-float: 0 4px 14px rgb(0 0 0 / 0.45), 0 44px 96px -30px rgb(0 0 0 / 0.8);
+  --shadow-soft: 0 1px 1px rgb(0 0 0 / 0.4), 0 8px 24px -10px rgb(0 0 0 / 0.6);
+  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.42), 0 22px 48px -18px rgb(0 0 0 / 0.72);
+  --shadow-float: 0 6px 16px -4px rgb(0 0 0 / 0.5), 0 42px 90px -30px rgb(0 0 0 / 0.85);
 }
 
-/* ============================ LIGHT ============================ */
+/* ============================ DAY ============================ */
 [data-theme='light'] {
   color-scheme: light;
 
-  /* warm porcelain paper — bg sits a touch below surface so every card lifts */
-  --bg: 238 235 229;
-  --bg-2: 246 244 238;
-  --surface: 255 255 254;
-  --surface-2: 247 245 240;
-  --surface-3: 237 234 227;
+  /* cool porcelain: bg sits below surface so every pane lifts */
+  --bg: 232 236 237;
+  --bg-2: 241 244 245;
+  --surface: 253 254 254;
+  --surface-2: 243 246 246;
+  --surface-3: 229 234 235;
 
-  --text-hi: 24 24 29;
-  --text-mid: 82 80 74;
-  --text-low: 106 103 95;
-  --text-dim: 150 147 138;
-  --text-on-accent: 8 16 11;
+  /* AA on --bg and --surface: hi 16:1, mid 8.8:1, low 6.1:1, dim 4.6:1 */
+  --text-hi: 12 18 20;
+  --text-mid: 56 66 68;
+  --text-low: 80 90 92;
+  --text-dim: 98 108 110;
+  --text-on-accent: 4 20 12;
 
-  /* all four clear 4.5:1 on --surface, --surface-3 and --bg */
-  --jade-ink: 9 112 68;
-  --gold-ink: 138 94 28;
-  --danger-ink: 178 48 38;
-  --info-ink: 38 92 166;
+  --jade-ink: 4 108 64;
+  --gold-ink: 128 84 16;
+  --danger-ink: 176 40 32;
+  --info-ink: 28 84 160;
 
-  --brand-mark: 11 143 86;
-  --brand-coin: 214 158 62;
+  --brand-mark: 10 140 86;
+  --brand-coin: 220 162 64;
 
-  --grad-from: 17 152 96;
-  --grad-to: 7 92 58;
+  --grad-from: 4 108 64;
+  --grad-to: 4 108 64;
 
-  --line: 32 27 22;
-  --line-a: 0.1;
-  --line-strong-a: 0.17;
+  --bulb: 214 152 48;
+  --bulb-off: 196 204 206;
+  --wire: 12 18 20;
+  --wire-a: 0.18;
 
-  /* real frosted glass: see-through translucency + crisp white top light + defined edge */
+  --line: 12 18 20;
+  --line-a: 0.09;
+  --line-strong-a: 0.15;
+
+  /* frosted white glass: bright fill, white top light, a fine cool edge */
   --glass-bg: 255 255 255;
-  --glass-a: 0.5;
+  --glass-a: 0.62;
+  --glass-thick-a: 0.8;
   --glass-hi: 255 255 255;
-  --glass-hi-a: 0.9;
-  /* light theme: the underside picks up warm paper bounce, not black */
-  --glass-lo: 96 82 62;
-  --glass-lo-a: 0.1;
-  --glass-border-a: 0.66;
-  --glass-tint: 255 255 255;
+  --glass-hi-a: 0.95;
+  --glass-rim-a: 0.08;
+  --glass-lo: 30 52 60;
+  --glass-lo-a: 0.09;
+  --glass-sat: 1.8;
 
-  --neu-light: 255 255 255;
-  --neu-light-a: 0.95;
-  --neu-dark: 150 138 118;
-  --neu-dark-a: 0.2;
+  --field: 12 18 20;
+  --field-a: 0.045;
 
-  /* light theme: the same single-source lighting, warmed by the paper it sits on */
-  --aurora-1: 34 168 118;
-  --aurora-2: 208 168 104;
-  --aurora-3: 92 150 138;
-  --aurora-a: 0.16;
-  --grid-a: 0.045;
-
-  /* soft, warm, layered — premium light depth */
-  --shadow-soft: 0 1px 2px rgb(72 60 44 / 0.05), 0 10px 24px -12px rgb(72 60 44 / 0.13);
-  --shadow-raised: 0 2px 6px rgb(72 60 44 / 0.07), 0 24px 52px -20px rgb(72 60 44 / 0.19);
-  --shadow-float: 0 4px 14px rgb(72 60 44 / 0.09), 0 38px 84px -26px rgb(72 60 44 / 0.24);
+  --shadow-soft: 0 1px 2px rgb(24 44 52 / 0.06), 0 8px 22px -10px rgb(24 44 52 / 0.14);
+  --shadow-raised: 0 2px 6px rgb(24 44 52 / 0.07), 0 22px 46px -18px rgb(24 44 52 / 0.2);
+  --shadow-float: 0 6px 16px -6px rgb(24 44 52 / 0.12), 0 40px 80px -28px rgb(24 44 52 / 0.28);
 }
 
 * {
@@ -190,44 +176,62 @@
 }
 
 html {
+  /* framer's scroll-linked offsets measure against a positioned root */
+  position: relative;
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
-  /* no grey flash on tap — the single biggest "this is a website" tell on mobile */
   -webkit-tap-highlight-color: transparent;
+  background-color: rgb(var(--bg));
 }
 
+/* only html carries the ground colour: if body painted one too, it would sit as an
+   opaque block above every negative-z background layer (lane, marketing light) */
 body {
-  background-color: rgb(var(--bg));
   color: rgb(var(--text-hi));
-  font-family: 'Satoshi', system-ui, sans-serif;
-  font-feature-settings: 'ss01', 'cv01';
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
 ::selection {
-  background: rgb(var(--jade-500) / 0.28);
+  background: rgb(var(--jade-500) / 0.3);
   color: rgb(var(--text-hi));
+}
+
+input,
+textarea {
+  caret-color: rgb(var(--jade-ink));
 }
 
 :focus-visible {
   outline: 2px solid rgb(var(--jade-400));
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-/* display headings: open the gap between words so multi-word titles breathe
-   (word-spacing only — letters stay tightly tracked by the fontSize tokens) */
-.font-display {
-  word-spacing: 0.09em;
+a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 
-/* money & metrics always tabular */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* money and metrics always tabular */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* controls stay finger-sized and never fight a long press */
 button,
 [role='button'],
 a,
@@ -238,7 +242,7 @@ textarea {
   touch-action: manipulation;
 }
 
-/* horizontal chip/card rails: scroll, no visible bar, no page scroll-chaining */
+/* horizontal chip/card rails: scroll, no visible bar, no scroll-chaining */
 .rail {
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -249,23 +253,22 @@ textarea {
   display: none;
 }
 
-/* thin theme-matched scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(var(--text-low) / 0.35) transparent;
+  scrollbar-color: rgb(var(--text-low) / 0.3) transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgb(var(--text-low) / 0.28);
+  background: rgb(var(--text-low) / 0.26);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--text-low) / 0.45);
+  background: rgb(var(--text-low) / 0.44);
   background-clip: content-box;
 }
 

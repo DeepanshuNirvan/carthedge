@@ -8,10 +8,10 @@ type MoneyTextProps = {
   strike?: boolean;
 };
 
-/** The only way money is rendered — mono, tabular, formatted en-IN. */
+/** The only way money is rendered: tabular figures, formatted en-IN. */
 export function MoneyText({ paise, compact, className, strike }: MoneyTextProps) {
   return (
-    <span className={cn('font-mono tnum', strike && 'text-low line-through', className)}>
+    <span className={cn('tnum tracking-snug', strike && 'text-low line-through decoration-1', className)}>
       {compact ? formatPaiseCompact(paise) : formatPaise(paise)}
     </span>
   );

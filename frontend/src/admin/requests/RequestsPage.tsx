@@ -114,7 +114,7 @@ export default function RequestsPage() {
                 to={`/admin/businesses/${working.businessId}`}
                 className="text-sm font-medium text-jade-ink hover:underline"
               >
-                Assign a plan →
+                Assign a plan
               </Link>
             )}
           </div>

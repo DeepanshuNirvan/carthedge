@@ -14,6 +14,7 @@ import { MoneyText } from '@/ui/MoneyText';
 import { Button } from '@/ui/Button';
 import { Badge } from '@/ui/Badge';
 import { Skeleton } from '@/ui/Skeleton';
+import { LaneGround } from '@/ui/LaneGround';
 import { EmptyState } from '@/ui/EmptyState';
 
 type Selection = { qty: number; variantId?: string };
@@ -82,17 +83,18 @@ export default function LinkCheckoutPage() {
   return (
     <div className="min-h-dvh bg-bg">
       <Seo
-        title={`${link.title || 'Checkout'} — ${link.business.name}`}
+        title={`${link.title || 'Checkout'} | ${link.business.name}`}
         description={`Complete your order with ${link.business.name}. Secure checkout, no signup needed.`}
         path={`/l/${businessCode}/${token}`}
         noIndex
       />
 
-      <header className="sticky top-0 z-30 border-b bg-bg/90 backdrop-blur">
+      <LaneGround />
+      <header className="glass-bar scroll-edge sticky top-0 z-30 shadow-[0_1px_0_rgb(var(--line)/var(--line-a))]">
         <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
           <Avatar name={link.business.name} src={link.business.logoUrl || undefined} className="size-10" />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-semibold text-hi">{link.business.name}</p>
+            <p className="truncate text-[15px] font-semibold tracking-snug text-hi">{link.business.name}</p>
             {link.business.verified && (
               <span className="flex items-center gap-1 text-xs text-jade-ink">
                 <ShieldCheck className="size-3.5" /> Verified seller
@@ -108,17 +110,17 @@ export default function LinkCheckoutPage() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="rounded-xl bg-surface p-5 shadow-soft hairline"
+          className="panel rounded-xl p-5 sm:p-6"
         >
           {!checkingOut ? (
             <>
               <Badge tone="jade">{link.kind === 'custom' ? 'Custom order' : 'Reserved for you'}</Badge>
-              <h1 className="mt-3 font-display text-xl font-semibold leading-snug text-hi">
+              <h1 className="mt-3 text-[1.5rem] font-semibold leading-tight tracking-[-0.025em] text-hi">
                 {link.title || 'Your order'}
               </h1>
 
               {link.kind === 'custom' ? (
-                <p className="mt-4 font-display text-3xl font-semibold text-hi">
+                <p className="mt-4 text-[2.5rem] font-semibold leading-none tracking-tightest text-hi">
                   <MoneyText paise={link.amount ?? 0} />
                 </p>
               ) : (
@@ -127,7 +129,7 @@ export default function LinkCheckoutPage() {
                     const sel = selectionFor(p);
                     return (
                       <li key={p.id} className="flex gap-3 py-3.5">
-                        <div className="size-20 shrink-0 overflow-hidden rounded-md bg-surface-2">
+                        <div className="size-20 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-soft">
                           {p.images[0] ? (
                             <img src={p.images[0]} alt={p.name} className="size-full object-cover" loading="lazy" />
                           ) : (
@@ -148,8 +150,8 @@ export default function LinkCheckoutPage() {
                                   disabled={!v.inStock}
                                   onClick={() => setSelections({ ...selections, [p.id]: { ...sel, variantId: v.id } })}
                                   className={cn(
-                                    'min-h-9 rounded px-3 py-1.5 text-xs font-medium transition-colors active:scale-95',
-                                    sel.variantId === v.id ? 'bg-jade-500 text-white' : 'bg-surface-2 text-mid',
+                                    'min-h-9 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors active:scale-95',
+                                    sel.variantId === v.id ? 'bg-hi text-bg' : 'neu text-mid',
                                     !v.inStock && 'cursor-not-allowed line-through opacity-50',
                                   )}
                                 >
@@ -159,21 +161,21 @@ export default function LinkCheckoutPage() {
                             </div>
                           )}
 
-                          <div className="mt-2 flex w-fit items-center rounded-md bg-surface-2 hairline">
+                          <div className="mt-2 flex w-fit items-center rounded-full neu">
                             <button
                               aria-label={`Decrease quantity of ${p.name}`}
                               onClick={() =>
                                 setSelections({ ...selections, [p.id]: { ...sel, qty: Math.max(1, sel.qty - 1) } })
                               }
-                              className="flex size-10 items-center justify-center text-mid hover:text-hi"
+                              className="flex size-10 items-center justify-center rounded-full text-mid hover:text-hi active:scale-90"
                             >
                               <Minus className="size-3.5" />
                             </button>
-                            <span className="w-7 text-center font-mono text-sm tnum">{sel.qty}</span>
+                            <span className="w-7 text-center text-sm font-semibold tnum">{sel.qty}</span>
                             <button
                               aria-label={`Increase quantity of ${p.name}`}
                               onClick={() => setSelections({ ...selections, [p.id]: { ...sel, qty: sel.qty + 1 } })}
-                              className="flex size-10 items-center justify-center text-mid hover:text-hi"
+                              className="flex size-10 items-center justify-center rounded-full text-mid hover:text-hi active:scale-90"
                             >
                               <Plus className="size-3.5" />
                             </button>
@@ -227,8 +229,8 @@ export default function LinkCheckoutPage() {
             ? 'Payments secured by Razorpay'
             : link.business.onlinePayment === 'upi'
               ? 'Pay by UPI direct to the seller'
-              : 'Cash on delivery'}{' '}
-          · Powered by
+              : 'Cash on delivery'}
+          <span aria-hidden className="text-dim">|</span> Powered by
           <LogoMark size={13} className="-ml-0.5" />
           CartHedge
         </p>

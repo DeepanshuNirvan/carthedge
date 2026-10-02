@@ -95,7 +95,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     if (res.status === 401 && auth === 'seller') useAuth.getState().clear();
     if (res.status === 401 && auth === 'admin') useAdminAuth.getState().clear();
     if (res.status === 402 && code === 'subscriptionExpired') useUi.getState().setPaywall(true);
-    if (res.status === 429) message = 'Too many attempts — take a breath and retry in a minute.';
+    if (res.status === 429) message = 'Too many attempts, take a breath and retry in a minute.';
     throw new ApiError(res.status, message, code);
   }
   return res.json() as Promise<T>;

@@ -173,7 +173,7 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
             </Button>
           </div>
           {fields.length === 0 ? (
-            <p className="text-xs text-low">No variants — sizes and colors go here (e.g. “M”, “Red / L”).</p>
+            <p className="text-xs text-low">No variants, sizes and colors go here (e.g. “M”, “Red / L”).</p>
           ) : (
             <div className="flex flex-col gap-2">
               {fields.map((f, i) => (

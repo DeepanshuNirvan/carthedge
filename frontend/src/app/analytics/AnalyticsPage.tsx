@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
                   aria-label="Report month"
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
-                  className="h-9 w-[8.5rem] rounded-md bg-surface-2 px-3 text-sm text-hi hairline focus:outline-none"
+                  className="h-10 w-[9.5rem] rounded-full neu-inset px-3.5 text-sm text-hi focus:shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400))] focus:outline-none"
                 />
                 <Button variant="secondary" size="sm" onClick={exportReport} disabled={!report}>
                   Export
@@ -82,36 +82,36 @@ export default function AnalyticsPage() {
               <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div>
                   <dt className="text-xs text-low">Orders</dt>
-                  <dd className="mt-0.5 font-display text-xl font-semibold tnum text-hi">{report.orders}</dd>
+                  <dd className="mt-0.5 text-xl font-semibold tracking-tight tnum text-hi">{report.orders}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-low">Revenue</dt>
-                  <dd className="mt-0.5 font-display text-xl font-semibold text-hi">
+                  <dd className="mt-0.5 text-xl font-semibold tracking-tight text-hi">
                     <MoneyText paise={report.revenue} compact />
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-low">RTO saved</dt>
-                  <dd className="mt-0.5 font-display text-xl font-semibold text-jade-ink">
+                  <dd className="mt-0.5 text-xl font-semibold tracking-tight text-jade-ink">
                     <MoneyText paise={report.rtoMeter?.savedThisMonth ?? 0} compact />
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-low">COD revenue</dt>
-                  <dd className="mt-0.5 font-mono text-sm text-hi tnum">
+                  <dd className="mt-0.5 text-[15px] font-semibold text-hi tnum">
                     <MoneyText paise={report.codRevenue} compact />
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-low">Prepaid revenue</dt>
-                  <dd className="mt-0.5 font-mono text-sm text-hi tnum">
+                  <dd className="mt-0.5 text-[15px] font-semibold text-hi tnum">
                     <MoneyText paise={report.prepaidRevenue} compact />
                   </dd>
                 </div>
                 {report.quota && (
                   <div>
                     <dt className="text-xs text-low">Quota used</dt>
-                    <dd className="mt-0.5 font-mono text-sm text-hi tnum">
+                    <dd className="mt-0.5 text-[15px] font-semibold text-hi tnum">
                       {report.quota.used}/{report.quota.included}
                     </dd>
                   </div>
@@ -122,7 +122,7 @@ export default function AnalyticsPage() {
                     {Object.entries(report.ordersByStatus ?? {}).map(([status, count]) => (
                       <span key={status} className="flex items-center gap-1.5">
                         <StatusChip status={status} />
-                        <span className="font-mono text-xs text-mid tnum">{count}</span>
+                        <span className="text-xs font-semibold text-mid tnum">{count}</span>
                       </span>
                     ))}
                   </dd>

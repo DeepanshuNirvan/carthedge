@@ -1,78 +1,38 @@
-import {
-  Bell,
-  Bot,
-  ClipboardCheck,
-  FileText,
-  KanbanSquare,
-  Link2,
-  MessageCircle,
-  Podcast,
-  Radio,
-  ShieldCheck,
-  Tags,
-  Truck,
-  Users,
-} from 'lucide-react';
 import { features } from '@/strings/marketing';
-import { Section, SectionHead, Reveal } from '../Section';
 import { Badge } from '@/ui/Badge';
-import { cn } from '@/lib/cn';
+import { RevealGroup, RevealItem, SectionHead } from '../Section';
 
-const icons = [MessageCircle, KanbanSquare, Link2, ShieldCheck, Podcast, Tags, Users, Bell, Truck, ClipboardCheck, FileText, Bot, Radio];
-
-// bento rhythm: the two anchor features span two columns and carry a jade wash
-const wide = new Set(['capture', 'cod']);
-
-function spotlight(e: React.MouseEvent<HTMLElement>) {
-  const el = e.currentTarget;
-  const r = el.getBoundingClientRect();
-  el.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
-  el.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
-}
-
+/**
+ * Everything that is not an automation, set as a ledger: the job on the left,
+ * what CartHedge does for it on the right. Words carry it, no icon tiles.
+ */
 export function FeaturesBento() {
   return (
-    <Section id="features">
-      <SectionHead eyebrow={features.eyebrow} title={features.title} />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {features.items.map((item, i) => {
-          const Icon = icons[i];
-          const isWide = wide.has(item.key);
-          return (
-            <Reveal key={item.key} delay={(i % 4) * 0.05} className={cn(isWide && 'sm:col-span-2')}>
-              <article
-                onMouseMove={spotlight}
-                className={cn(
-                  'spotlight group relative h-full overflow-hidden rounded-lg p-6 transition-transform duration-std ease-enter hover:-translate-y-1',
-                  isWide ? 'glass sheen shadow-float' : 'panel shadow-soft',
-                )}
-              >
-                {isWide && (
-                  <div
-                    aria-hidden
-                    className="absolute inset-0 -z-0 bg-[radial-gradient(120%_100%_at_0%_0%,rgb(var(--jade-500)/0.14),transparent_55%)]"
-                  />
-                )}
-                <div className="relative flex items-start justify-between">
-                  <span
-                    className={cn(
-                      'flex size-11 items-center justify-center rounded-md transition-colors duration-std',
-                      isWide ? 'bg-jade-500/18 text-jade-ink' : 'neu text-jade-ink group-hover:text-jade-ink',
-                    )}
-                  >
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  {item.badge && <Badge tone="gold">{item.badge}</Badge>}
-                </div>
-                <h3 className={cn('relative mt-4 font-display font-semibold text-hi', isWide ? 'text-xl' : 'text-lg')}>
-                  {item.title}
-                </h3>
-                <p className="relative mt-1.5 max-w-md text-sm leading-relaxed text-mid">{item.copy}</p>
-              </article>
-            </Reveal>
-          );
-        })}
+    <section id="features" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+      <SectionHead title={features.title} />
+      <div className="flex flex-col">
+        {features.groups.map((group) => (
+          <RevealGroup
+            key={group.title}
+            className="grid gap-x-10 gap-y-5 border-t py-8 first:border-t-0 first:pt-0 lg:grid-cols-[13rem_1fr] lg:py-10"
+          >
+            <RevealItem>
+              <h3 className="text-d4 font-semibold text-hi lg:sticky lg:top-28">{group.title}</h3>
+            </RevealItem>
+            <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
+              {group.items.map((item) => (
+                <RevealItem key={item.key}>
+                  <dt className="flex flex-wrap items-center gap-2 text-[16px] font-semibold tracking-snug text-hi">
+                    {item.title}
+                    {'badge' in item && item.badge && <Badge tone="gold">{item.badge}</Badge>}
+                  </dt>
+                  <dd className="mt-1.5 max-w-[42ch] text-[14.5px] leading-relaxed text-mid">{item.copy}</dd>
+                </RevealItem>
+              ))}
+            </dl>
+          </RevealGroup>
+        ))}
       </div>
-    </Section>
+    </section>
   );
 }

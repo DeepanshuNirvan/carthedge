@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, MessageSquarePlus, Wallet } from 'lucide-react';
+import { ArrowUpRight, Check, MessageSquarePlus, Wallet } from 'lucide-react';
 import { subscriptionCheckout, subscriptionVerify, useCancelSubscription, usePlans, useSubscriptionInfo, requestCustomPlan } from '@/api/plans';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRazorpay } from '@/hooks/useRazorpay';
@@ -7,7 +7,8 @@ import { toast } from '@/store/ui';
 import { formatPaise } from '@/lib/money';
 import { formatDate, daysLeft } from '@/lib/date';
 import { PageHeader } from '../shell/PageHeader';
-import { Card, CardHeader } from '@/ui/Card';
+import { Card } from '@/ui/Card';
+import { Progress } from '@/ui/Progress';
 import { Button } from '@/ui/Button';
 import { Badge, StatusChip } from '@/ui/Badge';
 import { Field, Input, Textarea } from '@/ui/Input';
@@ -39,7 +40,7 @@ export default function BillingPage() {
         signature: res.razorpay_signature,
       });
       qc.invalidateQueries({ queryKey: ['subscription'] });
-      toast('success', 'Subscription active', 'Welcome aboard — everything is unlocked.');
+      toast('success', 'Subscription active', 'Welcome aboard. Everything is unlocked.');
     } catch (e) {
       toast('error', 'Payment not completed', e instanceof Error ? e.message : undefined);
     } finally {
@@ -61,45 +62,56 @@ export default function BillingPage() {
 
   return (
     <>
-      <PageHeader title="Billing" subtitle="Plan, renewal and invoices for your CartHedge subscription" />
+      <PageHeader title="Billing" subtitle="Your CartHedge plan, renewal and usage" />
 
-      <div className="max-w-3xl">
-        <Card>
-          <CardHeader title="Current plan" />
-          <div className="p-5 pt-4">
-            {isLoading ? (
+      <div className="max-w-5xl">
+        {/* the current plan, with the period's usage as the one bar on the page */}
+        <Card className="overflow-hidden">
+          {isLoading ? (
+            <div className="p-6">
               <SkeletonRows rows={2} />
-            ) : sub ? (
-              <div className="flex flex-wrap items-center gap-4">
-                <div>
-                  <p className="flex items-center gap-2 font-display text-xl font-semibold text-hi">
-                    {sub.planName} <StatusChip status={sub.status} />
-                  </p>
-                  <p className="mt-1 text-sm text-mid">
-                    <MoneyText paise={sub.priceMonthly} />/month · {sub.orderQuota} orders included ·{' '}
-                    <MoneyText paise={sub.perOrderFee} />/order after
-                  </p>
-                  <p className="mt-1 text-xs text-low">
-                    {sub.status === 'trial' ? 'Trial ends' : sub.status === 'cancelled' ? 'Access till' : 'Renews by'}{' '}
-                    {formatDate(sub.endsAt)} ({daysLeft(sub.endsAt)} days)
-                  </p>
-                  <p className="mt-1 text-xs text-mid">
-                    {sub.ordersUsed} of {sub.orderQuota} included orders used this period
-                  </p>
-                  {/* the per-order fee is charged at renewal, so it has to be
-                      visible before the seller is asked to pay it */}
-                  {!!info?.overageOrders && (
-                    <p className="mt-1.5 rounded-md bg-gold-400/10 px-2.5 py-1.5 text-xs text-gold-ink">
-                      {info.overageOrders} order{info.overageOrders === 1 ? '' : 's'} above your quota ·{' '}
-                      <MoneyText paise={info.overageFee} className="text-xs font-semibold" /> will be added to your next
-                      renewal
-                    </p>
-                  )}
+            </div>
+          ) : sub ? (
+            <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.3fr_1fr] lg:items-center">
+              <div>
+                <p className="text-[13px] font-medium text-mid">Current plan</p>
+                <p className="mt-1 flex flex-wrap items-center gap-2.5 text-d3 font-semibold text-hi">
+                  {sub.planName} <StatusChip status={sub.status} />
+                </p>
+                <p className="mt-2 text-sm text-mid">
+                  <MoneyText paise={sub.priceMonthly} className="font-semibold text-hi" /> a month, {sub.orderQuota} orders
+                  included, then <MoneyText paise={sub.perOrderFee} /> an order
+                </p>
+                <p className="mt-1 text-[13px] text-low">
+                  {sub.status === 'trial' ? 'Trial ends' : sub.status === 'cancelled' ? 'Access till' : 'Renews by'}{' '}
+                  {formatDate(sub.endsAt)}, {daysLeft(sub.endsAt)} {daysLeft(sub.endsAt) === 1 ? 'day' : 'days'} left
+                </p>
+              </div>
+              <div className="rounded-xl bg-[rgb(var(--field)/0.04)] p-4 hairline">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="text-mid">Orders this period</span>
+                  <span className="font-semibold tnum text-hi">
+                    {sub.ordersUsed} <span className="font-normal text-low">of {sub.orderQuota}</span>
+                  </span>
                 </div>
+                <Progress
+                  className="mt-3"
+                  value={sub.ordersUsed}
+                  max={sub.orderQuota}
+                  tone={sub.ordersUsed > sub.orderQuota ? 'gold' : 'jade'}
+                />
+                {/* the per-order fee is charged at renewal, so it has to be visible before the seller is asked to pay it */}
+                {!!info?.overageOrders && (
+                  <p className="mt-3 text-xs text-gold-ink">
+                    {info.overageOrders} order{info.overageOrders === 1 ? '' : 's'} above your quota.{' '}
+                    <MoneyText paise={info.overageFee} className="font-semibold" /> will be added to your next renewal.
+                  </p>
+                )}
                 {sub.status === 'active' && (
                   <Button
                     variant="ghost"
-                    className="text-danger-ink sm:ml-auto"
+                    size="sm"
+                    className="-ml-2 mt-3 text-danger-ink"
                     loading={cancel.isPending}
                     onClick={() =>
                       cancel.mutate(undefined, {
@@ -111,39 +123,45 @@ export default function BillingPage() {
                   </Button>
                 )}
               </div>
-            ) : (
-              <p className="text-sm text-mid">No subscription found — pick a plan below.</p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <p className="p-6 text-sm text-mid">No subscription found. Pick a plan below.</p>
+          )}
         </Card>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <h2 className="mb-3 mt-8 text-[15px] font-semibold text-hi">Plans</h2>
+        <div className="panel grid overflow-hidden rounded-xl md:grid-cols-3">
           {plans
             ?.filter((p) => !p.isCustom)
             .map((plan) => {
               const current = sub?.planCode === plan.code;
               return (
-                <Card key={plan.code} className={cn('flex flex-col p-5', current && 'ring-1 ring-jade-500/60')}>
-                  <p className="flex items-center justify-between font-display text-base font-semibold text-hi">
+                <div key={plan.code} className={cn('relative flex flex-col p-5 shadow-[inset_-1px_-1px_0_rgb(var(--line)/var(--line-a))] sm:p-6', current && 'bg-jade-500/6')}>
+                  {current && (
+                    <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-jade-500" />
+                  )}
+                  <p className="flex items-center justify-between text-[15px] font-semibold tracking-snug text-hi">
                     {plan.name}
                     {current && <Badge tone="jade">Current</Badge>}
                   </p>
-                  <p className="mt-2 font-display text-2xl font-semibold text-hi tnum">
-                    {formatPaise(plan.priceMonthly)}
-                    <span className="text-xs font-normal text-low">/mo</span>
+                  <p className="mt-3 flex items-baseline gap-1">
+                    <span className="text-[2rem] font-semibold leading-none tracking-tightest tnum text-hi">
+                      {formatPaise(plan.priceMonthly)}
+                    </span>
+                    <span className="text-sm text-low">/month</span>
                   </p>
-                  <p className="mt-1 text-xs text-low">
-                    {plan.orderQuota} orders · {formatPaise(plan.perOrderFee)}/extra
+                  <p className="mt-1.5 text-xs text-low">
+                    {plan.orderQuota} orders, then {formatPaise(plan.perOrderFee)} each
                   </p>
-                  <ul className="mt-3 flex flex-1 flex-col gap-1.5">
+                  <ul className="mt-4 flex flex-1 flex-col gap-2 border-t pt-4">
                     {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-xs text-mid">
-                        <Check className="mt-0.5 size-3.5 shrink-0 text-jade-ink" /> {f}
+                      <li key={f} className="flex items-start gap-2 text-[13px] leading-snug text-mid">
+                        <Check className="mt-0.5 size-3.5 shrink-0 text-jade-ink" strokeWidth={2.5} /> {f}
                       </li>
                     ))}
                   </ul>
                   <Button
-                    className="mt-4"
+                    className="mt-5 w-full"
                     variant={current ? 'secondary' : 'primary'}
                     loading={paying === plan.code}
                     icon={<Wallet className="size-4" />}
@@ -151,37 +169,40 @@ export default function BillingPage() {
                   >
                     {current ? 'Renew' : sub?.status === 'trial' ? 'Subscribe' : 'Switch'}
                   </Button>
-                </Card>
+                </div>
               );
             })}
         </div>
 
         <button
           onClick={() => setCustomOpen(true)}
-          className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-gold-400/40 p-4 text-left transition-colors hover:bg-gold-400/5"
+          className="mt-4 flex w-full items-center gap-3.5 rounded-xl bg-gold-400/[0.07] p-4 text-left shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)] transition-colors hover:bg-gold-400/10"
         >
-          <MessageSquarePlus className="size-5 text-gold-ink" />
-          <span>
-            <span className="block text-sm font-medium text-hi">Need a custom plan?</span>
-            <span className="text-xs text-mid">High volume, special quotas, negotiated pricing — tell us your numbers.</span>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold-400/15 text-gold-ink">
+            <MessageSquarePlus className="size-5" />
           </span>
+          <span className="flex-1">
+            <span className="block text-sm font-semibold text-hi">Need a custom plan?</span>
+            <span className="text-[13px] text-mid">High volume, special quotas or negotiated pricing. Tell us your numbers.</span>
+          </span>
+          <ArrowUpRight className="size-4 text-gold-ink" aria-hidden />
         </button>
       </div>
 
       <Modal open={customOpen} onClose={() => setCustomOpen(false)} title="Request a custom plan">
         <div className="flex flex-col gap-4">
-          <Field label="Expected orders / month">
+          <Field label="Expected orders a month">
             <Input inputMode="numeric" placeholder="2000" value={expectedOrders} onChange={(e) => setExpectedOrders(e.target.value)} />
           </Field>
           <Field label="What do you need?">
             <Textarea
               rows={4}
-              placeholder="We do ~2000 orders/month across two Instagram pages and need multi-page support…"
+              placeholder="We do about 2000 orders a month across two Instagram pages and need multi-page support"
               value={customMsg}
               onChange={(e) => setCustomMsg(e.target.value)}
             />
           </Field>
-          <Button onClick={sendCustomRequest} disabled={customMsg.length < 10}>
+          <Button size="lg" onClick={sendCustomRequest} disabled={customMsg.length < 10}>
             Send request
           </Button>
         </div>

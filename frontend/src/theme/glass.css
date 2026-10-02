@@ -1,8 +1,12 @@
-/* CartHedge morphism system — glass, neumorphic, aurora, clay.
-   One material language across all four surfaces. Every class is token-driven
-   so both themes stay premium by construction. */
+/* CartHedge materials.
+   Glass is reserved for things that float over content: navigation, tab bars,
+   sheets, menus, toasts, sticky headers and the marketing counter. Content
+   sits on .panel, which is opaque and cheap and carries the same rim light,
+   so the two read as one family. This follows iOS, which keeps glass for
+   chrome; a page of blurred cards is decoration and costs real frames
+   inside the Instagram browser. */
 
-/* ---------- hairline: 1px inset border respecting theme alpha ---------- */
+/* ---------- hairlines ---------- */
 .hairline {
   box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a));
 }
@@ -10,64 +14,45 @@
   box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-strong-a));
 }
 
-/* ---------- glass: frosted panel with luminous edge + inner highlight ----------
-   Two tiers: glass (cards) and glass-nav (floating chrome). Light comes from
-   above, so each carries a bright top edge and a dark bottom edge — that
-   asymmetry is what reads as real thickness rather than a flat rectangle. */
+/* ---------- glass: regular material ----------
+   Three edges make it read as a pane with thickness: a cool rim all round, a
+   bright specular line on top where the light hits, and a darker line
+   underneath. Fill is tinted, never fully clear, so text over it stays AA. */
 .glass {
   position: relative;
   background:
-    linear-gradient(150deg, rgb(var(--glass-hi) / var(--glass-hi-a)), transparent 44%),
+    linear-gradient(180deg, rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.35)), transparent 42%),
     rgb(var(--glass-bg) / var(--glass-a));
-  backdrop-filter: blur(var(--blur-md)) saturate(1.7) brightness(1.03);
-  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(1.7) brightness(1.03);
+  backdrop-filter: blur(var(--blur-md)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(var(--glass-sat));
   box-shadow:
-    inset 0 0 0 1px rgb(var(--line) / var(--glass-border-a)),
-    inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
-    inset 0 -1px 0 0 rgb(var(--glass-lo) / var(--glass-lo-a)),
-    inset 0 -24px 40px -28px rgb(0 0 0 / 0.3),
-    var(--shadow-soft);
-}
-
-/* stronger blur for floating nav / sheets that sit over motion */
-.glass-nav {
-  background:
-    linear-gradient(150deg, rgb(var(--glass-hi) / var(--glass-hi-a)), transparent 50%),
-    rgb(var(--glass-bg) / 0.74);
-  backdrop-filter: blur(var(--blur-lg)) saturate(1.8) brightness(1.03);
-  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.8) brightness(1.03);
-  box-shadow:
-    inset 0 0 0 1px rgb(var(--line) / var(--glass-border-a)),
+    inset 0 0 0 1px rgb(var(--line) / var(--glass-rim-a)),
     inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
     inset 0 -1px 0 0 rgb(var(--glass-lo) / var(--glass-lo-a)),
     var(--shadow-raised);
 }
 
-/* ---------- scroll edge: soften where content passes under floating chrome ----
-   Apple fades the meeting point instead of drawing a 1px rule. Put on the
-   sticky header itself; the gradient hangs just below its bottom edge. */
-.scroll-edge::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 -18px 0;
-  height: 18px;
-  pointer-events: none;
-  background: linear-gradient(to bottom, rgb(var(--bg) / 0.55), transparent);
-}
-
-/* panel = solid card with a glass sheen; the workhorse card surface (no blur = cheap) */
-.panel {
-  position: relative;
+/* thick material: bars and sheets that sit over moving content */
+.glass-nav {
   background:
-    linear-gradient(155deg, rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.55)), transparent 46%),
-    rgb(var(--surface));
+    linear-gradient(180deg, rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.3)), transparent 60%),
+    rgb(var(--glass-bg) / var(--glass-thick-a));
+  backdrop-filter: blur(var(--blur-lg)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(var(--glass-sat));
   box-shadow:
-    inset 0 0 0 1px rgb(var(--line) / var(--line-a)),
-    inset 0 1px 0 0 rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.8)),
+    inset 0 0 0 1px rgb(var(--line) / var(--glass-rim-a)),
+    inset 0 1px 0 0 rgb(var(--glass-hi) / var(--glass-hi-a)),
     var(--shadow-soft);
 }
 
-/* top-edge light refraction line — drop onto any rounded glass element */
+/* a bar pinned to an edge: only the inner edge gets a line */
+.glass-bar {
+  background: rgb(var(--glass-bg) / var(--glass-thick-a));
+  backdrop-filter: blur(var(--blur-lg)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(var(--glass-sat));
+}
+
+/* specular ring: a lit edge that is brighter top-left, fading round the pane */
 .sheen::before {
   content: '';
   position: absolute;
@@ -75,11 +60,11 @@
   border-radius: inherit;
   padding: 1px;
   background: linear-gradient(
-    130deg,
-    rgb(var(--glass-tint) / 0.5),
-    transparent 30%,
-    transparent 70%,
-    rgb(var(--glass-tint) / 0.18)
+    150deg,
+    rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 2.4)),
+    rgb(var(--glass-hi) / 0.02) 34%,
+    rgb(var(--glass-hi) / 0.02) 66%,
+    rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.9))
   );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
@@ -87,138 +72,57 @@
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  opacity: 0.6;
 }
 
-/* ---------- neumorphic control: soft raised/pressed tactile surface ---------- */
+/* where content passes under sticky chrome, fade instead of drawing a rule */
+.scroll-edge::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -16px 0;
+  height: 16px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(var(--bg) / 0.5), transparent);
+}
+
+/* ---------- panel: opaque content surface ---------- */
+.panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.22)), transparent 30%),
+    rgb(var(--surface));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--line) / var(--line-a)),
+    inset 0 1px 0 0 rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.7)),
+    var(--shadow-soft);
+}
+
+/* ---------- controls ---------- */
+/* raised control: chips, small buttons, icon wells */
 .neu {
   background: rgb(var(--surface-2));
   box-shadow:
     inset 0 0 0 1px rgb(var(--line) / var(--line-a)),
-    2px 2px 6px rgb(var(--neu-dark) / var(--neu-dark-a)),
-    -2px -2px 5px rgb(var(--neu-light) / var(--neu-light-a));
+    inset 0 1px 0 0 rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.6)),
+    0 1px 2px rgb(var(--glass-lo) / calc(var(--glass-lo-a) * 0.6));
 }
+/* recessed well: inputs, tracks, segmented-control grooves */
 .neu-inset {
-  background: rgb(var(--surface-2));
+  background: rgb(var(--field) / var(--field-a));
   box-shadow:
-    inset 2px 2px 6px rgb(var(--neu-dark) / var(--neu-dark-a)),
-    inset -2px -2px 5px rgb(var(--neu-light) / var(--neu-light-a));
+    inset 0 0 0 1px rgb(var(--line) / var(--line-a)),
+    inset 0 1px 2px rgb(var(--glass-lo) / calc(var(--glass-lo-a) * 0.5));
 }
 
-/* ---------- clay: soft weighty physical element for primary tappables ---------- */
+/* primary action material: a lit jade capsule with a glass top edge */
 .clay {
   box-shadow:
-    inset 0 2px 1px rgb(255 255 255 / 0.28),
-    inset 0 -3px 4px rgb(0 0 0 / 0.22),
-    0 10px 24px -8px rgb(var(--jade-700) / 0.55);
+    inset 0 1px 0 rgb(255 255 255 / 0.38),
+    inset 0 -1px 0 rgb(0 0 0 / 0.16),
+    0 1px 2px rgb(var(--jade-700) / 0.3),
+    0 6px 14px -8px rgb(var(--jade-700) / 0.55);
 }
 
-/* ---------- aurora: mesh light sources behind glass ---------- */
-.aurora {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.aurora::before,
-.aurora::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(var(--blur-xl));
-  opacity: var(--aurora-a);
-}
-.aurora::before {
-  width: 46vw;
-  height: 46vw;
-  top: -12%;
-  left: -8%;
-  background: radial-gradient(circle, rgb(var(--aurora-1)), transparent 62%);
-  animation: auroraDrift1 22s var(--ease-enter) infinite alternate;
-}
-.aurora::after {
-  width: 40vw;
-  height: 40vw;
-  bottom: -14%;
-  right: -6%;
-  background: radial-gradient(circle, rgb(var(--aurora-2)), transparent 62%);
-  animation: auroraDrift2 26s var(--ease-enter) infinite alternate;
-}
-
-@keyframes auroraDrift1 {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(8vw, 6vh, 0) scale(1.18); }
-}
-@keyframes auroraDrift2 {
-  from { transform: translate3d(0, 0, 0) scale(1.05); }
-  to { transform: translate3d(-7vw, -5vh, 0) scale(1.28); }
-}
-
-/* ---------- marketing page background: aurora field + structure grid ----------
-   Each blob is a cached blurred layer animated by transform ONLY (compositor),
-   so scrolling never repaints them. Capped blur keeps mid-range phones smooth. */
-.cart-aurora {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(46px);
-  opacity: var(--aurora-a);
-  will-change: transform;
-  transform: translateZ(0);
-}
-.cart-aurora--jade {
-  width: 52vw;
-  height: 52vw;
-  top: -16%;
-  left: -12%;
-  background: radial-gradient(circle, rgb(var(--aurora-1)), transparent 62%);
-  animation: cartDrift1 28s ease-in-out infinite alternate;
-}
-.cart-aurora--gold {
-  width: 44vw;
-  height: 44vw;
-  bottom: -18%;
-  right: -10%;
-  background: radial-gradient(circle, rgb(var(--aurora-2)), transparent 62%);
-  animation: cartDrift2 32s ease-in-out infinite alternate;
-}
-.cart-aurora--blue {
-  width: 34vw;
-  height: 34vw;
-  top: 38%;
-  left: 46%;
-  opacity: calc(var(--aurora-a) * 0.45);
-  background: radial-gradient(circle, rgb(var(--aurora-3)), transparent 66%);
-  animation: cartDrift3 36s ease-in-out infinite alternate;
-}
-@keyframes cartDrift1 {
-  to { transform: translate3d(6vw, 5vh, 0) scale(1.14); }
-}
-@keyframes cartDrift2 {
-  to { transform: translate3d(-6vw, -4vh, 0) scale(1.2); }
-}
-@keyframes cartDrift3 {
-  to { transform: translate3d(-4vw, 3vh, 0) scale(1.16); }
-}
-
-.cart-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgb(var(--line) / var(--grid-a)) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--line) / var(--grid-a)) 1px, transparent 1px);
-  background-size: 62px 62px;
-  -webkit-mask-image: radial-gradient(115% 92% at 50% 10%, black, transparent 74%);
-  mask-image: radial-gradient(115% 92% at 50% 10%, black, transparent 74%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cart-aurora {
-    animation: none;
-  }
-}
-
-/* ---------- spotlight border card: edge illuminates under cursor ----------
-   drive --mx/--my (0..100%) from JS on hover; degrades to static edge. */
+/* ---------- spotlight edge: lights under the pointer (--mx/--my) ---------- */
 .spotlight {
   position: relative;
 }
@@ -229,9 +133,9 @@
   border-radius: inherit;
   padding: 1px;
   background: radial-gradient(
-    180px circle at var(--mx, 50%) var(--my, 0%),
-    rgb(var(--jade-400) / 0.7),
-    transparent 60%
+    220px circle at var(--mx, 50%) var(--my, 0%),
+    rgb(var(--jade-400) / 0.5),
+    transparent 62%
   );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
@@ -242,58 +146,137 @@
   transition: opacity var(--dur-std) var(--ease-enter);
   pointer-events: none;
 }
-.spotlight:hover::after {
-  opacity: 1;
+@media (hover: hover) {
+  .spotlight:hover::after {
+    opacity: 1;
+  }
 }
 
-/* ---------- cinematic film grain (fixed layer, never on scrolling content) ---------- */
-/* The marketing nav is fixed and floats over the page, so a native anchor jump
-   (#pricing on the home page) parks the section underneath it. Routed hash
-   navigation applies the same offset in useLenis. */
+/* ---------- film grain: fixed layer, never on scrolling content ---------- */
 .grain > main section[id] {
-  scroll-margin-top: 104px;
+  scroll-margin-top: 96px;
 }
-
 .grain::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 60;
-  opacity: 0.045;
+  opacity: 0.032;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ---------- shimmer for skeletons ---------- */
-@keyframes shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
-}
-
-/* ---------- brand accent type ----------
-   One hue, lit from the top-left, so the words read as a material catching
-   light. A two-hue jade→gold sweep is the stock "AI headline" gradient and was
-   the loudest generic tell on the landing page. Endpoints are theme tokens
-   because the brand ramp is theme-invariant — jade-300 on white paper is
-   unreadable, so light mode swaps to the deep end of the same family. */
+/* ---------- accent ink (was a gradient; emphasis now comes from colour + weight) ---------- */
 .text-brand-grad {
-  background: linear-gradient(166deg, rgb(var(--grad-from)) 4%, rgb(var(--grad-to)) 88%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* the gradient can hairline-clip descenders at display sizes */
-  padding-bottom: 0.06em;
+  color: rgb(var(--jade-ink));
 }
 
-/* ---------- premium range slider: recessed track + physical jade knob ---------- */
+/* ---------- skeleton: a sheen of light passing over an unlit pane ---------- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(var(--field) / calc(var(--field-a) * 1.6));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / calc(var(--line-a) * 0.7));
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(var(--glass-hi) / calc(var(--glass-hi-a) * 0.55)) 50%,
+    transparent 80%
+  );
+  animation: skeletonSweep 1.6s var(--ease-enter) infinite;
+}
+@keyframes skeletonSweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ---------- the strand: bulbs and the chase ---------- */
+.bulb {
+  display: inline-block;
+  border-radius: 999px;
+  background: rgb(var(--bulb-off));
+  transition:
+    background-color var(--dur-expr) var(--ease-enter),
+    box-shadow var(--dur-expr) var(--ease-enter);
+}
+.bulb[data-lit='true'] {
+  background: rgb(var(--bulb));
+  box-shadow:
+    0 0 0 3px rgb(var(--bulb) / 0.14),
+    0 9px 12px -5px rgb(var(--bulb) / 0.65);
+}
+.bulb[data-state='done'] {
+  background: rgb(var(--jade-400));
+  box-shadow: 0 0 0 3px rgb(var(--jade-400) / 0.14);
+}
+
+/* typing indicator: three bulbs taking turns */
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+  animation: typingDot 1.2s var(--ease-enter) infinite;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+@keyframes typingDot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* strikethrough draw for status transitions */
+.strike-out {
+  position: relative;
+}
+.strike-out::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 52%;
+  height: 1.5px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: left center;
+  animation: strikeDraw 360ms var(--ease-enter) forwards;
+}
+@keyframes strikeDraw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ---------- range slider: recessed track, glass knob ---------- */
 .slider {
   -webkit-appearance: none;
   appearance: none;
-  /* the visible track stays 10px; padding grows the hit area to a full 44px so
-     a thumb can grab the rail anywhere, not just on the knob */
   height: 44px;
-  padding: 17px 0;
+  padding: 19px 0;
   background-clip: content-box;
   border-radius: 999px;
   outline: none;
@@ -301,70 +284,62 @@
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   cursor: grab;
-  background: linear-gradient(180deg, rgb(var(--jade-300)), rgb(var(--jade-500)));
+  background: rgb(255 255 255);
   box-shadow:
-    inset 0 1px 1px rgb(255 255 255 / 0.5),
-    0 3px 8px -1px rgb(var(--jade-700) / 0.6),
-    0 0 0 4px rgb(var(--jade-500) / 0.14);
+    inset 0 -1px 1px rgb(0 0 0 / 0.08),
+    0 0 0 0.5px rgb(0 0 0 / 0.12),
+    0 3px 8px rgb(0 0 0 / 0.22);
   transition: transform var(--dur-micro) var(--ease-spring);
 }
 .slider::-webkit-slider-thumb:active {
   cursor: grabbing;
-  transform: scale(1.14);
+  transform: scale(1.12);
 }
 .slider::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: 50%;
   cursor: grab;
-  background: linear-gradient(180deg, rgb(var(--jade-300)), rgb(var(--jade-500)));
-  box-shadow: 0 3px 8px -1px rgb(var(--jade-700) / 0.6), 0 0 0 4px rgb(var(--jade-500) / 0.14);
+  background: rgb(255 255 255);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.12), 0 3px 8px rgb(0 0 0 / 0.22);
 }
 
-/* ---------- performance: cap the blur radius on phones ----------
+/* ---------- performance: cap blur on phones ----------
    Buyers open these pages inside the Instagram and WhatsApp in-app browsers,
-   where backdrop-filter is the single most expensive thing on screen and its
-   cost scales with radius. Half the radius is visually near-identical at phone
-   size and stops the sticky header + tab bar from dropping frames on scroll. */
+   where backdrop-filter is the most expensive thing on screen and its cost
+   scales with radius. Half the radius is near-identical at phone size. */
 @media (max-width: 900px) {
   :root {
-    --blur-sm: 6px;
-    --blur-md: 10px;
-    --blur-lg: 16px;
-  }
-  /* saturation/brightness passes are a second full-surface filter for very
-     little gain once the radius is small — drop them, keep the frost */
-  .glass {
-    backdrop-filter: blur(var(--blur-md));
-    -webkit-backdrop-filter: blur(var(--blur-md));
+    --blur-sm: 8px;
+    --blur-md: 14px;
+    --blur-lg: 20px;
   }
 }
 
-/* reduced transparency: kill blur, fall back to solid so contrast holds */
 @media (prefers-reduced-transparency: reduce) {
   .glass,
   .glass-nav,
-  .panel {
+  .glass-bar {
     background: rgb(var(--surface));
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 }
 
-/* high contrast: near-solid surfaces with an edge you can actually see */
 @media (prefers-contrast: more) {
   .glass,
   .glass-nav,
+  .glass-bar,
   .panel {
     background: rgb(var(--surface));
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.85), var(--shadow-soft);
+    box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8), var(--shadow-soft);
   }
   .sheen::before,
   .spotlight::after,
@@ -373,44 +348,25 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .aurora::before,
-  .aurora::after {
-    animation: none;
+/* ---------- print: an invoice prints as a document, not as the app ---------- */
+@media print {
+  @page {
+    margin: 12mm;
   }
-}
-
-/* ---------- auth orb ----------
-   Compositor-only: transform + opacity, never layout. Each layer is its own
-   element so the browser can cache them; the sphere never repaints. */
-@keyframes authOrbSpin {
-  to { transform: rotate(360deg); }
-}
-@keyframes authOrbBreathe {
-  0%, 100% { transform: scale(1); opacity: 0.94; }
-  50% { transform: scale(1.045); opacity: 1; }
-}
-@keyframes authOrbTilt {
-  0%, 100% { transform: rotate3d(1, 0.3, 0, 74deg) rotate(0deg); }
-  50% { transform: rotate3d(1, 0.3, 0, 66deg) rotate(180deg); }
-}
-.auth-orb-spin {
-  animation: authOrbSpin 26s linear infinite;
-  will-change: transform;
-}
-.auth-orb-breathe {
-  animation: authOrbBreathe 7s ease-in-out infinite;
-  will-change: transform;
-}
-.auth-orb-tilt {
-  animation: authOrbTilt 22s ease-in-out infinite;
-  will-change: transform;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-orb-spin,
-  .auth-orb-breathe,
-  .auth-orb-tilt {
-    animation: none;
+  body {
+    background: #fff !important;
+  }
+  body > * {
+    display: none !important;
+  }
+  body > #invoice-print {
+    display: block !important;
+  }
+  #invoice-print article {
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .grain::after {
+    display: none !important;
   }
 }

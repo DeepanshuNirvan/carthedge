@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BadgeCheck, Banknote, CreditCard, Loader2, MapPinOff, PartyPopper, ShieldCheck, Smartphone, Truck } from 'lucide-react';
+import { BadgeCheck, Banknote, CreditCard, MapPinOff, ShieldCheck, Smartphone, Truck } from 'lucide-react';
 import type { Address, CheckoutInfo, OnlinePayment, OrderRef, PlacedOrder } from '@/api/types';
 import {
   buyerPay,
@@ -18,6 +18,9 @@ import { addressSchema, phoneSchema } from '@/lib/validators';
 import { toast } from '@/store/ui';
 import { cn } from '@/lib/cn';
 import { MoneyText } from '@/ui/MoneyText';
+import { SuccessMark } from '@/ui/SuccessMark';
+import { Spinner } from '@/ui/Spinner';
+import { buttonLink } from '@/ui/buttonLink';
 import { Button } from '@/ui/Button';
 import { Field, Input, Textarea } from '@/ui/Input';
 import { Stepper } from '@/ui/Stepper';
@@ -260,7 +263,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             <p id="pincodeReach" aria-live="polite" className="-mt-2 flex items-start gap-1.5 text-xs">
               {checkingPincode ? (
                 <span className="flex items-center gap-1.5 text-low">
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden /> Checking delivery to this pincode…
+                  <Spinner className="size-3.5" /> Checking delivery to this pincode
                 </span>
               ) : undeliverable ? (
                 <span className="flex items-start gap-1.5 text-danger-ink">
@@ -306,7 +309,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                 maxLength={6}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                className="text-center font-mono text-xl tracking-[0.5em]"
+                className="h-14 text-center text-2xl font-semibold tracking-[0.55em] tnum"
               />
             </Field>
             <Button size="lg" loading={busy} disabled={otp.length < 4} onClick={confirmOtp}>
@@ -324,7 +327,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
 
         {step === 'payment' && (
           <motion.div key="payment" {...slide} className="flex flex-col gap-4">
-            <div className="rounded-lg bg-surface-2 p-4">
+            <div className="rounded-lg bg-[rgb(var(--field)/0.05)] p-4 hairline">
               <dl className="flex flex-col gap-1.5 text-sm">
                 <div className="flex justify-between text-mid">
                   <dt>Items</dt>
@@ -348,19 +351,19 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   <button
                     onClick={() => setMethod('prepaid')}
                     className={cn(
-                      'flex items-center gap-3 rounded-md p-4 text-left transition-all duration-micro',
-                      method === 'prepaid' ? 'bg-jade-500/10 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))]' : 'bg-surface-2 hairline',
+                      'flex min-h-16 items-center gap-3 rounded-lg p-4 text-left transition-all duration-micro ease-spring active:scale-[0.99]',
+                      method === 'prepaid' ? 'bg-jade-500/10 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))]' : 'neu',
                     )}
                   >
                     <CreditCard className={cn('size-5', method === 'prepaid' ? 'text-jade-ink' : 'text-mid')} />
                     <span className="flex-1">
                       <span className="block text-sm font-medium text-hi">
-                        {ctx.onlinePayment === 'upi' ? 'Pay now by UPI' : 'Pay now — UPI or card'}
+                        {ctx.onlinePayment === 'upi' ? 'Pay now by UPI' : 'Pay now by UPI or card'}
                       </span>
                       <span className="block text-xs text-low">
                         {ctx.onlinePayment === 'upi'
-                          ? `GPay · PhonePe · Paytm — straight to ${ctx.businessName}`
-                          : 'Fastest dispatch · secured by Razorpay'}
+                          ? `GPay, PhonePe or Paytm, straight to ${ctx.businessName}`
+                          : 'Fastest dispatch, secured by Razorpay'}
                       </span>
                     </span>
                     {method === 'prepaid' && <BadgeCheck className="size-5 text-jade-ink" />}
@@ -371,8 +374,8 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   <button
                     onClick={() => setMethod('cod')}
                     className={cn(
-                      'flex items-center gap-3 rounded-md p-4 text-left transition-all duration-micro',
-                      method === 'cod' ? 'bg-gold-400/10 shadow-[inset_0_0_0_1.5px_rgb(var(--gold-400))]' : 'bg-surface-2 hairline',
+                      'flex min-h-16 items-center gap-3 rounded-lg p-4 text-left transition-all duration-micro ease-spring active:scale-[0.99]',
+                      method === 'cod' ? 'bg-gold-400/10 shadow-[inset_0_0_0_1.5px_rgb(var(--gold-400))]' : 'neu',
                     )}
                   >
                     <Banknote className={cn('size-5', method === 'cod' ? 'text-gold-ink' : 'text-mid')} />
@@ -408,14 +411,12 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center gap-4 py-6 text-center"
           >
-            <span className="flex size-16 items-center justify-center rounded-full bg-jade-500/15">
-              <PartyPopper className="size-8 text-jade-ink" />
-            </span>
+            <SuccessMark />
             <div>
-              <h3 className="font-display text-xl font-semibold text-hi">Order placed!</h3>
+              <h3 className="text-d4 font-semibold text-hi">Order placed</h3>
               <p className="mt-1 text-sm text-mid">
-                Order <span className="font-mono font-medium text-hi">{placed.orderCode}</span> ·{' '}
-                <MoneyText paise={placed.total} />
+                Order <span className="font-mono font-medium text-hi">{placed.orderCode}</span>,{' '}
+                <MoneyText paise={placed.total} className="font-semibold text-hi" />
               </p>
             </div>
 
@@ -426,7 +427,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             )}
 
             {placed.next === 'codPending' && (
-              <div className="w-full rounded-lg bg-gold-400/10 p-4 text-left">
+              <div className="w-full rounded-lg bg-gold-400/10 p-4 text-left shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.25)]">
                 <p className="text-sm font-medium text-gold-ink">One last step</p>
                 <p className="mt-1 text-xs leading-relaxed text-mid">
                   {ctx.businessName} will message you on WhatsApp to confirm this COD order before dispatch.
@@ -446,11 +447,8 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
               </div>
             )}
 
-            <Link
-              to={`/o/${placed.orderCode}`}
-              className="text-sm font-medium text-jade-ink hover:underline"
-            >
-              Track this order →
+            <Link to={`/o/${placed.orderCode}`} className={buttonLink('secondary')}>
+              Track this order
             </Link>
           </motion.div>
         )}

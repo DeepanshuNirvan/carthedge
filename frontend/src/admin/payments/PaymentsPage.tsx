@@ -39,7 +39,7 @@ export default function PaymentsPage() {
                     <p className="font-medium text-hi">{p.businessName}</p>
                     <p className="font-mono text-xs text-low">/{p.businessCode}</p>
                   </Td>
-                  <Td className="hidden text-xs font-medium uppercase text-mid sm:table-cell">{p.planCode || '—'}</Td>
+                  <Td className="hidden text-xs font-medium capitalize text-mid sm:table-cell">{p.planCode || '-'}</Td>
                   <Td className="text-right">
                     <MoneyText paise={p.amount} />
                   </Td>
