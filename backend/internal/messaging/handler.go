@@ -244,6 +244,21 @@ func (h *Handler) Conversation(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, out)
 }
 
+// SetAI pauses or resumes the DM assistant on one chat.
+func (h *Handler) SetAI(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Paused bool `json:"paused"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := h.svc.SetAIPaused(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), in.Paused); err != nil {
+		httpx.Err(w, http.StatusNotFound, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
 func (h *Handler) Reply(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Text string `json:"text"`

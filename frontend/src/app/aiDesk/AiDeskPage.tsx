@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Check, Inbox as InboxIcon, Lock, MessageSquareText, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
-import type { AiDraft, DraftData } from '@/api/types';
+import { Bot, Check, Inbox as InboxIcon, Lock, MessageSquareText, Pause, Play, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
+import type { AiDraft, ChatCart, ConversationSummary, DraftData } from '@/api/types';
 import { useAiMutations, useDrafts } from '@/api/ai';
 import { useConversation, useConversations, useChannelMutations } from '@/api/messaging';
 import { useCan } from '@/api/plans';
@@ -26,6 +26,30 @@ const sourceBadge = (source?: string) =>
       ? { label: 'Instagram', tone: 'gold' as const }
       : null;
 
+// what the seller needs to know about a chat at a glance, most urgent first
+const chatState = (c: Pick<ConversationSummary, 'stage' | 'draftId' | 'aiPaused'>) =>
+  c.stage === 'handoff'
+    ? { label: 'Needs you', tone: 'danger' as const }
+    : c.draftId
+      ? { label: 'Confirm order', tone: 'gold' as const }
+      : c.stage === 'confirming'
+        ? { label: 'Awaiting buyer', tone: 'info' as const }
+        : c.aiPaused
+          ? { label: 'AI paused', tone: 'neutral' as const }
+          : null;
+
+const authorLabel: Record<string, string> = { ai: 'AI', seller: 'You', system: 'Order update' };
+
+function cartLine(cart: ChatCart | undefined) {
+  const items = cart?.items ?? [];
+  if (items.length === 0) return '';
+  const parts = [items.map((i) => `${i.qty}× ${i.name}${i.variant ? ` (${i.variant})` : ''}`).join(', ')];
+  if (cart?.name) parts.push(cart.name);
+  if (cart?.address.pincode) parts.push(cart.address.pincode);
+  if (cart?.payment) parts.push(cart.payment.toUpperCase());
+  return parts.join(' · ');
+}
+
 function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
   const { data: convos, isLoading } = useConversations();
   return (
@@ -38,6 +62,7 @@ function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
           <ul className="divide-y">
             {convos.map((c) => {
               const b = sourceBadge(c.channel);
+              const state = chatState(c);
               return (
                 <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3">
                   <button className="min-w-0 flex-1 basis-full text-left sm:basis-0" onClick={() => onOpen(c.id)}>
@@ -52,7 +77,12 @@ function Inbox({ onOpen }: { onOpen: (id: string) => void }) {
                     <p className="mt-0.5 truncate text-xs text-low">{c.preview}</p>
                   </button>
                   {b && <Badge tone={b.tone}>{b.label}</Badge>}
-                  {c.draftId && <Badge tone="jade">draft ready</Badge>}
+                  {state && <Badge tone={state.tone}>{state.label}</Badge>}
+                  {c.lastOrderCode && (
+                    <Badge tone="jade">
+                      {c.lastOrderCode} · {c.lastOrderStatus}
+                    </Badge>
+                  )}
                   <span className="hidden text-xs text-low sm:inline">{timeAgo(c.lastMessageAt)}</span>
                 </li>
               );
@@ -82,9 +112,10 @@ function ConversationModal({
   onClose: () => void;
 }) {
   const { data: conv, isLoading } = useConversation(id);
-  const { reply } = useChannelMutations();
+  const { reply, setAi } = useChannelMutations();
   const [text, setText] = useState('');
   const draft = conv?.draftId ? drafts.find((d) => d.id === conv.draftId && d.status === 'pending') : undefined;
+  const building = cartLine(conv?.cart);
 
   return (
     <Modal open onClose={onClose} title={conv ? conv.contactName || conv.contactId : 'Conversation'} wide>
@@ -92,19 +123,57 @@ function ConversationModal({
         <SkeletonRows rows={4} />
       ) : (
         <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {chatState(conv) && <Badge tone={chatState(conv)!.tone}>{chatState(conv)!.label}</Badge>}
+            <span className="text-xs text-low">
+              {conv.aiPaused ? 'Assistant paused on this chat' : 'Assistant replying on this chat'}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              icon={conv.aiPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+              loading={setAi.isPending}
+              onClick={() =>
+                setAi.mutate(
+                  { id, paused: !conv.aiPaused },
+                  {
+                    onSuccess: () => toast('success', conv.aiPaused ? 'Assistant resumed' : 'Assistant paused'),
+                    onError: (e) => toast('error', 'Could not update', e.message),
+                  },
+                )
+              }
+            >
+              {conv.aiPaused ? 'Resume AI' : 'Pause AI'}
+            </Button>
+          </div>
+          {conv.stage === 'handoff' && (
+            <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-hi">
+              The assistant stepped back — this buyer needs you. Reply below; resume the assistant when you are done.
+            </p>
+          )}
           <div className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-md bg-surface-2 p-3">
             {conv.messages.map((m, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'max-w-[85%] rounded-lg px-3 py-2 text-sm text-hi',
-                  m.direction === 'in' ? 'bg-surface-3' : 'ml-auto bg-jade-500/15',
+              <div key={i} className={cn('flex max-w-[85%] flex-col gap-0.5', m.direction === 'in' ? '' : 'ml-auto items-end')}>
+                {m.direction === 'out' && authorLabel[m.author] && (
+                  <span className="px-1 text-[10px] font-medium uppercase tracking-wider text-low">{authorLabel[m.author]}</span>
                 )}
-              >
-                {m.body}
+                <div
+                  className={cn(
+                    'whitespace-pre-wrap rounded-lg px-3 py-2 text-sm text-hi',
+                    m.direction === 'in' ? 'bg-surface-3' : 'bg-jade-500/15',
+                  )}
+                >
+                  {m.body}
+                </div>
               </div>
             ))}
           </div>
+          {building && !draft && (
+            <p className="mt-3 text-xs text-low">
+              Order being built: <span className="text-mid">{building}</span>
+            </p>
+          )}
           {draft && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-jade-500/30 bg-jade-500/10 p-3">
               <p className="text-sm text-hi">AI drafted an order from this chat · {draft.confidence}% confident</p>

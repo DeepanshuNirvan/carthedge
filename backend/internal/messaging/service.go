@@ -2,14 +2,17 @@ package messaging
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"carthedge/internal/ai"
 	"carthedge/internal/events"
 	"carthedge/internal/httpx"
+	"carthedge/internal/notify"
 	"carthedge/internal/secure"
 
 	"github.com/jackc/pgx/v5"
@@ -17,8 +20,9 @@ import (
 )
 
 // lull is how long a conversation must be quiet before its new messages are
-// batched into one AI parse — bounds LLM cost during a buyer's burst of DMs.
-const lull = 12 * time.Second
+// handled together — buyers type in bursts, and one answer to the whole burst
+// reads like a person and costs one turn instead of five.
+const lull = 10 * time.Second
 
 // tokenSweep is how often connections are checked for an approaching expiry,
 // and tokenRenewLead how far ahead of it a token is renewed. The lead is wide
@@ -36,11 +40,20 @@ type Service struct {
 	ai     *ai.Service
 	bus    *events.Bus
 	cipher *secure.Cipher
+	notify *notify.Notifier
 	log    *slog.Logger
+	// can answers plan entitlements (plan.Service.HasFeature): drafts need
+	// "ai", automatic replies need "aiReply"
+	can func(ctx context.Context, bizID, feature string) bool
+	// busy holds the chats a turn is running on right now — one at a time
+	// per chat. ponytail: in-process, fine for one instance; a Redis lock if
+	// the service ever runs as several replicas.
+	busy sync.Map
 }
 
-func NewService(pool *pgxpool.Pool, client *Client, aiSvc *ai.Service, bus *events.Bus, cipher *secure.Cipher, log *slog.Logger) *Service {
-	return &Service{pool: pool, client: client, ai: aiSvc, bus: bus, cipher: cipher, log: log}
+func NewService(pool *pgxpool.Pool, client *Client, aiSvc *ai.Service, bus *events.Bus, cipher *secure.Cipher,
+	n *notify.Notifier, can func(ctx context.Context, bizID, feature string) bool, log *slog.Logger) *Service {
+	return &Service{pool: pool, client: client, ai: aiSvc, bus: bus, cipher: cipher, notify: n, can: can, log: log}
 }
 
 // Start runs the debounce loop: quiet conversations with new messages get one
@@ -68,6 +81,18 @@ func (s *Service) Start(ctx context.Context) {
 				return
 			case <-t.C:
 				s.refreshExpiring(ctx)
+			}
+		}
+	}()
+	go func() {
+		t := time.NewTicker(nudgeSweep)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.nudgeQuiet(ctx)
 			}
 		}
 	}()
@@ -230,6 +255,10 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 			s.log.Warn("inbound for unknown channel", "channel", in.Channel, "externalId", in.ExternalID)
 			continue
 		}
+		if in.Echo {
+			s.recordEcho(ctx, bizID, in)
+			continue
+		}
 		var convID, name string
 		err = s.pool.QueryRow(ctx, `insert into conversations
 			(business_id, channel, contact_id, contact_name, last_message_at, last_inbound_at, unread, parse_pending)
@@ -252,8 +281,8 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 				}
 			}
 		}
-		if _, err := s.pool.Exec(ctx, `insert into conversation_messages (conversation_id, direction, external_id, body)
-			values ($1,'in',$2,$3) on conflict do nothing`, convID, in.MessageID, in.Text); err != nil {
+		if _, err := s.pool.Exec(ctx, `insert into conversation_messages (conversation_id, direction, external_id, body, author)
+			values ($1,'in',$2,$3,'buyer') on conflict do nothing`, convID, in.MessageID, in.Text); err != nil {
 			s.log.Error("insert message failed", "err", err)
 			continue
 		}
@@ -262,48 +291,81 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 	}
 }
 
-// ingestDue parses every quiet, pending conversation exactly once.
+// ingestDue handles every quiet conversation with new messages exactly once:
+// the DM assistant answers it, or (auto-reply off / chat paused) it becomes a
+// draft for the seller as before. A few run at once so one slow model call
+// does not hold up every other buyer.
 func (s *Service) ingestDue(ctx context.Context) {
 	rows, err := s.pool.Query(ctx, `select id, business_id, channel from conversations
 		where parse_pending and last_inbound_at < now() - make_interval(secs => $1) limit 20`, lull.Seconds())
 	if err != nil {
 		return
 	}
-	type conv struct{ id, biz, channel string }
-	var due []conv
+	var due []dueConv
 	for rows.Next() {
-		var c conv
+		var c dueConv
 		if rows.Scan(&c.id, &c.biz, &c.channel) == nil {
 			due = append(due, c)
 		}
 	}
 	rows.Close()
 
+	sem := make(chan struct{}, 4)
+	var wg sync.WaitGroup
 	for _, c := range due {
-		// clear the flag first so a parse error (e.g. no LLM key) never loops
+		// clear the flag first so a failing turn (e.g. no LLM key) never loops
 		s.pool.Exec(ctx, `update conversations set parse_pending=false where id=$1`, c.id)
-		thread, err := s.thread(ctx, c.id)
-		if err != nil || thread == "" {
-			continue
-		}
-		draft, err := s.ai.ParseConversation(ctx, c.biz, thread, c.channel, c.id)
-		if err != nil {
-			s.log.Warn("dm parse failed", "conversationId", c.id, "err", err)
-			continue
-		}
-		s.pool.Exec(ctx, `update conversations set draft_id=$2 where id=$1`, c.id, draft.ID)
-		s.bus.Publish(ctx, c.biz, "draftReady", httpx.M{
-			"conversationId": c.id, "draftId": draft.ID, "confidence": draft.Confidence})
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(c dueConv) {
+			defer func() { <-sem; wg.Done() }()
+			if _, running := s.busy.LoadOrStore(c.id, true); running {
+				// still answering the previous burst: look again next tick
+				s.pool.Exec(ctx, `update conversations set parse_pending=true where id=$1`, c.id)
+				return
+			}
+			defer s.busy.Delete(c.id)
+			defer func() {
+				if r := recover(); r != nil {
+					s.log.Error("dm turn panicked", "conversationId", c.id, "err", r)
+				}
+			}()
+			s.handle(ctx, c)
+		}(c)
 	}
+	wg.Wait()
+}
+
+type dueConv struct{ id, biz, channel string }
+
+// draftOnly is the original behaviour: read the chat since the last order and
+// leave a draft card for the seller.
+func (s *Service) draftOnly(ctx context.Context, c dueConv) {
+	thread, err := s.thread(ctx, c.id)
+	if err != nil || thread == "" {
+		return
+	}
+	draft, err := s.ai.ParseConversation(ctx, c.biz, thread, c.channel, c.id)
+	if err != nil {
+		s.log.Warn("dm parse failed", "conversationId", c.id, "err", err)
+		return
+	}
+	s.pool.Exec(ctx, `update conversations set draft_id=$2 where id=$1`, c.id, draft.ID)
+	s.bus.Publish(ctx, c.biz, "draftReady", httpx.M{
+		"conversationId": c.id, "draftId": draft.ID, "confidence": draft.Confidence})
 }
 
 func (s *Service) thread(ctx context.Context, convID string) (string, error) {
 	// the newest 40 messages, then back into reading order. Taking the first 40
 	// instead would mean a repeat buyer's thread is pinned to its oldest messages
 	// forever, and their new order would never reach the parser.
+	// Only what came after the last placed order: a repeat buyer's new order
+	// must not re-read the items of the one they already received.
 	rows, err := s.pool.Query(ctx, `select direction, body from (
-			select direction, body, created_at from conversation_messages
-			where conversation_id=$1 order by created_at desc limit 40
+			select m.direction, m.body, m.created_at from conversation_messages m
+			join conversations c on c.id = m.conversation_id
+			where m.conversation_id=$1 and m.created_at > coalesce(c.cutoff_at, '-infinity')
+			order by m.created_at desc limit 40
 		) recent order by created_at asc`, convID)
 	if err != nil {
 		return "", err
@@ -325,9 +387,17 @@ func (s *Service) thread(ctx context.Context, convID string) (string, error) {
 }
 
 func (s *Service) ListConversations(ctx context.Context, bizID string, limit, offset int) ([]httpx.M, error) {
+	// draftId is only a draft still waiting for the seller; a confirmed one is
+	// reported as lastOrder instead, so the Inbox never says "draft ready" for
+	// an order that already exists
 	rows, err := s.pool.Query(ctx, `select c.id, c.channel, c.contact_id, c.contact_name, c.unread, c.status,
-		to_char(c.last_message_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), coalesce(c.draft_id::text,''),
-		coalesce((select body from conversation_messages m where m.conversation_id=c.id order by created_at desc limit 1),'')
+		to_char(c.last_message_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+		coalesce((select d.id::text from ai_drafts d where d.conversation_id=c.id and d.status='pending'
+			order by d.created_at desc limit 1),''),
+		coalesce((select body from conversation_messages m where m.conversation_id=c.id order by created_at desc limit 1),''),
+		c.stage, coalesce(c.ai_paused_until > now(), false),
+		coalesce((select o.order_code from orders o where o.conversation_id=c.id order by o.created_at desc limit 1),''),
+		coalesce((select o.status from orders o where o.conversation_id=c.id order by o.created_at desc limit 1),'')
 		from conversations c where c.business_id=$1 order by c.last_message_at desc limit $2 offset $3`, bizID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -335,72 +405,78 @@ func (s *Service) ListConversations(ctx context.Context, bizID string, limit, of
 	defer rows.Close()
 	out := []httpx.M{}
 	for rows.Next() {
-		var id, channel, contactID, name, status, lastAt, draftID, last string
+		var id, channel, contactID, name, status, lastAt, draftID, last, stage, orderCode, orderStatus string
 		var unread int
-		if err := rows.Scan(&id, &channel, &contactID, &name, &unread, &status, &lastAt, &draftID, &last); err != nil {
+		var paused bool
+		if err := rows.Scan(&id, &channel, &contactID, &name, &unread, &status, &lastAt, &draftID, &last,
+			&stage, &paused, &orderCode, &orderStatus); err != nil {
 			return nil, err
 		}
 		out = append(out, httpx.M{"id": id, "channel": channel, "contactId": contactID, "contactName": name,
-			"unread": unread, "status": status, "lastMessageAt": lastAt, "draftId": draftID, "preview": preview(last)})
+			"unread": unread, "status": status, "lastMessageAt": lastAt, "draftId": draftID, "preview": preview(last),
+			"stage": stage, "aiPaused": paused, "lastOrderCode": orderCode, "lastOrderStatus": orderStatus})
 	}
 	return out, rows.Err()
 }
 
 // Conversation returns the full thread (and clears the unread badge).
 func (s *Service) Conversation(ctx context.Context, bizID, convID string) (httpx.M, error) {
-	var channel, contactID, name, draftID string
-	err := s.pool.QueryRow(ctx, `select channel, contact_id, contact_name, coalesce(draft_id::text,'')
-		from conversations where id=$1 and business_id=$2`, convID, bizID).Scan(&channel, &contactID, &name, &draftID)
+	var channel, contactID, name, draftID, stage string
+	var paused bool
+	var cart []byte
+	err := s.pool.QueryRow(ctx, `select channel, contact_id, contact_name,
+		coalesce((select d.id::text from ai_drafts d where d.conversation_id=c.id and d.status='pending'
+			order by d.created_at desc limit 1),''),
+		stage, coalesce(ai_paused_until > now(), false), cart
+		from conversations c where id=$1 and business_id=$2`, convID, bizID).Scan(&channel, &contactID, &name, &draftID, &stage, &paused, &cart)
 	if err != nil {
 		return nil, errors.New("conversation not found")
 	}
 	s.pool.Exec(ctx, `update conversations set unread=0 where id=$1`, convID)
 
-	rows, err := s.pool.Query(ctx, `select direction, body, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-		from conversation_messages where conversation_id=$1 order by created_at asc limit 100`, convID)
+	// the latest 100, oldest first
+	rows, err := s.pool.Query(ctx, `select direction, body, at, author from (
+			select direction, body, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') at, author, created_at
+			from conversation_messages where conversation_id=$1 order by created_at desc limit 100
+		) recent order by created_at asc`, convID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	msgs := []httpx.M{}
 	for rows.Next() {
-		var dir, body, at string
-		if err := rows.Scan(&dir, &body, &at); err != nil {
+		var dir, body, at, author string
+		if err := rows.Scan(&dir, &body, &at, &author); err != nil {
 			return nil, err
 		}
-		msgs = append(msgs, httpx.M{"direction": dir, "body": body, "createdAt": at})
+		msgs = append(msgs, httpx.M{"direction": dir, "body": body, "createdAt": at, "author": author})
 	}
+	var c ai.Cart
+	json.Unmarshal(cart, &c)
 	return httpx.M{"id": convID, "channel": channel, "contactId": contactID, "contactName": name,
-		"draftId": draftID, "messages": msgs}, rows.Err()
+		"draftId": draftID, "messages": msgs, "stage": stage, "aiPaused": paused, "cart": c}, rows.Err()
 }
 
 // Reply sends the seller's message back on the buyer's channel and records it.
+// The seller speaking pauses the assistant on this chat for a while, so the two
+// never talk over each other.
 func (s *Service) Reply(ctx context.Context, bizID, convID, text string) error {
 	if strings.TrimSpace(text) == "" {
 		return errors.New("message is empty")
 	}
-	var channel, contactID string
-	if err := s.pool.QueryRow(ctx, `select channel, contact_id from conversations where id=$1 and business_id=$2`,
-		convID, bizID).Scan(&channel, &contactID); err != nil {
+	var found bool
+	s.pool.QueryRow(ctx, `select exists(select 1 from conversations where id=$1 and business_id=$2)`, convID, bizID).Scan(&found)
+	if !found {
 		return errors.New("conversation not found")
 	}
-	var externalID, tokenEnc string
-	if err := s.pool.QueryRow(ctx, `select external_id, access_token from channel_connections
-		where business_id=$1 and channel=$2 and status='connected'`, bizID, channel).Scan(&externalID, &tokenEnc); err != nil {
-		return errors.New(channel + " is not connected")
+	if err := s.send(ctx, convID, "seller", text); err != nil {
+		if errors.Is(err, errNotConnected) {
+			return err
+		}
+		return errors.New("could not send right now — reconnect the account or try again")
 	}
-	token, err := s.cipher.Decrypt(tokenEnc)
-	if err != nil {
-		return errors.New("channel token unavailable")
-	}
-	if err := s.client.Send(ctx, channel, externalID, token, contactID, text); err != nil {
-		// the raw error carries graph URLs and transport detail — useless to the
-		// seller and not theirs to see
-		s.log.Error("channel send failed", "channel", channel, "businessId", bizID, "err", err)
-		return errors.New("could not send on " + channel + " right now — reconnect the account or try again")
-	}
-	s.pool.Exec(ctx, `insert into conversation_messages (conversation_id, direction, body) values ($1,'out',$2)`, convID, text)
-	s.pool.Exec(ctx, `update conversations set last_message_at=now() where id=$1`, convID)
+	s.pool.Exec(ctx, `update conversations set ai_paused_until = greatest(coalesce(ai_paused_until, now()), now() + make_interval(secs => $2))
+		where id=$1`, convID, sellerPause.Seconds())
 	return nil
 }
 

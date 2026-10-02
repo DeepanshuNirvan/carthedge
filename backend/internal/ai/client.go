@@ -37,11 +37,16 @@ type Client struct {
 func NewClient(cfg *config.Config, log *slog.Logger) *Client {
 	// any OpenAI-compatible endpoint works here (Azure, OpenRouter, a local model)
 	openai := provider{name: "openai", key: cfg.OpenAIKey, model: cfg.OpenAIModel, baseURL: cfg.OpenAIBase}
-	gemini := provider{name: "gemini", key: cfg.GeminiKey, model: cfg.GeminiModel}
+	gemini := []provider{{name: "gemini", key: cfg.GeminiKey, model: cfg.GeminiModel}}
+	if cfg.GeminiFallbackModel != "" && cfg.GeminiFallbackModel != cfg.GeminiModel {
+		// a second model has its own capacity and quota: "high demand" on one
+		// rarely means the other is down too
+		gemini = append(gemini, provider{name: "gemini", key: cfg.GeminiKey, model: cfg.GeminiFallbackModel})
+	}
 
-	order := []provider{openai, gemini}
+	order := append([]provider{openai}, gemini...)
 	if cfg.AIProvider == "gemini" {
-		order = []provider{gemini, openai}
+		order = append(gemini, openai)
 	}
 	c := &Client{hc: &http.Client{Timeout: 60 * time.Second}, log: log}
 	for _, p := range order {
@@ -71,10 +76,25 @@ func (c *Client) Complete(ctx context.Context, system, user string, jsonMode boo
 	var lastErr error
 	for i, p := range c.providers {
 		var out string
-		if p.name == "gemini" {
-			out, lastErr = c.gemini(ctx, p, system, user, jsonMode)
-		} else {
-			out, lastErr = c.openai(ctx, p, system, user, jsonMode)
+		// a busy or rate-limited model usually answers a few seconds later;
+		// a buyer waiting a little beats a buyer getting nothing
+		for attempt, wait := range []time.Duration{0, 2 * time.Second, 6 * time.Second} {
+			if attempt > 0 {
+				select {
+				case <-ctx.Done():
+					return "", ctx.Err()
+				case <-time.After(wait):
+				}
+			}
+			if p.name == "gemini" {
+				out, lastErr = c.gemini(ctx, p, system, user, jsonMode)
+			} else {
+				out, lastErr = c.openai(ctx, p, system, user, jsonMode)
+			}
+			var busy *busyError
+			if lastErr == nil || !errors.As(lastErr, &busy) {
+				break
+			}
 		}
 		if lastErr == nil {
 			return out, nil
@@ -83,7 +103,7 @@ func (c *Client) Complete(ctx context.Context, system, user string, jsonMode boo
 			break // the caller gave up; a retry would only burn the next provider
 		}
 		if i < len(c.providers)-1 {
-			c.log.Warn("ai provider failed, trying the next one", "provider", p.name, "err", lastErr)
+			c.log.Warn("ai provider failed, trying the next one", "provider", p.name, "model", p.model, "err", lastErr)
 		}
 	}
 	return "", lastErr
@@ -173,10 +193,19 @@ func (c *Client) do(req *http.Request, providerName string) ([]byte, error) {
 		// from any other 4xx and costs an afternoon to tell apart
 		c.log.Error("ai provider rejected the request", "provider", providerName,
 			"status", resp.StatusCode, "body", string(raw))
-		return nil, fmt.Errorf("%s api error (%d)", providerName, resp.StatusCode)
+		err := fmt.Errorf("%s api error (%d)", providerName, resp.StatusCode)
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			return nil, &busyError{err}
+		}
+		return nil, err
 	}
 	return raw, nil
 }
+
+// busyError is a rate limit or a provider-side failure: worth a retry.
+type busyError struct{ error }
+
+func (e *busyError) Unwrap() error { return e.error }
 
 // stripFences removes markdown code fences some models wrap JSON in.
 func stripFences(s string) string {

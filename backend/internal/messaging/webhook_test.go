@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -23,8 +24,9 @@ func TestParseWebhookInstagram(t *testing.T) {
 		 "message":{"mid":"m4","text":"oops","is_deleted":true}}]}]}`)
 
 	got := parseWebhook(body)
-	if len(got) != 2 {
-		t.Fatalf("got %d inbound messages, want 2 (echo and deleted must be dropped): %+v", len(got), got)
+	// the deleted message is dropped; the seller's echo comes back flagged
+	if len(got) != 3 || got[0].Echo || got[1].Echo || !got[2].Echo {
+		t.Fatalf("want 2 buyer messages then 1 echo: %+v", got)
 	}
 	if got[0].Text != "[replying to your story] ye wala M size me hai?" {
 		t.Errorf("story reply lost its context: %q", got[0].Text)
@@ -134,5 +136,27 @@ func TestParseWebhookInstagramChangesShape(t *testing.T) {
 	got := parseWebhook(body)
 	if len(got) != 1 || got[0].Text != "pink kurti M size COD" || got[0].ContactID != "BUYER1" || got[0].ExternalID != "SELLER_IG" {
 		t.Fatalf("changes-shaped DM lost: %+v", got)
+	}
+}
+
+// The seller replying from the Instagram app arrives as an echo. It must be
+// kept (addressed to the buyer) so the assistant can step back, not dropped.
+func TestParseWebhookKeepsSellerEchoes(t *testing.T) {
+	body := []byte(`{"object":"instagram","entry":[{"id":"SELLER_IG","messaging":[
+		{"sender":{"id":"SELLER_IG"},"recipient":{"id":"BUYER1"},"message":{"mid":"e1","text":"haan M available hai","is_echo":true}}]}]}`)
+	got := parseWebhook(body)
+	if len(got) != 1 || !got[0].Echo || got[0].ContactID != "BUYER1" || got[0].Text != "haan M available hai" {
+		t.Fatalf("echo lost or misrouted: %+v", got)
+	}
+}
+
+func TestChunksRespectInstagramLimit(t *testing.T) {
+	long := strings.Repeat("a", 900) + "\n\n" + strings.Repeat("b", 900)
+	parts := chunks(long, 1000)
+	if len(parts) != 2 || len([]rune(parts[0])) > 1000 || !strings.HasPrefix(parts[1], "b") {
+		t.Fatalf("bad split: %d parts", len(parts))
+	}
+	if got := chunks("short", 1000); len(got) != 1 || got[0] != "short" {
+		t.Fatalf("short text split: %v", got)
 	}
 }

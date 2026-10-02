@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/smtp"
+	"strconv"
+	"strings"
 	"time"
 
 	"carthedge/internal/config"
@@ -72,6 +74,31 @@ func (n *Notifier) Async(name string, fn func() error) {
 	}()
 }
 
+// Rupees formats paise the way an Indian shop writes it: ₹1,499 or ₹1,49,999.50.
 func Rupees(paise int) string {
-	return fmt.Sprintf("₹%.2f", float64(paise)/100)
+	neg := paise < 0
+	if neg {
+		paise = -paise
+	}
+	rupees, rest := paise/100, paise%100
+	s := strconv.Itoa(rupees)
+	if len(s) > 3 {
+		head, tail := s[:len(s)-3], s[len(s)-3:]
+		var groups []string
+		for len(head) > 2 {
+			groups = append([]string{head[len(head)-2:]}, groups...)
+			head = head[:len(head)-2]
+		}
+		if head != "" {
+			groups = append([]string{head}, groups...)
+		}
+		s = strings.Join(groups, ",") + "," + tail
+	}
+	if rest > 0 {
+		s += fmt.Sprintf(".%02d", rest)
+	}
+	if neg {
+		return "-₹" + s
+	}
+	return "₹" + s
 }

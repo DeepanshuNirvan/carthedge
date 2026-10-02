@@ -62,6 +62,12 @@ export type BusinessProfile = {
   baselineRtoPercent: number;
   razorpayKeyId: string;
   razorpayConfigured: boolean;
+  /** DM assistant answers buyers automatically */
+  aiAutoReply: boolean;
+  /** buyer's chat "yes" places the order without the seller's tap */
+  aiAutoOrder: boolean;
+  /** facts the assistant may quote: delivery time, exchange policy, sizing */
+  aiNotes: string;
 };
 
 // plans & subscription
@@ -187,6 +193,8 @@ export type Order = {
   id: string;
   code: string;
   status: OrderStatus;
+  /** moves the API allows from the current status (detail endpoint only) */
+  nextStatuses?: OrderStatus[];
   paymentMethod: 'cod' | 'prepaid';
   /** pending | claimed (buyer reported a UPI transfer) | paid | token_paid | failed */
   paymentStatus: string;
@@ -359,11 +367,33 @@ export type ConversationSummary = {
   unread: number;
   status: string;
   lastMessageAt: string;
+  /** a draft still waiting for the seller; empty once confirmed or discarded */
   draftId: string;
   preview: string;
+  stage: ChatStage;
+  aiPaused: boolean;
+  lastOrderCode: string;
+  lastOrderStatus: string;
 };
 
-export type ConversationMessage = { direction: 'in' | 'out'; body: string; createdAt: string };
+/** open · confirming (summary shown) · awaiting_seller (buyer said yes) · handoff (needs the seller) */
+export type ChatStage = 'open' | 'confirming' | 'awaiting_seller' | 'handoff';
+
+export type ConversationMessage = {
+  direction: 'in' | 'out';
+  body: string;
+  createdAt: string;
+  /** buyer · ai · seller · system (order updates) */
+  author: string;
+};
+
+export type ChatCart = {
+  items: { productId: string; name: string; variant: string; qty: number }[] | null;
+  name: string;
+  phone: string;
+  address: { line: string; city: string; state: string; pincode: string };
+  payment: string;
+};
 
 export type ConversationDetail = {
   id: string;
@@ -372,6 +402,9 @@ export type ConversationDetail = {
   contactName: string;
   draftId: string;
   messages: ConversationMessage[];
+  stage: ChatStage;
+  aiPaused: boolean;
+  cart: ChatCart;
 };
 
 // admin

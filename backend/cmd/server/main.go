@@ -95,10 +95,12 @@ func main() {
 	broadcastSvc := broadcast.NewService(pool, notifier, log)
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg, log)
-	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log)
+	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log, cfg.PublicBaseURL)
 	metaClient := messaging.NewClient(cfg.MetaGraphVersion, cfg.MetaAppSecret, cfg.MetaIgAppSecret)
-	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, log)
+	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, notifier, planSvc.HasFeature, log)
 	messagingSvc.Start(ctx)
+	// orders placed from a DM chat are confirmed and tracked on that chat
+	orderSvc.SetDirectMessenger(messagingSvc.SendToConversation)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)
 
 	spa, err := web.New(pool, cfg.FrontendDir, cfg.PublicBaseURL, log)

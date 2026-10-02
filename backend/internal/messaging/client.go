@@ -98,40 +98,88 @@ func (c *Client) SubscribeInstagram(ctx context.Context, token string) error {
 }
 
 // Send delivers a text reply on the given channel using the seller's own token,
-// inside the 24-hour service window (free-form, no template).
-func (c *Client) Send(ctx context.Context, channel, externalID, token, to, text string) error {
+// inside the 24-hour service window (free-form, no template). It returns
+// Meta's id for the last message sent, which is how our own messages are told
+// apart from the seller's when Instagram echoes them back.
+func (c *Client) Send(ctx context.Context, channel, externalID, token, to, text string) (string, error) {
 	if token == "" {
-		return errors.New("channel is not connected")
+		return "", errors.New("channel is not connected")
 	}
-	var url string
+	limit := 4096
+	if channel == "instagram" {
+		limit = 1000 // Instagram rejects longer text messages
+	}
+	var id string
+	for _, part := range chunks(text, limit) {
+		var err error
+		if id, err = c.sendOne(ctx, channel, externalID, token, to, part); err != nil {
+			return "", err
+		}
+	}
+	return id, nil
+}
+
+func (c *Client) sendOne(ctx context.Context, channel, externalID, token, to, text string) (string, error) {
+	var endpoint string
 	var payload any
 	switch channel {
 	case "whatsapp":
-		url = fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", c.version, externalID)
+		endpoint = fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", c.version, externalID)
 		payload = map[string]any{"messaging_product": "whatsapp", "to": to, "type": "text", "text": map[string]string{"body": text}}
 	case "instagram":
-		url = fmt.Sprintf("https://graph.instagram.com/%s/me/messages", c.version)
+		endpoint = fmt.Sprintf("https://graph.instagram.com/%s/me/messages", c.version)
 		payload = map[string]any{"recipient": map[string]string{"id": to}, "message": map[string]string{"text": text}}
 	default:
-		return errors.New("unknown channel")
+		return "", errors.New("unknown channel")
 	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	res, err := c.hc.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer res.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<14))
 	if res.StatusCode >= 300 {
-		b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<12))
-		return fmt.Errorf("meta send failed (%d): %s", res.StatusCode, string(b))
+		return "", fmt.Errorf("meta send failed (%d): %s", res.StatusCode, string(raw))
 	}
-	return nil
+	var out struct {
+		MessageID string `json:"message_id"` // instagram
+		Messages  []struct {
+			ID string `json:"id"`
+		} `json:"messages"` // whatsapp
+	}
+	json.Unmarshal(raw, &out)
+	if out.MessageID == "" && len(out.Messages) > 0 {
+		out.MessageID = out.Messages[0].ID
+	}
+	return out.MessageID, nil
+}
+
+// chunks splits a long message at paragraph, then line, then rune boundaries.
+func chunks(text string, limit int) []string {
+	var out []string
+	for len([]rune(text)) > limit {
+		r := []rune(text)
+		cut := limit
+		head := string(r[:limit])
+		if i := strings.LastIndex(head, "\n\n"); i > 0 {
+			cut = len([]rune(head[:i]))
+		} else if i := strings.LastIndex(head, "\n"); i > 0 {
+			cut = len([]rune(head[:i]))
+		}
+		out = append(out, strings.TrimSpace(string(r[:cut])))
+		text = strings.TrimSpace(string(r[cut:]))
+	}
+	if text != "" {
+		out = append(out, text)
+	}
+	return out
 }
 
 // Inbound is one buyer message normalised across WhatsApp and Instagram.
@@ -142,6 +190,10 @@ type Inbound struct {
 	Name       string
 	MessageID  string
 	Text       string
+	// Echo marks a message the business account itself sent. ContactID is
+	// then the buyer it went to. Our own sends come back this way too; the
+	// rest are the seller replying from the Instagram app.
+	Echo bool
 }
 
 // parseWebhook normalises a Meta webhook body into inbound buyer messages,
@@ -214,12 +266,19 @@ func parseWebhook(body []byte) []Inbound {
 				}
 			}
 			for _, m := range events {
-				// e.ID is the seller's own account: their outbound echoes land here too
-				if m.Message.IsEcho || m.Message.IsDeleted || m.Sender.ID == "" || m.Sender.ID == e.ID {
+				if m.Message.IsDeleted || m.Sender.ID == "" {
 					continue
 				}
 				text := igText(m)
 				if text == "" {
+					continue
+				}
+				// e.ID is the seller's own account: their outbound messages echo back
+				if m.Message.IsEcho || m.Sender.ID == e.ID {
+					if m.Recipient.ID != "" && m.Recipient.ID != e.ID {
+						out = append(out, Inbound{Channel: "instagram", ExternalID: e.ID, ContactID: m.Recipient.ID,
+							MessageID: m.Message.MID, Text: text, Echo: true})
+					}
 					continue
 				}
 				out = append(out, Inbound{Channel: "instagram", ExternalID: e.ID, ContactID: m.Sender.ID,

@@ -42,6 +42,9 @@ type Profile struct {
 	BaselineRtoPercent int    `json:"baselineRtoPercent"`
 	RazorpayKeyID      string `json:"razorpayKeyId"`
 	RazorpayConfigured bool   `json:"razorpayConfigured"`
+	AiAutoReply        bool   `json:"aiAutoReply"`
+	AiAutoOrder        bool   `json:"aiAutoOrder"`
+	AiNotes            string `json:"aiNotes"`
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -50,11 +53,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var secretEnc string
 	err := h.pool.QueryRow(r.Context(), `select id, code, name, owner_name, email, phone, whatsapp, instagram,
 		address, city, state, pincode, gstin, upi_id, logo_url, shipping_fee, free_shipping_above,
-		cod_enabled, cod_token_amount, baseline_rto_percent, razorpay_key_id, razorpay_key_secret
+		cod_enabled, cod_token_amount, baseline_rto_percent, razorpay_key_id, razorpay_key_secret,
+		ai_auto_reply, ai_auto_order, ai_notes
 		from businesses where id = $1`, bizID).Scan(
 		&p.ID, &p.Code, &p.Name, &p.OwnerName, &p.Email, &p.Phone, &p.WhatsApp, &p.Instagram,
 		&p.Address, &p.City, &p.State, &p.Pincode, &p.Gstin, &p.UpiID, &p.LogoURL, &p.ShippingFee,
-		&p.FreeShippingAbove, &p.CodEnabled, &p.CodTokenAmount, &p.BaselineRtoPercent, &p.RazorpayKeyID, &secretEnc)
+		&p.FreeShippingAbove, &p.CodEnabled, &p.CodTokenAmount, &p.BaselineRtoPercent, &p.RazorpayKeyID, &secretEnc,
+		&p.AiAutoReply, &p.AiAutoOrder, &p.AiNotes)
 	if err != nil {
 		httpx.Err(w, http.StatusNotFound, "business not found")
 		return
@@ -127,6 +132,32 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			httpx.Err(w, http.StatusConflict, "this "+field+" already belongs to another business")
 			return
 		}
+		httpx.Err(w, http.StatusInternalServerError, "update failed")
+		return
+	}
+	h.Get(w, r)
+}
+
+// UpdateAI sets how the DM assistant behaves: answer buyers automatically,
+// place orders without the seller's tap, and the notes it may quote. Omitted
+// fields keep their value.
+func (h *Handler) UpdateAI(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		AutoReply *bool   `json:"autoReply"`
+		AutoOrder *bool   `json:"autoOrder"`
+		Notes     *string `json:"notes"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if in.Notes != nil && len([]rune(*in.Notes)) > 2000 {
+		httpx.Err(w, http.StatusBadRequest, "notes can be at most 2000 characters")
+		return
+	}
+	if _, err := h.pool.Exec(r.Context(), `update businesses set
+		ai_auto_reply=coalesce($2, ai_auto_reply), ai_auto_order=coalesce($3, ai_auto_order),
+		ai_notes=coalesce($4, ai_notes), updated_at=now() where id=$1`,
+		middleware.BusinessID(r.Context()), in.AutoReply, in.AutoOrder, in.Notes); err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "update failed")
 		return
 	}

@@ -92,6 +92,7 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/business", d.Business.Get, authed)
 	handle("PUT /api/v1/business", d.Business.Update, authed)
 	handle("PUT /api/v1/business/payments", d.Business.UpdatePayments, authed)
+	handle("PUT /api/v1/business/ai", d.Business.UpdateAI, authed)
 
 	// plans & subscription (reachable when expired, so sellers can pay)
 	handle("GET /api/v1/plans", d.Plans.List)
@@ -179,6 +180,7 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/conversations", d.Messaging.ListConversations, authed, active, aiFeature)
 	handle("GET /api/v1/conversations/{id}", d.Messaging.Conversation, authed, active, aiFeature)
 	handle("POST /api/v1/conversations/{id}/reply", d.Messaging.Reply, authed, active, aiFeature)
+	handle("PUT /api/v1/conversations/{id}/ai", d.Messaging.SetAI, authed, active, aiFeature)
 
 	// uploads
 	handle("POST /api/v1/uploads", d.Uploads.Upload, authed, active)

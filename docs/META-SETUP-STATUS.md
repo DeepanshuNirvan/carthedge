@@ -13,6 +13,16 @@ Written 20 August 2026. Plain English. Read top to bottom.
 > 3. **Signature checked with only the Meta app secret.** Instagram Login webhooks can be
 >    signed with the Instagram app secret. Both are now accepted.
 >
+> **DM assistant (built 1 Oct 2026, spec in `docs/superpowers/specs/2026-10-01-dm-sales-agent-design.md`).**
+> Buyers' DMs are now answered automatically in their own language, from the catalog and the
+> seller's notes only; the assistant collects the order, shows a summary, and on "yes" either
+> leaves a draft for the seller (default) or places the order (Settings → AI assistant). The
+> buyer gets the order code and `/o/{code}` link on the same chat; status updates follow on the
+> chat inside Meta's 24-hour window, WhatsApp after it. Before real buyers use it:
+> - **Enable billing on the Gemini key (or add an OpenAI key).** The current key is free tier:
+>   `gemini-3.6-flash` allows 20 requests per day and 5 per minute; each buyer turn uses 2–3.
+> - Deploy runs migration `0014_dm_agent.sql` (additive, safe for the running code).
+>
 > Also: a failed long-lived token exchange no longer stores a 1-hour token as "connected";
 > deauthorize + data-deletion callbacks added (see 7.2); Graph API default bumped
 > v21.0 → v25.0 (v21 stops working 21 Jan 2027 — **set `META_GRAPH_VERSION=v25.0` on

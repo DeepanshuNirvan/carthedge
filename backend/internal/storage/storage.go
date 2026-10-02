@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -25,7 +26,18 @@ func New(cfg *config.Config) (Store, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &s3Store{client: s3.NewFromConfig(awsCfg), bucket: cfg.S3Bucket, region: cfg.S3Region}, nil
+		client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			// any S3-compatible store (Cloudflare R2, MinIO) is an endpoint away
+			if cfg.S3Endpoint != "" {
+				o.BaseEndpoint = aws.String(cfg.S3Endpoint)
+				o.UsePathStyle = true
+			}
+		})
+		publicURL := strings.TrimSuffix(cfg.S3PublicURL, "/")
+		if publicURL == "" {
+			publicURL = fmt.Sprintf("https://%s.s3.%s.amazonaws.com", cfg.S3Bucket, cfg.S3Region)
+		}
+		return &s3Store{client: client, bucket: cfg.S3Bucket, publicURL: publicURL}, nil
 	}
 	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
 		return nil, err
@@ -55,9 +67,9 @@ func (s *localStore) Save(ctx context.Context, key, contentType string, r io.Rea
 }
 
 type s3Store struct {
-	client *s3.Client
-	bucket string
-	region string
+	client    *s3.Client
+	bucket    string
+	publicURL string // where buyers' browsers fetch the file from
 }
 
 func (s *s3Store) Save(ctx context.Context, key, contentType string, r io.Reader) (string, error) {
@@ -70,5 +82,5 @@ func (s *s3Store) Save(ctx context.Context, key, contentType string, r io.Reader
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, s.region, key), nil
+	return s.publicURL + "/" + key, nil
 }

@@ -30,6 +30,11 @@ type Config struct {
 	UploadDir     string
 	S3Bucket      string
 	S3Region      string
+	// S3Endpoint points the S3 driver at a compatible store such as Cloudflare
+	// R2 (https://<account>.r2.cloudflarestorage.com); S3PublicURL is the
+	// bucket's public base (r2.dev or a custom domain). Blank = AWS.
+	S3Endpoint  string
+	S3PublicURL string
 
 	// FrontendDir serves the built SPA from the API origin so shared links get
 	// server-rendered meta tags. Empty in dev, where Vite serves it.
@@ -41,6 +46,9 @@ type Config struct {
 	OpenAIBase  string
 	GeminiKey   string
 	GeminiModel string
+	// GeminiFallbackModel is tried when GeminiModel is overloaded or rate
+	// limited, before failing over to OpenAI. Blank = none.
+	GeminiFallbackModel string
 
 	RazorpayKeyID         string
 	RazorpayKeySecret     string
@@ -92,16 +100,19 @@ func Load() (*Config, error) {
 		UploadDir:     env("UPLOAD_DIR", "uploads"),
 		S3Bucket:      os.Getenv("S3_BUCKET"),
 		S3Region:      os.Getenv("S3_REGION"),
+		S3Endpoint:    os.Getenv("S3_ENDPOINT"),
+		S3PublicURL:   os.Getenv("S3_PUBLIC_URL"),
 		FrontendDir:   os.Getenv("FRONTEND_DIR"),
 
 		// "auto" (default) uses whichever keys are set, OpenAI first; naming one
 		// promotes it to lead and leaves the other as failover
-		AIProvider:  env("AI_PROVIDER", "auto"),
-		OpenAIKey:   os.Getenv("OPENAI_API_KEY"),
-		OpenAIModel: env("OPENAI_MODEL", "gpt-4o-mini"),
-		OpenAIBase:  strings.TrimSuffix(env("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
-		GeminiKey:   os.Getenv("GEMINI_API_KEY"),
-		GeminiModel: env("GEMINI_MODEL", "gemini-3.6-flash"),
+		AIProvider:          env("AI_PROVIDER", "auto"),
+		OpenAIKey:           os.Getenv("OPENAI_API_KEY"),
+		OpenAIModel:         env("OPENAI_MODEL", "gpt-4o-mini"),
+		OpenAIBase:          strings.TrimSuffix(env("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
+		GeminiKey:           os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:         env("GEMINI_MODEL", "gemini-3.6-flash"),
+		GeminiFallbackModel: os.Getenv("GEMINI_FALLBACK_MODEL"),
 
 		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
 		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { del, get, post } from './http';
+import { del, get, post, put } from './http';
 import type { Channel, ConversationDetail, ConversationSummary } from './types';
 
 type ChannelsResponse = { channels: Channel[]; oauth: Record<'whatsapp' | 'instagram', boolean> };
@@ -47,6 +47,14 @@ export function useChannelMutations() {
     disconnect: useMutation({
       mutationFn: (channel: string) => del<{ ok: boolean }>(`/api/v1/channels/${channel}`),
       onSuccess: invalidate,
+    }),
+    setAi: useMutation({
+      mutationFn: ({ id, paused }: { id: string; paused: boolean }) =>
+        put<{ ok: boolean }>(`/api/v1/conversations/${id}/ai`, { paused }),
+      onSuccess: (_r, v) => {
+        qc.invalidateQueries({ queryKey: ['conversation', v.id] });
+        qc.invalidateQueries({ queryKey: ['conversations'] });
+      },
     }),
     reply: useMutation({
       mutationFn: ({ id, text }: { id: string; text: string }) =>

@@ -55,6 +55,9 @@ type Order struct {
 	CodConfirmedAt  string           `json:"codConfirmedAt,omitempty"`
 	CreatedAt       string           `json:"createdAt"`
 	Events          []Event          `json:"events,omitempty"`
+	// NextStatuses are the moves the board allows from here, so the UI offers
+	// only those instead of keeping its own copy of the rules
+	NextStatuses []string `json:"nextStatuses,omitempty"`
 }
 
 // Ref points at a catalog product; CustomLine is pre-priced (custom links,
@@ -79,6 +82,9 @@ type CreateParams struct {
 	OfferCode     string
 	Notes         string
 	AiDraftID     string
+	// ConversationID links an order placed from a DM chat: the buyer is
+	// answered on that chat, and the chat starts fresh for the next order.
+	ConversationID string
 }
 
 type Service struct {
@@ -91,6 +97,29 @@ type Service struct {
 	events    *events.Bus
 	log       *slog.Logger
 	baseURL   string
+	// dm sends a message on the buyer's chat; set by messaging at boot (it
+	// imports order, so it cannot be a constructor argument)
+	dm func(ctx context.Context, conversationID, text string) error
+}
+
+// SetDirectMessenger lets orders placed from a chat be answered on that chat.
+func (s *Service) SetDirectMessenger(fn func(ctx context.Context, conversationID, text string) error) {
+	s.dm = fn
+}
+
+// tellBuyer reaches the buyer on the chat the order came from, and falls back
+// to WhatsApp when there is no chat or its messaging window has closed.
+func (s *Service) tellBuyer(name, convID, phone, text string) {
+	s.notify.Async(name, func() error {
+		if convID != "" && s.dm != nil {
+			err := s.dm(context.Background(), convID, text)
+			if err == nil {
+				return nil
+			}
+			s.log.Info("chat message not sent, falling back to WhatsApp", "name", name, "err", err)
+		}
+		return s.notify.WhatsApp(phone, text)
+	})
 }
 
 func NewService(pool *pgxpool.Pool, rdb *redis.Client, customers *customer.Service, products *product.Service,
@@ -182,10 +211,17 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	code := "CH-" + strings.ToUpper(secure.Token(8))
 	itemsJSON, _ := json.Marshal(lines)
 	addrJSON, _ := json.Marshal(p.Address)
-	var linkID any
+	var linkID, convID any
 	if p.LinkID != "" {
 		linkID = p.LinkID
 	}
+	if p.ConversationID != "" {
+		convID = p.ConversationID
+	}
+	// a buyer who said yes to the exact summary in their chat has confirmed the
+	// COD order already; a second confirmation link would only add friction.
+	// A configured COD token still goes out: that is a payment, not a question.
+	chatCodConfirmed := p.ConversationID != "" && p.PaymentMethod == "cod" && tokenAmount == 0
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -195,15 +231,29 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 
 	var orderID string
 	err = tx.QueryRow(ctx, `insert into orders (business_id, order_code, link_id, customer_id, items, subtotal,
-		discount, shipping, total, offer_code, payment_method, token_amount, address, source, notes, risk_flagged)
-		values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16) returning id`,
+		discount, shipping, total, offer_code, payment_method, token_amount, address, source, notes, risk_flagged, conversation_id)
+		values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17) returning id`,
 		p.BusinessID, code, linkID, cust.ID, string(itemsJSON), subtotal, discount, shippingFee, total,
-		strings.ToUpper(p.OfferCode), p.PaymentMethod, tokenAmount, string(addrJSON), p.Source, p.Notes, riskFlagged).Scan(&orderID)
+		strings.ToUpper(p.OfferCode), p.PaymentMethod, tokenAmount, string(addrJSON), p.Source, p.Notes, riskFlagged, convID).Scan(&orderID)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'new','order placed')`, orderID); err != nil {
 		return nil, err
+	}
+	if chatCodConfirmed {
+		if _, err := tx.Exec(ctx, `update orders set status='confirmed', cod_confirmed_at=now() where id=$1`, orderID); err != nil {
+			return nil, err
+		}
+		tx.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed','buyer confirmed in chat')`, orderID)
+	}
+	if p.ConversationID != "" {
+		// everything said before this point belongs to this order; the next one
+		// starts from a clean cart instead of re-reading these items
+		if _, err := tx.Exec(ctx, `update conversations set cutoff_at=now(), stage='open', cart='{}'::jsonb, summary_hash=''
+			where id=$1 and business_id=$2`, p.ConversationID, p.BusinessID); err != nil {
+			return nil, err
+		}
 	}
 	// draw down counted inventory in the same transaction — overselling and the
 	// order that caused it must fail together
@@ -220,13 +270,17 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 		return nil, err
 	}
 
-	if p.PaymentMethod == "cod" {
-		s.startCodFlow(code, p.Phone, bizName, total, tokenAmount)
-	} else {
-		s.notify.Async("orderPlaced", func() error {
-			return s.notify.WhatsApp(p.Phone, fmt.Sprintf("Order %s placed at %s for %s. Complete payment to confirm. Track: %s",
-				code, bizName, notify.Rupees(total), s.trackURL(code)))
-		})
+	switch {
+	case chatCodConfirmed:
+		s.tellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+			"✅ Order confirmed: %s\nTotal %s, pay cash on delivery.\nTrack it anytime: %s (enter %s on the page)",
+			code, notify.Rupees(total), s.trackURL(code), p.Phone))
+	case p.PaymentMethod == "cod":
+		s.startCodFlow(code, p.Phone, bizName, total, tokenAmount, p.ConversationID)
+	default:
+		s.tellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+			"Order %s placed at %s for %s. Complete payment here to confirm it: %s (enter %s on the page)",
+			code, bizName, notify.Rupees(total), s.trackURL(code), p.Phone))
 	}
 
 	o, err := s.GetByID(ctx, p.BusinessID, orderID)
@@ -238,7 +292,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 
 // startCodFlow sends the RTO-cutting confirmation sequence: summary + address
 // confirm link (+ token payment ask when the seller has one configured).
-func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount int) {
+func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount int, convID string) {
 	confirmToken := secure.Hex(16)
 	s.rdb.Set(context.Background(), "codconfirm:"+code, confirmToken, 72*time.Hour)
 	msg := fmt.Sprintf("Order %s at %s — total %s (Cash on Delivery).\nPlease confirm your order and address here: %s/o/%s/confirm?token=%s",
@@ -246,7 +300,7 @@ func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount i
 	if tokenAmount > 0 {
 		msg += fmt.Sprintf("\nPay a %s token now to guarantee your order (adjusted in the COD amount).", notify.Rupees(tokenAmount))
 	}
-	s.notify.Async("codConfirm", func() error { return s.notify.WhatsApp(phone, msg) })
+	s.tellBuyer("codConfirm", convID, phone, msg)
 }
 
 // ConfirmCod is hit from the buyer's WhatsApp confirmation link.
@@ -271,20 +325,20 @@ func (s *Service) ConfirmCod(ctx context.Context, code, token string) error {
 // ResendCodConfirmation re-sends the confirmation link — the seller's manual
 // nudge from the order card, and what the background job calls in bulk.
 func (s *Service) ResendCodConfirmation(ctx context.Context, bizID, orderID string) error {
-	var code, phone, bizName string
+	var code, phone, bizName, convID string
 	var total, tokenAmount int
-	err := s.pool.QueryRow(ctx, `select o.order_code, c.phone, b.name, o.total, o.token_amount
+	err := s.pool.QueryRow(ctx, `select o.order_code, c.phone, b.name, o.total, o.token_amount, coalesce(o.conversation_id::text, '')
 		from orders o join customers c on c.id = o.customer_id join businesses b on b.id = o.business_id
 		where o.id=$1 and o.business_id=$2 and o.payment_method='cod'
 		and o.cod_confirmed_at is null and o.status in ('new','confirmed')`,
-		orderID, bizID).Scan(&code, &phone, &bizName, &total, &tokenAmount)
+		orderID, bizID).Scan(&code, &phone, &bizName, &total, &tokenAmount, &convID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errors.New("no unconfirmed COD order to confirm")
 	}
 	if err != nil {
 		return err
 	}
-	s.startCodFlow(code, phone, bizName, total, tokenAmount)
+	s.startCodFlow(code, phone, bizName, total, tokenAmount, convID)
 	s.pool.Exec(ctx, `update orders set cod_reminder_at=now() where id=$1`, orderID)
 	return nil
 }
@@ -298,19 +352,19 @@ func (s *Service) NudgePendingCod(ctx context.Context, after time.Duration) (int
 		and o.payment_method='cod' and o.cod_confirmed_at is null and o.cod_reminder_at is null
 		and o.payment_status <> 'token_paid' and o.status = 'new'
 		and o.created_at < now() - make_interval(mins => $1) and b.status = 'active'
-		returning o.order_code, c.phone, b.name, o.total, o.token_amount`, int(after.Minutes()))
+		returning o.order_code, c.phone, b.name, o.total, o.token_amount, coalesce(o.conversation_id::text, '')`, int(after.Minutes()))
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
 	sent := 0
 	for rows.Next() {
-		var code, phone, bizName string
+		var code, phone, bizName, convID string
 		var total, tokenAmount int
-		if err := rows.Scan(&code, &phone, &bizName, &total, &tokenAmount); err != nil {
+		if err := rows.Scan(&code, &phone, &bizName, &total, &tokenAmount, &convID); err != nil {
 			return sent, err
 		}
-		s.startCodFlow(code, phone, bizName, total, tokenAmount)
+		s.startCodFlow(code, phone, bizName, total, tokenAmount, convID)
 		sent++
 	}
 	return sent, rows.Err()
@@ -344,14 +398,14 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 	if kind == "token" {
 		q = `update orders set payment_status='token_paid', cod_confirmed_at=now(),
 			status = case when status='new' then 'confirmed' else status end, updated_at=now()
-			where id=$1 returning order_code, business_id, (select phone from customers where id = orders.customer_id)`
+			where id=$1 returning order_code, business_id, (select phone from customers where id = orders.customer_id), coalesce(conversation_id::text, '')`
 	} else {
 		q = `update orders set payment_status='paid',
 			status = case when status='new' then 'confirmed' else status end, updated_at=now()
-			where id=$1 returning order_code, business_id, (select phone from customers where id = orders.customer_id)`
+			where id=$1 returning order_code, business_id, (select phone from customers where id = orders.customer_id), coalesce(conversation_id::text, '')`
 	}
-	var code, bizID, phone string
-	if err := s.pool.QueryRow(ctx, q, orderID).Scan(&code, &bizID, &phone); err != nil {
+	var code, bizID, phone, convID string
+	if err := s.pool.QueryRow(ctx, q, orderID).Scan(&code, &bizID, &phone, &convID); err != nil {
 		return ErrNotFound
 	}
 	note := "payment received"
@@ -359,9 +413,7 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 		note = "COD token payment received"
 	}
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed',$2)`, orderID, note)
-	s.notify.Async("paid", func() error {
-		return s.notify.WhatsApp(phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
-	})
+	s.tellBuyer("paid", convID, phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
 	s.publishOrder(ctx, bizID, orderID, "orderPaid")
 	return nil
 }
@@ -400,12 +452,12 @@ var buyerStatusMessage = map[string]string{
 // SetStatus moves an order across the board and runs the side effects
 // (ledger updates on delivered/rto, buyer WhatsApp updates).
 func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note string) (*Order, error) {
-	var status, code, phone, courierName, courierTracking string
+	var status, code, phone, courierName, courierTracking, convID string
 	var customerID string
 	var total int
 	err := s.pool.QueryRow(ctx, `select o.status, o.order_code, o.customer_id, o.total, o.courier_name, o.courier_tracking_id,
-		c.phone from orders o join customers c on c.id = o.customer_id
-		where o.id=$1 and o.business_id=$2`, orderID, bizID).Scan(&status, &code, &customerID, &total, &courierName, &courierTracking, &phone)
+		c.phone, coalesce(o.conversation_id::text, '') from orders o join customers c on c.id = o.customer_id
+		where o.id=$1 and o.business_id=$2`, orderID, bizID).Scan(&status, &code, &customerID, &total, &courierName, &courierTracking, &phone, &convID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -436,7 +488,7 @@ func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note
 			text += fmt.Sprintf(" Courier: %s, tracking id %s.", courierName, courierTracking)
 		}
 		text += " Track: " + s.trackURL(code)
-		s.notify.Async("statusUpdate", func() error { return s.notify.WhatsApp(phone, text) })
+		s.tellBuyer("statusUpdate", convID, phone, text)
 	}
 
 	o, err := s.GetByID(ctx, bizID, orderID)
@@ -508,6 +560,7 @@ func (s *Service) getOne(ctx context.Context, where string, args ...any) (*Order
 		return nil, ErrNotFound
 	}
 	o := &orders[0]
+	o.NextStatuses = transitions[o.Status]
 	rows, err := s.pool.Query(ctx, `select status, note, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		from order_events where order_id=$1 order by created_at`, o.ID)
 	if err != nil {

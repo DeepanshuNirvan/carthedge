@@ -25,6 +25,8 @@ export type BusinessUpdate = Partial<
 
 export type PaymentSettings = { razorpayKeyId?: string; razorpayKeySecret?: string; upiId?: string };
 
+export type AiSettings = { autoReply?: boolean; autoOrder?: boolean; notes?: string };
+
 export const useBusiness = () =>
   useQuery({ queryKey: ['business'], queryFn: () => get<BusinessProfile>('/api/v1/business') });
 
@@ -33,6 +35,14 @@ export function useUpdateBusiness() {
   return useMutation({
     mutationFn: (input: BusinessUpdate) => put<BusinessProfile>('/api/v1/business', input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['business'] }),
+  });
+}
+
+export function useUpdateAiSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AiSettings) => put<BusinessProfile>('/api/v1/business/ai', input),
+    onSuccess: (profile) => qc.setQueryData(['business'], profile),
   });
 }
 

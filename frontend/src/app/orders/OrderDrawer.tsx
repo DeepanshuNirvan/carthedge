@@ -35,10 +35,13 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
     );
   };
 
+  // a pick left over from another order is ignored, not applied here
+  const pendingStatus = order && nextStatus && order.nextStatuses?.includes(nextStatus) ? nextStatus : '';
+
   const doStatus = () => {
-    if (!order || !nextStatus) return;
+    if (!order || !pendingStatus) return;
     setStatus.mutate(
-      { id: order.id, status: nextStatus },
+      { id: order.id, status: pendingStatus },
       {
         onSuccess: () => {
           toast('success', 'Status updated');
@@ -169,19 +172,23 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
           {/* actions */}
           <section className="grid gap-4 rounded-lg bg-surface-2 p-4">
             <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-              <Field label="Change status">
-                <Select value={nextStatus} onChange={(e) => setNextStatus(e.target.value as OrderStatus)}>
-                  <option value="">Choose…</option>
-                  {orderStatuses
-                    .filter((s) => s !== order.status)
-                    .map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
+              <Field label="Status">
+                <Select
+                  value={pendingStatus || order.status}
+                  disabled={!order.nextStatuses?.length}
+                  onChange={(e) => setNextStatus(e.target.value === order.status ? '' : (e.target.value as OrderStatus))}
+                >
+                  <option value={order.status}>
+                    {order.status} {order.nextStatuses?.length ? '(current)' : '(final)'}
+                  </option>
+                  {(order.nextStatuses ?? orderStatuses.filter((s) => s !== order.status)).map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                 </Select>
               </Field>
-              <Button variant="secondary" onClick={doStatus} disabled={!nextStatus} loading={setStatus.isPending}>
+              <Button variant="secondary" onClick={doStatus} disabled={!pendingStatus} loading={setStatus.isPending}>
                 Apply
               </Button>
             </div>

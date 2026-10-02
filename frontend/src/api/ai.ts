@@ -7,6 +7,7 @@ export const useDrafts = () =>
     queryKey: ['ai', 'drafts'],
     queryFn: () => get<{ drafts: AiDraft[] }>('/api/v1/ai/drafts'),
     select: (d) => d.drafts ?? [],
+    refetchInterval: 10_000, // DM drafts are created server-side; same cadence as the inbox
   });
 
 export function useAiMutations() {

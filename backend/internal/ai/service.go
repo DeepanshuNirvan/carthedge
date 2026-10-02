@@ -13,6 +13,7 @@ import (
 	"carthedge/internal/order"
 	"carthedge/internal/product"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -79,10 +80,11 @@ type Service struct {
 	orders   *order.Service
 	products *product.Service
 	log      *slog.Logger
+	baseURL  string // buyer links the DM assistant may share
 }
 
-func NewService(pool *pgxpool.Pool, client *Client, orders *order.Service, products *product.Service, log *slog.Logger) *Service {
-	return &Service{pool: pool, client: client, orders: orders, products: products, log: log}
+func NewService(pool *pgxpool.Pool, client *Client, orders *order.Service, products *product.Service, log *slog.Logger, baseURL string) *Service {
+	return &Service{pool: pool, client: client, orders: orders, products: products, log: log, baseURL: baseURL}
 }
 
 // ParseOrder reads a pasted DM thread and drafts an order card for one-tap confirm.
@@ -120,6 +122,7 @@ func (s *Service) parse(ctx context.Context, bizID, conversation, source, conver
 	draftJSON, _ := json.Marshal(data)
 
 	d := &Draft{Conversation: conversation, Data: data, Confidence: data.Confidence, Status: "pending", Source: source, ConversationID: conversationID}
+	s.DiscardChatDrafts(ctx, bizID, conversationID)
 	err = s.pool.QueryRow(ctx, `insert into ai_drafts (business_id, conversation, draft, confidence, source, conversation_id)
 		values ($1,$2,$3::jsonb,$4,$5,nullif($6,'')::uuid) returning id, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`,
 		bizID, conversation, string(draftJSON), data.Confidence, source, conversationID).Scan(&d.ID, &d.CreatedAt)
@@ -159,8 +162,9 @@ func (s *Service) priceFromCatalog(ctx context.Context, bizID string, items []Dr
 // field from the review card before confirming.
 func (s *Service) ConfirmDraft(ctx context.Context, bizID, draftID string, overrides *DraftData) (*order.Order, error) {
 	var draftJSON []byte
-	var status string
-	err := s.pool.QueryRow(ctx, `select draft, status from ai_drafts where id=$1 and business_id=$2`, draftID, bizID).Scan(&draftJSON, &status)
+	var status, convID string
+	err := s.pool.QueryRow(ctx, `select draft, status, coalesce(conversation_id::text, '') from ai_drafts
+		where id=$1 and business_id=$2`, draftID, bizID).Scan(&draftJSON, &status, &convID)
 	if err != nil {
 		return nil, errors.New("draft not found")
 	}
@@ -174,7 +178,7 @@ func (s *Service) ConfirmDraft(ctx context.Context, bizID, draftID string, overr
 	}
 
 	params := order.CreateParams{
-		BusinessID: bizID, Source: "ai", AiDraftID: draftID,
+		BusinessID: bizID, Source: "ai", AiDraftID: draftID, ConversationID: convID,
 		Name: data.CustomerName, Phone: data.Phone, Email: "",
 		Address: data.Address, PaymentMethod: data.PaymentMethod, Notes: data.Notes,
 	}
@@ -206,12 +210,19 @@ func (s *Service) variantIDByName(ctx context.Context, productID, variantName st
 }
 
 func (s *Service) DiscardDraft(ctx context.Context, bizID, draftID string) error {
-	ct, err := s.pool.Exec(ctx, `update ai_drafts set status='discarded' where id=$1 and business_id=$2 and status='pending'`, draftID, bizID)
+	var convID *string
+	err := s.pool.QueryRow(ctx, `update ai_drafts set status='discarded' where id=$1 and business_id=$2 and status='pending'
+		returning conversation_id::text`, draftID, bizID).Scan(&convID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errors.New("draft not found or already handled")
+	}
 	if err != nil {
 		return err
 	}
-	if ct.RowsAffected() == 0 {
-		return errors.New("draft not found or already handled")
+	if convID != nil {
+		// the chat is no longer waiting on the seller; the assistant takes it
+		// from where the buyer is
+		s.pool.Exec(ctx, `update conversations set stage='open' where id=$1 and stage='awaiting_seller'`, *convID)
 	}
 	return nil
 }

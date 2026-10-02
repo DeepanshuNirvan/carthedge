@@ -1,0 +1,131 @@
+# DM sales assistant — design
+
+Date: 2026-10-01 · Status: approved in chat (option 1, with owner's changes) · implemented
+
+## Goal
+
+A buyer DMs a connected Instagram (later WhatsApp) account. CartHedge answers like a
+good shop assistant — short, warm, in the buyer's own language — answers questions
+from real store data only, collects what an order needs a little at a time, shows an
+exact summary, and on the buyer's "yes" either places the order (if the seller turned
+auto-confirm on) or hands the seller a ready draft. After the order the buyer gets the
+order code, total and tracking/payment link on the same chat, and can keep asking about
+status or start another order.
+
+## Owner decisions
+
+| Decision | Choice |
+|---|---|
+| Architecture | One buyer turn = a few sequential AI calls; Go owns state, money and every side effect |
+| Honesty | Natural tone, store voice ("hum"). Never claims to be human; asked "bot ho?" → honest answer |
+| Auto-reply | Seller toggle, **default ON**. Off = today's behaviour (drafts only) |
+| Auto-confirm orders | Seller toggle, **default OFF**. Off = buyer's "yes" creates a draft the seller taps |
+| Payment | Ask the buyer. Offer only what the seller supports: COD (if enabled), online via the order link (Razorpay or the seller's UPI). Chat "yes" to a COD summary counts as COD confirmation; a configured COD token still gets its payment link |
+| Provider | Stays behind `ai.Client` (Gemini/OpenAI/any OpenAI-compatible, ordered failover) |
+| Compatibility | No breaking changes; new columns have defaults; existing endpoints keep their shape |
+
+## Bugs fixed on the way
+
+1. Buyer never received confirmation/tracking: every buyer message went to the WhatsApp
+   provider (unconfigured). Orders now remember their conversation and are messaged back
+   on that channel inside the 24-hour window, falling back to WhatsApp after it.
+2. Order drawer status select showed "Choose…": it now shows the current status.
+3. Inbox badge "draft ready" after confirm: badge reflects the real state.
+4. New order re-included old items: each placed order sets a conversation cutoff; the AI
+   reads only messages after it (previous orders are given as facts, not as chat).
+5. Drafts list never refreshed: polls every 10s (shipped earlier today).
+
+## Flow per buyer turn
+
+```
+inbound DM ─► conversation (parse_pending) ─► ~10s quiet ─► agent turn
+agent turn:
+  1. UNDERSTAND (LLM, JSON): intent, language, updated cart, confirmed?, handoff?, replyNeeded
+  2. GO: validate cart against live catalog (product, variant, stock, qty), price it with the
+     order pricing code, list missing fields, decide the action (state machine below)
+  3. REPLY (LLM, text): writes the message from a facts sheet only
+  4. GO GUARD: every ₹ amount and URL in the reply must appear in the facts → else retry once
+     with a stricter instruction → else a plain templated fallback
+  5. send on the channel, store as author=ai
+```
+
+### State machine (Go, pure function)
+
+Stages on `conversations.stage`: `open` · `confirming` (summary shown) · `awaiting_seller`
+(draft created, auto-confirm off) · `handoff` (AI paused, seller needed).
+
+| Condition | Action |
+|---|---|
+| handoff reason (complaint, refund, human asked, bargaining beyond offers, abuse, 2 confused turns, reply cap hit) | stage=handoff, pause AI 12h, one holding reply, email/WhatsApp the owner |
+| buyer confirmed **and** stage=confirming **and** cart unchanged since the summary **and** complete | auto-confirm on → place order; off → create draft, stage=awaiting_seller, tell buyer the shop will confirm shortly |
+| cart complete and buyer is ordering | stage=confirming, reply + Go-rendered summary + "Confirm karein?" |
+| otherwise | answer questions; ask for at most 2 missing things |
+| `ok` / 👍 / noise with nothing to answer | no reply |
+
+A "yes" only counts after a summary was shown for that exact cart (cart hash stored when
+the summary is sent) — a buyer can never confirm something they were not shown.
+
+### Facts the reply call may use (and nothing else)
+
+Store name, city, delivery charge and free-delivery threshold, COD on/off, online payment
+on/off, seller's notes (policies, delivery time), store link `/s/{code}`, product links
+`/s/{code}/p/{id}`, in-stock catalog with rupee prices/variants/low-stock hints, priced cart,
+missing fields, recent orders from this chat (code, status, payment, courier, tracking
+link `/o/{code}`), previous delivery details for a returning buyer (offer to reuse).
+
+### Seller takes over
+
+- Reply from CartHedge → message author=seller, AI paused 12h for that chat.
+- Reply from the Instagram app → arrives as an echo webhook; echoes of our own sends are
+  recognised by their message id, anything else is stored as author=seller and pauses AI.
+- Per-chat Pause/Resume AI.
+
+### Follow-up
+
+One nudge per cart: cart has items, not ordered, buyer silent 4–22h, last message was
+ours, AI on and not paused. Generated by the reply call so it matches the buyer's language.
+
+### Messages after the order (templated in Go, not AI)
+
+Order placed (both auto and seller-tapped drafts): code, total, payment method, and
+`/o/{code}` (track; pay there if prepaid). Paid, packed, shipped (courier + tracking id),
+delivered, cancelled: same route. Inside 24h of the buyer's last message → their chat;
+otherwise → WhatsApp provider (when configured). Never the HUMAN_AGENT tag (Meta forbids it
+for automation).
+
+## Data
+
+Migration `0014_dm_agent.sql`, all additive with defaults:
+
+- `businesses`: `ai_auto_reply bool default true`, `ai_auto_order bool default false`, `ai_notes text default ''`
+- `conversations`: `stage text default 'open'`, `cart jsonb default '{}'`, `summary_hash text default ''`,
+  `cutoff_at timestamptz`, `ai_paused_until timestamptz`, `nudged_at timestamptz`
+- `conversation_messages`: `author text default ''` (buyer | ai | seller | system), backfilled from direction
+- `orders`: `conversation_id uuid null references conversations on delete set null`
+
+## Code layout
+
+- `internal/ai/agent.go` — prompts, `Understand`, `Reply`, guard. Pure inputs (no DB) so it
+  can be evaluated against the real model without a database.
+- `internal/ai/cart.go` — cart types, validation, missing fields, summary text, `decide()`.
+- `internal/messaging/agent.go` — loads context, runs a turn, sends, nudges, pause/resume,
+  `SendToConversation` (24h window) used by orders.
+- `internal/order` — `CreateParams.ConversationID`, `Quote`, buyer messages routed through an
+  injected direct-message function, cutoff/stage reset when an order is placed.
+- `internal/business` — `PUT /api/v1/business/ai` + three fields on the profile.
+- Frontend — Settings "AI assistant" card, Inbox state badges, author labels, pause/resume,
+  order drawer status fix.
+
+## Testing
+
+- Unit: cart validation/missing fields, summary math, `decide()` table, guard, thread cutoff,
+  echo routing, 24h fallback.
+- Eval: `go test ./internal/ai -run TestAgentEval -tags eval` plays ~15 scripted chats against
+  the configured model (short "price?", many questions, Hindi, "baad me batata hu", silence,
+  garbage, "bot ho?", bargaining, out of stock, repeat order, status question, angry buyer)
+  and prints transcripts with the guard results.
+
+## Out of scope (v2)
+
+Matching a product from a screenshot/story image; multi-language persona settings;
+WhatsApp Embedded Signup.
