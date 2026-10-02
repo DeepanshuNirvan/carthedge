@@ -86,7 +86,7 @@ func TestCheckNeedsEveryDeliveryDetail(t *testing.T) {
 	c.Phone = "12345"
 	_, _, problems, missing := testStore().check(c)
 	joined := strings.Join(missing, "|")
-	for _, want := range []string{"their name", "mobile number", "pincode", "how they want to pay"} {
+	for _, want := range []string{"name", "phone number", "pincode", "payment:"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing %q in %v", want, missing)
 		}
@@ -232,5 +232,34 @@ func TestReplyLanguageSkipsMessagesWithNoSignal(t *testing.T) {
 		{Who: "buyer", Text: "Priya"}, {Who: "buyer", Text: "45 civil lines delhi 110054"}, {Who: "buyer", Text: "9876543210"}}
 	if got := replyLanguage(lines, "English"); !strings.Contains(got, "Hinglish") {
 		t.Errorf("a name/address/number must not flip a Hinglish chat: %q", got)
+	}
+}
+
+func TestHinglishWithEnglishLookingWords(t *testing.T) {
+	for _, s := range []string{"Pink kurti confirm kardo pillow rehne do", "Mujhe pillow cover chaiye the", "Ha kardo yehi, price kam nahi ho sakta?"} {
+		if got := messageLanguage(s); !strings.Contains(got, "Hinglish") {
+			t.Errorf("%q read as %q", s, got)
+		}
+	}
+}
+
+func TestFindByBuyerWords(t *testing.T) {
+	st := testStore()
+	if p, ok, _ := st.find(CartItem{Name: "pink wali kurti"}); !ok || p.ID != "kurti" {
+		t.Errorf("pink wali kurti should be the only kurti: %v %v", p.ID, ok)
+	}
+	if p, ok, _ := st.find(CartItem{Name: "jhumka"}); !ok || p.ID != "jhumka" {
+		t.Errorf("jhumka should match Oxidised Jhumkas: %v %v", p.ID, ok)
+	}
+	if _, ok, close := st.find(CartItem{Name: "blue kurti"}); ok || len(close) != 2 {
+		t.Errorf("blue kurti is ambiguous (kurti vs blue saree), want 2 suggestions: ok=%v close=%v", ok, close)
+	}
+}
+
+func TestMergeKeepsAMatchedProduct(t *testing.T) {
+	prev := Cart{Items: []CartItem{{ProductID: "kurti", Name: "Rose Chikankari Kurti", Variant: "M", Qty: 1}}}
+	next := merge(prev, Cart{Items: []CartItem{{Name: "pink kurti", Qty: 1}}}, "confirm")
+	if next.Items[0].ProductID != "kurti" || next.Items[0].Variant != "M" {
+		t.Errorf("matched product lost between turns: %+v", next.Items[0])
 	}
 }

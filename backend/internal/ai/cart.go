@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
@@ -79,9 +80,13 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 	var q Quote
 	var kept []CartItem
 	for _, it := range c.Items {
-		p, ok := st.find(it)
+		p, ok, close := st.find(it)
 		if !ok {
-			if it.Name != "" {
+			switch {
+			case len(close) > 0:
+				problems = append(problems, fmt.Sprintf("not sure which product %q means — closest: %s. Ask which one they want",
+					it.Name, strings.Join(close, ", ")))
+			case it.Name != "":
 				problems = append(problems, fmt.Sprintf("%q is not something the shop sells", it.Name))
 			}
 			continue
@@ -145,12 +150,12 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 		if p, ok := httpx.NormalizePhone(c.Phone); ok {
 			c.Phone = p
 		} else {
-			problems = append(problems, "the phone number "+c.Phone+" is not a valid 10-digit mobile number")
+			problems = append(problems, "the phone number "+c.Phone+" looks incomplete")
 			c.Phone = ""
 		}
 	}
 	if c.Address.Pincode != "" && !httpx.ValidPincode(c.Address.Pincode) {
-		problems = append(problems, "pincode "+c.Address.Pincode+" is not a valid 6-digit pincode")
+		problems = append(problems, "the pincode "+c.Address.Pincode+" looks wrong")
 		c.Address.Pincode = ""
 	}
 	switch {
@@ -164,20 +169,22 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 		c.Payment = ""
 	}
 
+	// plain words on purpose: the writer echoes these, and form language
+	// ("10-digit mobile number") is exactly what makes a chat feel automated
 	if c.Name == "" {
-		missing = append(missing, "their name")
+		missing = append(missing, "name")
 	}
 	if c.Phone == "" {
-		missing = append(missing, "their 10-digit mobile number")
+		missing = append(missing, "phone number")
 	}
 	if c.Address.Line == "" {
-		missing = append(missing, "full delivery address (house, street, area, city)")
+		missing = append(missing, "address")
 	}
 	if c.Address.Pincode == "" {
-		missing = append(missing, "6-digit pincode")
+		missing = append(missing, "pincode")
 	}
 	if c.Payment == "" {
-		missing = append(missing, "how they want to pay ("+st.payOptions()+")")
+		missing = append(missing, "payment: "+st.payOptions())
 	}
 
 	if q.Subtotal > 0 {
@@ -196,7 +203,7 @@ func (st Store) payOptions() string {
 		opts = append(opts, "cash on delivery")
 	}
 	if st.OnlinePay {
-		opts = append(opts, "online by UPI/card through the order link")
+		opts = append(opts, "online (UPI or card)")
 	}
 	if len(opts) == 0 {
 		return "the shop will confirm payment"
@@ -204,20 +211,83 @@ func (st Store) payOptions() string {
 	return strings.Join(opts, " or ")
 }
 
-// find resolves an item by catalog id, falling back to an exact name match —
-// models occasionally drop the id but keep the product's name.
-func (st Store) find(it CartItem) (product.Product, bool) {
+// find resolves an item: by catalog id, by exact name, then by the buyer's own
+// words ("pink wali kurti") when one product fits clearly. When it cannot
+// decide, close names the nearest products so the reply can offer them —
+// "which one do you mean?" sells; "we don't have that" loses the buyer.
+func (st Store) find(it CartItem) (p product.Product, ok bool, close []string) {
 	for _, p := range st.Products {
 		if it.ProductID != "" && p.ID == it.ProductID {
-			return p, true
+			return p, true, nil
 		}
 	}
 	for _, p := range st.Products {
 		if it.Name != "" && strings.EqualFold(strings.TrimSpace(p.Name), strings.TrimSpace(it.Name)) {
-			return p, true
+			return p, true, nil
 		}
 	}
-	return product.Product{}, false
+	words := keywords(it.Name)
+	if len(words) == 0 {
+		return product.Product{}, false, nil
+	}
+	best, hits := 0, []product.Product{}
+	for _, p := range st.Products {
+		text := strings.ToLower(p.Name + " " + p.Category + " " + p.Description)
+		score := 0
+		for _, w := range words {
+			if strings.Contains(text, w) {
+				score++
+			}
+		}
+		switch {
+		case score > best:
+			best, hits = score, []product.Product{p}
+		case score == best && score > 0:
+			hits = append(hits, p)
+		}
+	}
+	if best == 0 {
+		return product.Product{}, false, nil
+	}
+	if len(hits) == 1 {
+		return hits[0], true, nil
+	}
+	seen := map[string]bool{}
+	for _, h := range hits {
+		if !seen[h.Name] && len(close) < 3 {
+			seen[h.Name] = true
+			close = append(close, h.Name)
+		}
+	}
+	return product.Product{}, false, close
+}
+
+// fillers carry no product meaning in how buyers describe what they want.
+var fillers = map[string]bool{"wali": true, "wala": true, "wale": true, "chahiye": true, "chaiye": true, "the": true,
+	"and": true, "for": true, "size": true, "want": true, "need": true, "please": true, "plz": true, "mujhe": true,
+	"yeh": true, "woh": true, "vali": true, "vala": true, "one": true, "this": true, "that": true}
+
+// keywords are the meaningful words of a product description, lowercased.
+func keywords(s string) []string {
+	var out []string
+	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if len([]rune(w)) >= 3 && !fillers[w] {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// sameThing reports whether two descriptions share a meaningful word.
+func sameThing(a, b string) bool {
+	for _, x := range keywords(a) {
+		for _, y := range keywords(b) {
+			if x == y || strings.HasPrefix(x, y) || strings.HasPrefix(y, x) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func variantByName(p product.Product, name string) (product.Variant, bool) {

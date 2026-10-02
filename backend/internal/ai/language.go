@@ -28,17 +28,20 @@ func init() {
 	for _, w := range strings.Fields(`ka ki ke ko hai hain kya kyu kyun chahiye nahi nhi kitne kitna kitni aap aapka
 		mujhe muje humko karo karna kar bhi hu hoon hun wala wali wale bhejo bhej milega milegi kab kaise kaisa haan
 		theek thik batao bataiye dikhao bhaiya didi accha acha abhi kal aaj kuch koi mera meri mere apna lena dena
-		yeh ye woh wo isme usme liye se tak par jaldi paisa paise rupay rupaye`) {
+		yeh ye woh wo isme usme liye se tak par jaldi paisa paise rupay rupaye kardo krdo karde kariye kijiye dijiye
+		chaiye chahie chahiye rehne rahne sakta sakte sakti yehi yahi wahi kam zyada jyada bahut bohot bhut thoda sirf
+		ho hoga hogi kaisi kaise kyunki lekin magar matlab bas`) {
 		hindiWords[w] = true
 	}
 }
 
-// englishWords are function words a buyer writing English cannot avoid.
+// englishWords are function words a buyer writing English cannot avoid —
+// minus the ones romanised Hindi shares: "kar do", "chahiye the", "phir to".
 var englishWords = map[string]bool{}
 
 func init() {
-	for _, w := range strings.Fields(`the is are do does you your can could would what how when where please i my have has
-		will it this that to of and for with there any am was`) {
+	for _, w := range strings.Fields(`is are does you your can could would what how when where please i my have has
+		will it this that of and for with there any am was`) {
 		englishWords[w] = true
 	}
 }
