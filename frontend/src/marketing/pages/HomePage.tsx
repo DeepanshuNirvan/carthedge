@@ -41,7 +41,7 @@ export default function HomePage() {
       />
       <MarketingBackground />
       {/* the strand the app hangs over every working surface, strung across the top of the page */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-14">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14">
         <LampStrand />
       </div>
       <MarketingNav />

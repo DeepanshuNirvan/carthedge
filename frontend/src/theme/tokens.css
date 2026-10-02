@@ -100,6 +100,7 @@
   --glass-a: 0.56;
   --glass-thick-a: 0.78;
   --glass-clear-a: 0.4;
+  --lamp-a: 1;
   --glass-hi: 255 255 255;
   --glass-hi-a: 0.13;
   --glass-rim-a: 0.1;
@@ -158,6 +159,7 @@
   --glass-a: 0.62;
   --glass-thick-a: 0.8;
   --glass-clear-a: 0.46;
+  --lamp-a: 0.65;
   --glass-hi: 255 255 255;
   --glass-hi-a: 0.95;
   --glass-rim-a: 0.08;

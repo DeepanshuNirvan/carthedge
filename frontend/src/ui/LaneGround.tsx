@@ -45,10 +45,17 @@ export function LampStrand() {
         const [y0, y2] = t < 0.5 ? [1, 8] : [8, 1];
         const y = (1 - u) * (1 - u) * y0 + 2 * u * (1 - u) * 23 + u * u * y2;
         const top = (y * 56) / 24 - 4;
+        // p-3 is a finger-sized hit area round the 8px bulb; hovering (or tapping) one turns it up
         return (
-          <span key={i} className="absolute -translate-x-1/2" style={{ left: `${t * 100}%`, top }}>
-            <span className="absolute left-1/2 top-1/2 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgb(var(--bulb)/0.22),transparent_65%)]" />
-            <span className="bulb relative block size-2" data-lit="true" />
+          <span
+            key={i}
+            className="group pointer-events-auto absolute -translate-x-1/2 p-3"
+            style={{ left: `${t * 100}%`, top: top - 12 }}
+          >
+            <span className="absolute left-1/2 top-1/2 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgb(var(--bulb)/0.22),transparent_65%)] transition-transform duration-expr ease-spring group-hover:scale-150" />
+            <span className="relative block transition-transform duration-std ease-spring group-hover:scale-150">
+              <span className="bulb block size-2" data-lit="true" />
+            </span>
           </span>
         );
       })}

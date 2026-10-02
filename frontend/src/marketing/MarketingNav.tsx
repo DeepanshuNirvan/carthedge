@@ -36,7 +36,7 @@ export function MarketingNav() {
   );
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-4">
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-3 [&>*]:pointer-events-auto pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-4">
       {/* set by CartHedge staff in the admin console; empty hides it */}
       {/* folds away once the page moves, so it never sits on top of content */}
       <AnimatePresence initial={false}>
