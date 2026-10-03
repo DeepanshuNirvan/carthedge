@@ -114,8 +114,9 @@ func (h *Handler) Bulk(w http.ResponseWriter, r *http.Request) {
 	var inputs []Input
 
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 		if err := r.ParseMultipartForm(5 << 20); err != nil {
-			httpx.Err(w, http.StatusBadRequest, "invalid upload")
+			httpx.Err(w, http.StatusBadRequest, "invalid upload (max 5MB)")
 			return
 		}
 		file, _, err := r.FormFile("file")

@@ -198,13 +198,17 @@ func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusUnauthorized, "phone verification required")
 		return
 	}
+	fail := func(status int, msg string) {
+		h.otp.Restore(r.Context(), bizCode, phone, in.OrderToken)
+		httpx.Err(w, status, msg)
+	}
 	biz, err := h.storeBusiness(r.Context(), bizCode)
 	if err != nil {
-		httpx.Err(w, http.StatusNotFound, "store not found")
+		fail(http.StatusNotFound, "store not found")
 		return
 	}
 	if !h.plans.IsActive(r.Context(), biz.ID) {
-		httpx.Err(w, http.StatusForbidden, "this store is temporarily paused")
+		fail(http.StatusForbidden, "this store is temporarily paused")
 		return
 	}
 	o, err := h.orders.Create(r.Context(), order.CreateParams{
@@ -213,7 +217,7 @@ func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
 		Refs: in.Items, PaymentMethod: in.PaymentMethod, OfferCode: in.OfferCode, Notes: in.Notes,
 	})
 	if err != nil {
-		httpx.Err(w, http.StatusBadRequest, err.Error())
+		fail(http.StatusBadRequest, err.Error())
 		return
 	}
 	next := "pay"

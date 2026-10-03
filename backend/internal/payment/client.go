@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -61,6 +62,31 @@ func (c *Client) CreateOrder(ctx context.Context, amount int, receipt string, no
 		return "", fmt.Errorf("razorpay returned unexpected response")
 	}
 	return out.ID, nil
+}
+
+// ErrBadKeys is Razorpay refusing a key pair.
+var ErrBadKeys = errors.New("razorpay rejected the keys")
+
+// Verify checks the key pair with Razorpay, so a typo is caught when the
+// seller saves it instead of on a buyer's checkout.
+func (c *Client) Verify(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.razorpay.com/v1/orders?count=1", nil)
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(c.keyID, c.keySecret)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusBadRequest:
+		return ErrBadKeys
+	case resp.StatusCode >= 300:
+		return fmt.Errorf("razorpay returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // VerifySignature checks the checkout callback signature: HMAC-SHA256(orderId|paymentId).

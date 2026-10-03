@@ -208,7 +208,10 @@ function ProfileSection() {
   const onLogo = async (file: File) => {
     try {
       const logoUrl = await uploadFile(file);
-      update.mutate({ logoUrl }, { onSuccess: () => toast('success', 'Logo updated') });
+      update.mutate(
+        { logoUrl },
+        { onSuccess: () => toast('success', 'Logo updated'), onError: (e) => toast('error', 'Logo not saved', e.message) },
+      );
     } catch {
       toast('error', 'Logo upload failed');
     }
@@ -246,8 +249,8 @@ function ProfileSection() {
         <Field label="Owner" error={errors.ownerName?.message}>
           <Input {...register('ownerName')} />
         </Field>
-        <Field label="Phone">
-          <Input type="tel" {...register('phone')} />
+        <Field label="Phone" hint="Your verified login number. Contact support to change it.">
+          <Input type="tel" readOnly {...register('phone')} />
         </Field>
         <Field label="WhatsApp">
           <Input type="tel" {...register('whatsapp')} />
@@ -390,6 +393,11 @@ function PaymentsSection() {
   const { data: business } = useBusiness();
   const updateBusiness = useUpdateBusiness();
   const updatePayments = useUpdatePayments();
+  const quickSave = (input: Parameters<typeof updateBusiness.mutate>[0], done: string) =>
+    updateBusiness.mutate(input, {
+      onSuccess: () => toast('success', done),
+      onError: (e) => toast('error', 'Could not save', e.message),
+    });
   const {
     register,
     handleSubmit,
@@ -468,9 +476,7 @@ function PaymentsSection() {
             <Switch
               checked={business.codEnabled}
               label="COD enabled"
-              onChange={(codEnabled) =>
-                updateBusiness.mutate({ codEnabled }, { onSuccess: () => toast('success', codEnabled ? 'COD on' : 'COD off') })
-              }
+              onChange={(codEnabled) => quickSave({ codEnabled }, codEnabled ? 'COD on' : 'COD off')}
             />
             Accept COD
           </span>
@@ -481,8 +487,7 @@ function PaymentsSection() {
               onBlur={(e) => {
                 const paise = e.target.value === '' ? 0 : rupeesToPaise(e.target.value);
                 if (paise === null) return toast('error', 'Invalid token amount');
-                if (paise !== business.codTokenAmount)
-                  updateBusiness.mutate({ codTokenAmount: paise }, { onSuccess: () => toast('success', 'Token amount saved') });
+                if (paise !== business.codTokenAmount) quickSave({ codTokenAmount: paise }, 'Token amount saved');
               }}
             />
           </Field>
@@ -493,8 +498,7 @@ function PaymentsSection() {
               onBlur={(e) => {
                 const paise = rupeesToPaise(e.target.value);
                 if (paise === null) return toast('error', 'Invalid shipping fee');
-                if (paise !== business.shippingFee)
-                  updateBusiness.mutate({ shippingFee: paise }, { onSuccess: () => toast('success', 'Shipping fee saved') });
+                if (paise !== business.shippingFee) quickSave({ shippingFee: paise }, 'Shipping fee saved');
               }}
             />
           </Field>
@@ -505,8 +509,7 @@ function PaymentsSection() {
               onBlur={(e) => {
                 const n = Number(e.target.value);
                 if (!Number.isInteger(n) || n < 0 || n > 90) return toast('error', 'Enter 0–90');
-                if (n !== business.baselineRtoPercent)
-                  updateBusiness.mutate({ baselineRtoPercent: n }, { onSuccess: () => toast('success', 'Baseline saved') });
+                if (n !== business.baselineRtoPercent) quickSave({ baselineRtoPercent: n }, 'Baseline saved');
               }}
             />
           </Field>

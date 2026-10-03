@@ -95,6 +95,12 @@ func (s *Service) Valid(ctx context.Context, bizCode, phone, token string) bool 
 	return err == nil && n == 1
 }
 
+// Restore hands back a token whose order was refused (a typo'd offer code,
+// stock, a paused store): fixing the cart must not cost the buyer a new OTP.
+func (s *Service) Restore(ctx context.Context, bizCode, phone, token string) {
+	s.rdb.Set(ctx, tokenKey(bizCode, phone, token), "1", 15*time.Minute)
+}
+
 // Consume validates and burns an order token.
 func (s *Service) Consume(ctx context.Context, bizCode, phone, token string) bool {
 	n, err := s.rdb.Del(ctx, tokenKey(bizCode, phone, token)).Result()

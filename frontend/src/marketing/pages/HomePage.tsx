@@ -40,8 +40,9 @@ export default function HomePage() {
         jsonLd={[organizationJsonLd, faqJsonLd]}
       />
       <MarketingBackground />
-      {/* the strand the app hangs over every working surface, strung across the top of the page */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14">
+      {/* the strand the app hangs over every working surface, strung across the top of the page;
+          clipped sideways only, so the end lamps' glow never widens a phone screen */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14 overflow-x-clip">
         <LampStrand />
       </div>
       <MarketingNav />

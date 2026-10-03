@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Copy, Truck } from 'lucide-react';
 import type { CheckoutInfo, TrackedOrder } from '@/api/types';
@@ -28,10 +28,16 @@ const journeyLabels: Record<string, string> = {
   delivered: 'Delivered',
 };
 
+// orders nobody can pay for any more; the API refuses them too
+const closedStatuses = ['cancelled', 'rto', 'delivered'];
+
 export default function TrackPage() {
   const { orderCode: codeFromUrl } = useParams();
   const [code, setCode] = useState(codeFromUrl ?? '');
-  const [phone, setPhone] = useState('');
+  // checkout hands the number over in router state, so a buyer who just ordered
+  // does not retype it (state stays out of the URL)
+  const { state } = useLocation();
+  const [phone, setPhone] = useState<string>((state as { phone?: string } | null)?.phone ?? '');
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [upiInfo, setUpiInfo] = useState<CheckoutInfo | null>(null);
   const [busy, setBusy] = useState(false);
@@ -260,7 +266,9 @@ export default function TrackPage() {
                     <dd>{order.shipping > 0 ? <MoneyText paise={order.shipping} /> : 'Free'}</dd>
                   </div>
                   <div className="flex justify-between text-base font-semibold text-hi">
-                    <dt>Total ({order.paymentMethod === 'cod' ? 'pay on delivery' : 'paid online'})</dt>
+                    <dt>
+                      Total ({order.paymentMethod === 'cod' ? 'pay on delivery' : order.paymentStatus === 'paid' ? 'paid online' : 'pay online'})
+                    </dt>
                     <dd><MoneyText paise={order.total} /></dd>
                   </div>
                 </dl>
@@ -271,7 +279,7 @@ export default function TrackPage() {
                     Your order moves on as soon as it is matched.
                   </p>
                 )}
-                {order.paymentMethod === 'prepaid' && order.paymentStatus !== 'paid' && !upiInfo && (
+                {order.paymentMethod === 'prepaid' && order.paymentStatus !== 'paid' && !upiInfo && !closedStatuses.includes(order.status) && (
                   <Button className="mt-4 w-full" size="lg" loading={busy} onClick={payNow}>
                     {order.paymentStatus === 'claimed' ? 'Pay again' : 'Complete payment'}
                   </Button>

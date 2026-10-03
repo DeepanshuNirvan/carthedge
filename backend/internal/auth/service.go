@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -183,9 +184,10 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, clientIP strin
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (*Session, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	var bizID, code, name, hash, status string
 	err := s.pool.QueryRow(ctx, `select id, code, name, password_hash, status from businesses where email = $1`,
-		strings.ToLower(email)).Scan(&bizID, &code, &name, &hash, &status)
+		email).Scan(&bizID, &code, &name, &hash, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrBadLogin
 	}
@@ -205,25 +207,39 @@ func (s *Service) Login(ctx context.Context, email, password string) (*Session, 
 	return &Session{Tokens: *tokens, BusinessID: bizID, BusinessCode: code, BusinessName: name}, nil
 }
 
-// Refresh rotates the refresh token and issues a new access token.
+// Refresh rotates the refresh token and issues a new access token. GETDEL makes
+// the rotation atomic: one refresh token can be redeemed exactly once.
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (*Tokens, error) {
-	key := "auth:refresh:" + refreshToken
-	val, err := s.rdb.Get(ctx, key).Result()
+	val, err := s.rdb.GetDel(ctx, "auth:refresh:"+refreshToken).Result()
 	if err != nil {
 		return nil, ErrBadRefresh
 	}
-	s.rdb.Del(ctx, key)
-	bizID, code, _ := strings.Cut(val, "|")
+	parts := strings.SplitN(val, "|", 3)
+	if len(parts) < 2 {
+		return nil, ErrBadRefresh
+	}
+	bizID, code := parts[0], parts[1]
+	var issued int64 // tokens minted before this field existed count as oldest
+	if len(parts) == 3 {
+		issued, _ = strconv.ParseInt(parts[2], 10, 64)
+	}
+	// a password reset ends every session that started before it
+	if revoked, err := s.rdb.Get(ctx, revokedKey(bizID)).Int64(); err == nil && issued < revoked {
+		return nil, ErrBadRefresh
+	}
 	return s.issueTokens(ctx, bizID, code)
 }
+
+func revokedKey(bizID string) string { return "auth:revoked:" + bizID }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) {
 	s.rdb.Del(ctx, "auth:refresh:"+refreshToken)
 }
 
 func (s *Service) ForgotPassword(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
 	var ownerName string
-	err := s.pool.QueryRow(ctx, `select owner_name from businesses where email = $1`, strings.ToLower(email)).Scan(&ownerName)
+	err := s.pool.QueryRow(ctx, `select owner_name from businesses where email = $1`, email).Scan(&ownerName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil // don't reveal whether the email exists
 	}
@@ -231,7 +247,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 		return err
 	}
 	token := secure.Hex(24)
-	if err := s.rdb.Set(ctx, "auth:reset:"+token, strings.ToLower(email), 30*time.Minute).Err(); err != nil {
+	if err := s.rdb.Set(ctx, "auth:reset:"+token, email, 30*time.Minute).Err(); err != nil {
 		return err
 	}
 	link := s.cfg.PublicBaseURL + "/reset-password?token=" + token
@@ -251,14 +267,18 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	if err != nil {
 		return err
 	}
-	ct, err := s.pool.Exec(ctx, `update businesses set password_hash = $1, updated_at = now() where email = $2`, string(hash), email)
+	var bizID string
+	err = s.pool.QueryRow(ctx, `update businesses set password_hash = $1, updated_at = now() where email = $2 returning id`,
+		string(hash), email).Scan(&bizID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrBadReset
+	}
 	if err != nil {
 		return err
 	}
-	if ct.RowsAffected() == 0 {
-		return ErrBadReset
-	}
 	s.rdb.Del(ctx, "auth:reset:"+token)
+	// whoever held the old password may also hold a live refresh token
+	s.rdb.Set(ctx, revokedKey(bizID), time.Now().UnixMilli(), s.cfg.RefreshTTL)
 	return nil
 }
 
@@ -275,7 +295,8 @@ func (s *Service) issueTokens(ctx context.Context, bizID, code string) (*Tokens,
 		return nil, err
 	}
 	refresh := secure.Hex(32)
-	if err := s.rdb.Set(ctx, "auth:refresh:"+refresh, bizID+"|"+code, s.cfg.RefreshTTL).Err(); err != nil {
+	session := bizID + "|" + code + "|" + strconv.FormatInt(now.UnixMilli(), 10)
+	if err := s.rdb.Set(ctx, "auth:refresh:"+refresh, session, s.cfg.RefreshTTL).Err(); err != nil {
 		return nil, err
 	}
 	return &Tokens{AccessToken: access, RefreshToken: refresh}, nil

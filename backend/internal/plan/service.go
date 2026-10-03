@@ -125,10 +125,16 @@ func (s *Service) Checkout(ctx context.Context, bizID, planCode string) (httpx.M
 	if err != nil {
 		return nil, err
 	}
-	// custom plans may carry a negotiated price on the subscription
+	// a custom plan is renewable only by the business it was assigned to, at
+	// the negotiated price on its subscription
 	if isCustom {
 		var customPrice *int
-		s.pool.QueryRow(ctx, `select custom_price from subscriptions where business_id = $1`, bizID).Scan(&customPrice)
+		var current string
+		err := s.pool.QueryRow(ctx, `select custom_price, plan_id::text from subscriptions where business_id = $1`,
+			bizID).Scan(&customPrice, &current)
+		if err != nil || current != planID {
+			return nil, errors.New("custom plans are set up by CartHedge — request one from this page")
+		}
 		if customPrice != nil {
 			price = *customPrice
 		}
@@ -178,46 +184,36 @@ func (s *Service) VerifyCheckout(ctx context.Context, bizID, rzpOrderID, rzpPaym
 	if !payment.VerifySignature(rzpOrderID, rzpPaymentID, signature, s.cfg.RazorpayKeySecret) {
 		return errors.New("payment signature verification failed")
 	}
-	var planCode string
-	err := s.pool.QueryRow(ctx, `select notes->>'planCode' from payments
-		where razorpay_order_id = $1 and business_id = $2 and kind = 'subscription'`, rzpOrderID, bizID).Scan(&planCode)
-	if err != nil {
-		return errors.New("payment record not found")
-	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
-		where razorpay_order_id=$1`, rzpOrderID, rzpPaymentID); err != nil {
+	// pending → paid exactly once: a replayed verify, or one landing after the
+	// webhook already settled this payment, must not buy another 30 days
+	var planCode string
+	err = tx.QueryRow(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
+		where razorpay_order_id=$1 and business_id=$3 and kind='subscription' and status<>'paid'
+		returning notes->>'planCode'`, rzpOrderID, rzpPaymentID, bizID).Scan(&planCode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var exists bool
+		s.pool.QueryRow(ctx, `select exists(select 1 from payments where razorpay_order_id=$1 and business_id=$2
+			and kind='subscription')`, rzpOrderID, bizID).Scan(&exists)
+		if !exists {
+			return errors.New("payment record not found")
+		}
+		return nil // already settled; the plan is active
+	}
+	if err != nil {
 		return err
 	}
-	if err := ActivateSubscription(ctx, tx, bizID, planCode); err != nil {
+	if err := payment.ActivateSubscription(ctx, tx, bizID, planCode); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	s.invalidate(ctx, bizID)
-	return nil
-}
-
-// ActivateSubscription switches the plan and extends the period by 30 days
-// from now or from the current expiry, whichever is later.
-func ActivateSubscription(ctx context.Context, tx pgx.Tx, bizID, planCode string) error {
-	ct, err := tx.Exec(ctx, `update subscriptions set
-		plan_id = (select id from plans where code = $2),
-		status = 'active',
-		ends_at = greatest(ends_at, now()) + interval '30 days',
-		updated_at = now()
-		where business_id = $1`, bizID, planCode)
-	if err != nil {
-		return err
-	}
-	if ct.RowsAffected() == 0 {
-		return errors.New("subscription not found")
-	}
 	return nil
 }
 
@@ -250,7 +246,10 @@ func (s *Service) CustomRequest(ctx context.Context, bizID, message string, expe
 // Access is what every seller request needs to know about the plan: whether it
 // still runs, and which paid features it may reach.
 type Access struct {
-	Active       bool     `json:"active"`
+	Active bool `json:"active"`
+	// Suspended is the admin's switch, told apart from a lapsed plan so the
+	// seller is not sent to a paywall that payment cannot clear
+	Suspended    bool     `json:"suspended"`
 	Capabilities []string `json:"capabilities"`
 }
 
@@ -270,9 +269,9 @@ func (s *Service) access(ctx context.Context, bizID string) (Access, error) {
 	var caps []byte
 	err := s.pool.QueryRow(ctx, `select
 		b.status = 'active' and s.status in ('trial','active','cancelled') and s.ends_at > now(),
-		p.capabilities
+		b.status <> 'active', p.capabilities
 		from subscriptions s join businesses b on b.id = s.business_id
-		join plans p on p.id = s.plan_id where s.business_id = $1`, bizID).Scan(&a.Active, &caps)
+		join plans p on p.id = s.plan_id where s.business_id = $1`, bizID).Scan(&a.Active, &a.Suspended, &caps)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// genuinely no subscription row — that IS inactive, not a fault
 		return Access{}, nil
@@ -331,6 +330,10 @@ func (s *Service) RequireActive(next http.Handler) http.Handler {
 				"error": "we could not check your plan just now, try again in a moment",
 				"code":  "planCheckUnavailable",
 			})
+			return
+		}
+		if a.Suspended {
+			httpx.JSON(w, http.StatusForbidden, httpx.M{"error": "account suspended, contact support", "code": "accountSuspended"})
 			return
 		}
 		if !a.Active {

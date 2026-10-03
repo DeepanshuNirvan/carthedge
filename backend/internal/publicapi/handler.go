@@ -46,6 +46,7 @@ func (h *Handler) ResolveLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res.Paused = !h.plans.IsActive(r.Context(), res.Business.ID)
+	h.links.CountClick(res.LinkID)
 	httpx.OK(w, res)
 }
 
@@ -60,6 +61,14 @@ func (h *Handler) SendOtp(w http.ResponseWriter, r *http.Request) {
 	phone, ok := httpx.NormalizePhone(in.Phone)
 	if !ok {
 		httpx.Err(w, http.StatusBadRequest, "invalid phone number")
+		return
+	}
+	// the send limit is per store, so an unchecked code would make this a free
+	// OTP relay to any phone
+	var exists bool
+	if h.pool.QueryRow(r.Context(), `select exists(select 1 from businesses where code=$1 and status='active')`,
+		r.PathValue("businessCode")).Scan(&exists); !exists {
+		httpx.Err(w, http.StatusNotFound, "store not found")
 		return
 	}
 	if err := h.otp.Send(r.Context(), r.PathValue("businessCode"), phone, in.Email); err != nil {
@@ -133,14 +142,18 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusUnauthorized, "phone verification required")
 		return
 	}
+	fail := func(status int, msg string) {
+		h.otp.Restore(r.Context(), bizCode, phone, in.OrderToken)
+		httpx.Err(w, status, msg)
+	}
 
 	res, err := h.links.Resolve(r.Context(), bizCode, r.PathValue("token"))
 	if err != nil {
-		httpx.Err(w, http.StatusNotFound, "this link is no longer available")
+		fail(http.StatusNotFound, "this link is no longer available")
 		return
 	}
 	if !h.plans.IsActive(r.Context(), res.Business.ID) {
-		httpx.Err(w, http.StatusForbidden, "this store is temporarily paused")
+		fail(http.StatusForbidden, "this store is temporarily paused")
 		return
 	}
 
@@ -154,14 +167,14 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	} else {
 		refs, err := pickItems(res, in.Items)
 		if err != nil {
-			httpx.Err(w, http.StatusBadRequest, err.Error())
+			fail(http.StatusBadRequest, err.Error())
 			return
 		}
 		params.Refs = refs
 	}
 	o, err := h.orders.Create(r.Context(), params)
 	if err != nil {
-		httpx.Err(w, http.StatusBadRequest, err.Error())
+		fail(http.StatusBadRequest, err.Error())
 		return
 	}
 	next := "pay"

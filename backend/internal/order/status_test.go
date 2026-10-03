@@ -5,7 +5,7 @@ import "testing"
 func TestTransitions(t *testing.T) {
 	allowed := [][2]string{
 		{"new", "confirmed"}, {"new", "cancelled"},
-		{"confirmed", "packed"}, {"packed", "shipped"},
+		{"confirmed", "packed"}, {"confirmed", "shipped"}, {"packed", "shipped"},
 		{"shipped", "delivered"}, {"shipped", "rto"},
 	}
 	for _, tr := range allowed {

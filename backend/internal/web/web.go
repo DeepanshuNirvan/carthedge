@@ -365,10 +365,13 @@ func (h *Handler) abs(url string) string {
 	return h.baseURL + "/" + strings.TrimPrefix(url, "/")
 }
 
+// clamp cuts by rune: descriptions are often Hindi, and a byte cut through a
+// Devanagari character puts invalid UTF-8 into the preview.
 func clamp(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if len(s) <= n {
+	r := []rune(s)
+	if len(r) <= n {
 		return s
 	}
-	return strings.TrimSpace(s[:n]) + "…"
+	return strings.TrimSpace(string(r[:n])) + "…"
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"carthedge/internal/customer"
+	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
 	"carthedge/internal/order"
 	"carthedge/internal/product"
@@ -176,6 +177,16 @@ func (s *Service) ConfirmDraft(ctx context.Context, bizID, draftID string, overr
 	if overrides != nil {
 		data = *overrides
 	}
+	// the model (or a quick edit) wrote these; the ledger keys buyers on the
+	// normalised mobile, and a bad pincode is a failed delivery
+	phone, ok := httpx.NormalizePhone(data.Phone)
+	if !ok {
+		return nil, errors.New("add the buyer's 10-digit mobile number before confirming")
+	}
+	if !httpx.ValidPincode(data.Address.Pincode) {
+		return nil, errors.New("add a valid 6-digit pincode before confirming")
+	}
+	data.Phone = phone
 
 	params := order.CreateParams{
 		BusinessID: bizID, Source: "ai", AiDraftID: draftID, ConversationID: convID,

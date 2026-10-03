@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
@@ -24,6 +25,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, "businessName and ownerName are required")
 		return
 	}
+	in.Email = strings.TrimSpace(in.Email)
 	if !httpx.ValidEmail(in.Email) {
 		httpx.Err(w, http.StatusBadRequest, "invalid email")
 		return
@@ -34,8 +36,8 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Phone = phone
-	if len(in.Password) < 8 {
-		httpx.Err(w, http.StatusBadRequest, "password must be at least 8 characters")
+	if msg := passwordProblem(in.Password); msg != "" {
+		httpx.Err(w, http.StatusBadRequest, msg)
 		return
 	}
 	if in.Pincode != "" && !httpx.ValidPincode(in.Pincode) {
@@ -51,6 +53,11 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		in.WhatsApp = whatsapp
 	}
 	in.Instagram = httpx.NormalizeHandle(in.Instagram)
+	in.UpiID = strings.TrimSpace(in.UpiID)
+	if in.UpiID != "" && !httpx.ValidUPI(in.UpiID) {
+		httpx.Err(w, http.StatusBadRequest, "enter a UPI ID like yourname@okhdfcbank")
+		return
+	}
 	session, err := h.svc.Register(r.Context(), in, middleware.ClientIP(r))
 	switch {
 	case err == nil:
@@ -204,8 +211,8 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	if len(in.Password) < 8 {
-		httpx.Err(w, http.StatusBadRequest, "password must be at least 8 characters")
+	if msg := passwordProblem(in.Password); msg != "" {
+		httpx.Err(w, http.StatusBadRequest, msg)
 		return
 	}
 	if err := h.svc.ResetPassword(r.Context(), in.Token, in.Password); err != nil {
@@ -213,4 +220,16 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// passwordProblem enforces the length rules; bcrypt refuses anything past 72
+// bytes, which used to surface as a 500 "registration failed".
+func passwordProblem(p string) string {
+	switch {
+	case len(p) < 8:
+		return "password must be at least 8 characters"
+	case len(p) > 72:
+		return "password must be at most 72 characters"
+	}
+	return ""
 }

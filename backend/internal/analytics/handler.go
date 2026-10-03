@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"carthedge/internal/events"
@@ -42,10 +43,10 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	var todayOrders, monthOrders, pendingOrders, codAtRisk int
 	var todayRevenue, monthRevenue int64
 	err := h.pool.QueryRow(ctx, `select
-		count(*) filter (where created_at::date = current_date and status <> 'cancelled'),
-		coalesce(sum(total) filter (where created_at::date = current_date and status not in ('cancelled','rto')), 0),
-		count(*) filter (where created_at >= date_trunc('month', now()) and status <> 'cancelled'),
-		coalesce(sum(total) filter (where created_at >= date_trunc('month', now()) and status not in ('cancelled','rto')), 0),
+		count(*) filter (where (created_at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date and status <> 'cancelled'),
+		coalesce(sum(total) filter (where (created_at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date and status not in ('cancelled','rto')), 0),
+		count(*) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') and status <> 'cancelled'),
+		coalesce(sum(total) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') and status not in ('cancelled','rto')), 0),
 		count(*) filter (where status in ('new','confirmed')),
 		count(*) filter (where payment_method='cod' and status in ('new','confirmed','packed','shipped')
 			and (risk_flagged or (cod_confirmed_at is null and payment_status <> 'token_paid')))
@@ -101,7 +102,7 @@ func (h *Handler) rtoSavings(ctx context.Context, bizID string) (httpx.M, error)
 		count(*) filter (where status='rto'),
 		coalesce(avg(total), 0)
 		from orders where business_id=$1 and payment_method='cod'
-		and status in ('delivered','rto') and updated_at >= date_trunc('month', now())`, bizID).Scan(&delivered, &rto, &avgValue)
+		and status in ('delivered','rto') and updated_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')`, bizID).Scan(&delivered, &rto, &avgValue)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func (h *Handler) Sales(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("days") == "90" {
 		days = 90
 	}
-	rows, err := h.pool.Query(ctx, `select created_at::date, count(*), coalesce(sum(total),0)
+	rows, err := h.pool.Query(ctx, `select (created_at at time zone 'Asia/Kolkata')::date, count(*), coalesce(sum(total),0)
 		from orders where business_id=$1 and created_at > now() - make_interval(days => $2)
 		and status not in ('cancelled','rto')
 		group by 1 order by 1`, middleware.BusinessID(ctx), days)
@@ -221,7 +222,7 @@ func (h *Handler) Insights(w http.ResponseWriter, r *http.Request) {
 	best := []seller{}
 	rows, err := h.pool.Query(ctx, `select i->>'name', sum((i->>'qty')::int), sum((i->>'qty')::int * (i->>'price')::int)
 		from orders o, jsonb_array_elements(o.items) i
-		where o.business_id=$1 and o.created_at >= date_trunc('month', now())
+		where o.business_id=$1 and o.created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')
 		and o.status not in ('cancelled','rto')
 		group by 1 order by 3 desc limit 5`, bizID)
 	if err != nil {
@@ -263,15 +264,15 @@ func (h *Handler) Insights(w http.ResponseWriter, r *http.Request) {
 
 	var thisMonth, lastMonth int
 	h.pool.QueryRow(ctx, `select
-		count(distinct customer_id) filter (where created_at >= date_trunc('month', now())),
-		count(distinct customer_id) filter (where created_at >= date_trunc('month', now()) - interval '1 month'
-			and created_at < date_trunc('month', now()))
+		count(distinct customer_id) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')),
+		count(distinct customer_id) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') - interval '1 month'
+			and created_at < (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata'))
 		from orders o where business_id=$1 and status <> 'cancelled'
 		and (select orders_count from customers c where c.id = o.customer_id) > 1`, bizID).Scan(&thisMonth, &lastMonth)
 	out["repeatBuyers"] = httpx.M{"thisMonth": thisMonth, "lastMonth": lastMonth}
 
 	var hour, hourOrders int
-	if h.pool.QueryRow(ctx, `select extract(hour from created_at)::int, count(*) from orders
+	if h.pool.QueryRow(ctx, `select extract(hour from created_at at time zone 'Asia/Kolkata')::int, count(*) from orders
 		where business_id=$1 and created_at > now() - interval '90 days'
 		group by 1 order by 2 desc limit 1`, bizID).Scan(&hour, &hourOrders) == nil {
 		out["suggestedBroadcastWindow"] = httpx.M{
@@ -283,8 +284,8 @@ func (h *Handler) Insights(w http.ResponseWriter, r *http.Request) {
 		var prevDelivered, prevRto int
 		h.pool.QueryRow(ctx, `select count(*) filter (where status='delivered'), count(*) filter (where status='rto')
 			from orders where business_id=$1 and payment_method='cod'
-			and updated_at >= date_trunc('month', now()) - interval '1 month'
-			and updated_at < date_trunc('month', now())`, bizID).Scan(&prevDelivered, &prevRto)
+			and updated_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') - interval '1 month'
+			and updated_at < (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')`, bizID).Scan(&prevDelivered, &prevRto)
 		if prev := prevDelivered + prevRto; prev > 0 {
 			rto["lastMonthPercent"] = prevRto * 100 / prev
 		}
@@ -299,10 +300,10 @@ func (h *Handler) MonthlyReport(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	bizID := middleware.BusinessID(ctx)
 	month := r.URL.Query().Get("month")
-	start, err := time.Parse("2006-01", month)
+	start, err := time.ParseInLocation("2006-01", month, ist)
 	if err != nil {
-		now := time.Now()
-		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		now := time.Now().In(ist)
+		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, ist)
 	}
 	end := start.AddDate(0, 1, 0)
 
@@ -382,9 +383,23 @@ func (h *Handler) exportCSV(w http.ResponseWriter, r *http.Request, bizID string
 			&subtotal, &discount, &shipping, &total, &invoice); err != nil {
 			return // headers are already out; truncate rather than write a broken body
 		}
-		cw.Write([]string{code, createdAt.Format("2006-01-02"), name, phone, city, pincode, method, payStatus, status,
+		cw.Write([]string{code, createdAt.In(ist).Format("2006-01-02"), cell(name), phone, cell(city), pincode, method, payStatus, status,
 			rupees(subtotal), rupees(discount), rupees(shipping), rupees(total), invoice})
 	}
 }
 
 func rupees(paise int) string { return strconv.FormatFloat(float64(paise)/100, 'f', 2, 64) }
+
+// ist is the sellers' clock. The database runs on UTC, so every "today",
+// "this month" and order hour here is taken in Asia/Kolkata explicitly —
+// otherwise orders placed before 05:30 count as yesterday.
+var ist = time.FixedZone("IST", 5*3600+1800)
+
+// cell defuses a buyer-typed value a spreadsheet would run as a formula
+// (=HYPERLINK(...), +cmd, -2+3, @SUM) when the seller opens the export.
+func cell(s string) string {
+	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return "'" + s
+	}
+	return s
+}

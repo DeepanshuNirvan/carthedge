@@ -356,8 +356,10 @@ func (s *Service) SetAIPaused(ctx context.Context, bizID, convID string, paused 
 // nudgeQuiet sends one gentle follow-up to buyers who stopped mid-order,
 // while the messaging window is still open.
 func (s *Service) nudgeQuiet(ctx context.Context) {
-	rows, err := s.pool.Query(ctx, `select c.id, c.business_id, c.channel, b.ai_auto_order
-		from conversations c join businesses b on b.id = c.business_id
+	// claimed by stamping nudged_at up front, so two instances never both
+	// follow up with the same buyer
+	rows, err := s.pool.Query(ctx, `update conversations set nudged_at=now()
+		where id in (select c.id from conversations c join businesses b on b.id = c.business_id
 		where b.ai_auto_reply and b.status='active'
 		  and c.stage in ('open','confirming') and not c.parse_pending
 		  -- an emptied cart is stored as items:null, which jsonb_array_length rejects
@@ -367,7 +369,9 @@ func (s *Service) nudgeQuiet(ctx context.Context) {
 		  and (c.nudged_at is null or c.nudged_at < c.last_inbound_at)
 		  and (select m.author from conversation_messages m where m.conversation_id=c.id
 		       order by m.created_at desc limit 1) = 'ai'
-		limit 20`, nudgeBefore.Seconds(), nudgeAfter.Seconds())
+		limit 20 for update of c skip locked)
+		returning id, business_id, channel,
+		  (select b.ai_auto_order from businesses b where b.id = conversations.business_id)`, nudgeBefore.Seconds(), nudgeAfter.Seconds())
 	if err != nil {
 		s.log.Warn("nudge query failed", "err", err)
 		return

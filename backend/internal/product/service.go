@@ -11,7 +11,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
 
 	"github.com/jackc/pgx/v5"
@@ -141,12 +143,23 @@ type Input struct {
 	Variants      []Variant `json:"variants"`
 }
 
-// qty resolves the tracked quantity; an omitted value leaves stock untracked.
+// qty resolves the tracked quantity; an omitted or negative value (the API
+// returns -1 for untracked) leaves stock untracked.
 func (in *Input) qty() int {
-	if in.StockQty == nil {
+	if in.StockQty == nil || *in.StockQty < 0 {
 		return Untracked
 	}
-	return max(*in.StockQty, 0)
+	return *in.StockQty
+}
+
+// qtyParam is the stock to write on an edit: nil keeps the counted stock.
+// The edit form never carries it, and "absent" used to mean "untracked",
+// wiping real inventory on every save.
+func qtyParam(q *int) any {
+	if q == nil {
+		return nil
+	}
+	return max(*q, Untracked)
 }
 
 // stocked is the in-stock flag: an explicit toggle wins, otherwise a tracked
@@ -202,7 +215,6 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 	if err := in.validate(); err != nil {
 		return nil, err
 	}
-	inStock := in.stocked()
 	images, _ := json.Marshal(orEmpty(in.Images))
 
 	var wasInStock bool
@@ -216,11 +228,16 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `update products set name=$3, description=$4, category=$5, price=$6, reseller_price=$7,
-		compare_price=$8, sku=$9, images=$10::jsonb, in_stock=$11, stock_qty=$12, trending=$13, updated_at=now()
-		where id=$1 and business_id=$2`,
+	// an explicit toggle wins; a given count decides (0 = out); neither keeps it
+	var inStock bool
+	err = tx.QueryRow(ctx, `update products set name=$3, description=$4, category=$5, price=$6, reseller_price=$7,
+		compare_price=$8, sku=$9, images=$10::jsonb,
+		in_stock = coalesce($11, case when $12::int is null then in_stock else $12::int <> 0 end),
+		stock_qty = coalesce($12::int, stock_qty),
+		trending=$13, updated_at=now()
+		where id=$1 and business_id=$2 returning in_stock`,
 		id, bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
-		string(images), inStock, in.qty(), in.Trending)
+		string(images), in.InStock, qtyParam(in.StockQty), in.Trending).Scan(&inStock)
 	if err != nil {
 		return nil, err
 	}
@@ -280,8 +297,10 @@ func (s *Service) SetStock(ctx context.Context, bizID, id string, inStock *bool,
 		return errors.New("stockQty must be -1 (untracked) or a count")
 	}
 	var nowInStock bool
+	// switching a sold-out counted product back on without a count means the
+	// seller manages it by the toggle now; a count of 0 would refuse every order
 	err = s.pool.QueryRow(ctx, `update products set
-		stock_qty = coalesce($3, stock_qty),
+		stock_qty = case when $4 is true and $3::int is null and stock_qty = 0 then -1 else coalesce($3, stock_qty) end,
 		in_stock = coalesce($4, case when coalesce($3, stock_qty) = 0 then false else in_stock end),
 		updated_at = now()
 		where id=$1 and business_id=$2 returning in_stock`, id, bizID, qty, inStock).Scan(&nowInStock)
@@ -436,14 +455,14 @@ func (s *Service) query(ctx context.Context, where, order string, args ...any) (
 	for rows.Next() {
 		var p Product
 		var images, variants []byte
-		var createdAt any
+		var createdAt time.Time
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.ResellerPrice,
 			&p.ComparePrice, &p.Sku, &images, &p.InStock, &p.StockQty, &p.Trending, &p.Active, &createdAt, &variants); err != nil {
 			return nil, err
 		}
 		json.Unmarshal(images, &p.Images)
 		json.Unmarshal(variants, &p.Variants)
-		p.CreatedAt = fmt.Sprint(createdAt)
+		p.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -497,6 +516,9 @@ func (s *Service) Bulk(ctx context.Context, bizID string, inputs []Input) (BulkR
 	return res, nil
 }
 
+// outOfStockWords are what sellers type in a stock sheet's inStock column.
+var outOfStockWords = map[string]bool{"false": true, "0": true, "no": true, "n": true, "out": true}
+
 // csvColumns is the import sheet's layout; name and price are required.
 var csvColumns = []string{"name", "description", "category", "price", "resellerPrice", "sku", "inStock", "stockQty"}
 
@@ -535,7 +557,7 @@ func ParseCSV(r io.Reader) ([]Input, error) {
 			in.Sku = strings.TrimSpace(rec[5])
 		}
 		if len(rec) > 6 && rec[6] != "" {
-			inStock := !strings.EqualFold(strings.TrimSpace(rec[6]), "false")
+			inStock := !outOfStockWords[strings.ToLower(strings.TrimSpace(rec[6]))]
 			in.InStock = &inStock
 		}
 		if len(rec) > 7 && strings.TrimSpace(rec[7]) != "" {
@@ -557,6 +579,12 @@ func (s *Service) ResolveLine(ctx context.Context, bizID, productID, variantID s
 		qty = 1
 	}
 	var l Line
+	if !httpx.ValidID(productID) {
+		return l, ErrNotFound
+	}
+	if variantID != "" && !httpx.ValidID(variantID) {
+		return l, errors.New("variant not found")
+	}
 	var price, resellerPrice int
 	var inStock bool
 	err := s.pool.QueryRow(ctx, `select name, price, reseller_price, in_stock from products
@@ -570,9 +598,7 @@ func (s *Service) ResolveLine(ctx context.Context, bizID, productID, variantID s
 	if !inStock {
 		return l, fmt.Errorf("%s is out of stock", l.Name)
 	}
-	if segment == "reseller" && resellerPrice > 0 {
-		price = resellerPrice
-	}
+	variantPrice := 0
 	if variantID != "" {
 		var vName string
 		var vPrice int
@@ -586,15 +612,26 @@ func (s *Service) ResolveLine(ctx context.Context, bizID, productID, variantID s
 			return l, fmt.Errorf("%s (%s) is out of stock", l.Name, vName)
 		}
 		l.Variant = vName
-		if vPrice > 0 && segment != "reseller" {
-			price = vPrice
-		}
+		variantPrice = vPrice
 	}
 	l.ProductID = productID
 	l.VariantID = variantID
 	l.Qty = qty
-	l.Price = price
+	l.Price = linePrice(price, resellerPrice, variantPrice, segment)
 	return l, nil
+}
+
+// linePrice is what a buyer pays for one unit: a reseller pays the reseller
+// price when the seller set one; everyone else, and a reseller without one,
+// pays the variant's own price when it has one, else the product price.
+func linePrice(price, resellerPrice, variantPrice int, segment string) int {
+	if segment == "reseller" && resellerPrice > 0 {
+		return resellerPrice
+	}
+	if variantPrice > 0 {
+		return variantPrice
+	}
+	return price
 }
 
 // db is satisfied by both *pgxpool.Pool and pgx.Tx, so stock moves can run
@@ -742,11 +779,15 @@ func insertVariants(ctx context.Context, tx pgx.Tx, productID string, variants [
 		if strings.TrimSpace(v.Name) == "" {
 			return errors.New("variant name is required")
 		}
+		// a new row defaults to untracked; an existing one keeps its count
+		// unless the payload names one (the edit form does not)
 		if _, err := tx.Exec(ctx, `insert into product_variants (id, product_id, name, price, sku, in_stock, stock_qty)
-			values (coalesce(nullif($1,'')::uuid, gen_random_uuid()),$2,$3,$4,$5,$6,$7)
+			values (coalesce(nullif($1,'')::uuid, gen_random_uuid()),$2,$3,$4,$5,
+				coalesce($6, coalesce($7::int, -1) <> 0), coalesce($7::int, -1))
 			on conflict (id) do update set name=excluded.name, price=excluded.price, sku=excluded.sku,
-				in_stock=excluded.in_stock, stock_qty=excluded.stock_qty`,
-			v.ID, productID, v.Name, v.Price, v.Sku, v.Stocked(), v.Qty()); err != nil {
+				in_stock = coalesce($6, case when $7::int is null then product_variants.in_stock else $7::int <> 0 end),
+				stock_qty = coalesce($7::int, product_variants.stock_qty)`,
+			v.ID, productID, v.Name, v.Price, v.Sku, v.InStock, qtyParam(v.StockQty)); err != nil {
 			return err
 		}
 	}

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"io"
 	"net/http"
 	"path"
 	"strings"
@@ -18,16 +19,24 @@ var allowedExt = map[string]string{
 	".gif":  "image/gif",
 }
 
+// allowedTypes are the sniffed content types accepted, whatever the extension.
+var allowedTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true, "image/gif": true}
+
 type Handler struct {
 	store Store
 }
 
 func NewHandler(store Store) *Handler { return &Handler{store: store} }
 
+const maxUpload = 5 << 20
+
 // Upload accepts a multipart image (field "file") and returns its public URL.
 // Files are namespaced per business code.
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(5 << 20); err != nil {
+	// ParseMultipartForm's argument only caps memory (the rest spills to disk),
+	// so the size limit has to be on the body itself
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload+64<<10)
+	if err := r.ParseMultipartForm(maxUpload); err != nil {
 		httpx.Err(w, http.StatusBadRequest, "file too large (max 5MB)")
 		return
 	}
@@ -40,8 +49,19 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	ext := strings.ToLower(path.Ext(header.Filename))
 	contentType, ok := allowedExt[ext]
-	if !ok {
-		httpx.Err(w, http.StatusBadRequest, "only jpg, png, webp and gif files are allowed")
+	if !ok || header.Size > maxUpload {
+		httpx.Err(w, http.StatusBadRequest, "only jpg, png, webp and gif files up to 5MB are allowed")
+		return
+	}
+	// the name is the seller's claim; the bytes have to agree
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(file, head)
+	if !allowedTypes[http.DetectContentType(head[:n])] {
+		httpx.Err(w, http.StatusBadRequest, "that file is not a jpg, png, webp or gif image")
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "upload failed")
 		return
 	}
 	key := middleware.BusinessCode(r.Context()) + "/" + secure.Token(12) + ext

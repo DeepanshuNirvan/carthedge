@@ -17,6 +17,12 @@ export const phoneSchema = z
 
 export const pincodeSchema = z.string().regex(/^[1-9]\d{5}$/, 'Enter a valid 6-digit pincode');
 
+/** Mirrors httpx.ValidUPI: handle@psp. Empty is allowed (UPI is optional). */
+export const upiSchema = z
+  .string()
+  .trim()
+  .refine((s) => s === '' || /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9.\-]{1,63}$/.test(s), 'Enter a UPI ID like name@okhdfcbank');
+
 /** Mirrors secure.Slug in Go, so the field preview matches what the API stores. */
 export const storeCodeSlug = (s: string) =>
   s
@@ -35,7 +41,8 @@ export const storeCodeSchema = z
   .regex(/[a-z0-9]$/, 'Cannot end with a hyphen')
   .refine((s) => !s.includes('--'), 'No double hyphens');
 
-export const emailSchema = z.string().email('Enter a valid email');
+// trimmed first: mobile keyboards append a space after an autocompleted address
+export const emailSchema = z.string().trim().email('Enter a valid email');
 
 export const addressSchema = z.object({
   line: z.string().min(6, 'Full address helps delivery succeed'),

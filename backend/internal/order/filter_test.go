@@ -23,7 +23,7 @@ func TestListFilterSQL(t *testing.T) {
 		}
 	}
 	for _, fragment := range []string{"o.status = $2", "o.payment_method = $3", "o.source = $4",
-		"o.created_at >= $5::date", "o.created_at < $6::date + 1", "c.phone like $7"} {
+		"o.created_at >= ($5::date)", "o.created_at < ($6::date + 1)", "c.phone like $7"} {
 		if !strings.Contains(where, fragment) {
 			t.Fatalf("where clause missing %q:\n%s", fragment, where)
 		}

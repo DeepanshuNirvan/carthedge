@@ -2,6 +2,7 @@ package plan
 
 import (
 	"net/http"
+	"strings"
 
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
@@ -80,6 +81,11 @@ func (h *Handler) CustomRequest(w http.ResponseWriter, r *http.Request) {
 		ExpectedOrders int    `json:"expectedOrders"`
 	}
 	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	in.Message = strings.TrimSpace(in.Message)
+	if n := len([]rune(in.Message)); n < 10 || n > 2000 || in.ExpectedOrders < 0 {
+		httpx.Err(w, http.StatusBadRequest, "tell us what you need in 10 to 2000 characters")
 		return
 	}
 	if err := h.svc.CustomRequest(r.Context(), middleware.BusinessID(r.Context()), in.Message, in.ExpectedOrders); err != nil {

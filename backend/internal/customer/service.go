@@ -48,11 +48,13 @@ type Service struct {
 
 func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
-// Upsert creates or refreshes the ledger entry for a buyer and bumps order counters.
-func (s *Service) Upsert(ctx context.Context, bizID, name, phone, email string, addr Address) (*Ref, error) {
+// Upsert creates or refreshes the ledger entry for a buyer and bumps order
+// counters. It runs in the order's transaction, so an order that is refused
+// (stock, offer, payment rules) leaves the ledger untouched.
+func (s *Service) Upsert(ctx context.Context, tx pgx.Tx, bizID, name, phone, email string, addr Address) (*Ref, error) {
 	addrJSON, _ := json.Marshal(addr)
 	var ref Ref
-	err := s.pool.QueryRow(ctx, `insert into customers (business_id, name, phone, email, last_address, orders_count, last_order_at)
+	err := tx.QueryRow(ctx, `insert into customers (business_id, name, phone, email, last_address, orders_count, last_order_at)
 		values ($1,$2,$3,$4,$5::jsonb,1,now())
 		on conflict (business_id, phone) do update set
 			name = excluded.name,

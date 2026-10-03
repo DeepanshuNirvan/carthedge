@@ -199,8 +199,13 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 	if res.Kind != "custom" && len(res.Items) == 0 {
 		return nil, ErrNotFound
 	}
-	go s.pool.Exec(context.Background(), `update order_links set clicks = clicks + 1 where id=$1`, res.LinkID)
 	return &res, nil
+}
+
+// CountClick records one buyer opening the link. Kept out of Resolve, which
+// the order POST calls too — an order is not a second click.
+func (s *Service) CountClick(linkID string) {
+	go s.pool.Exec(context.Background(), `update order_links set clicks = clicks + 1 where id=$1`, linkID)
 }
 
 // OnlinePaymentMode names the prepaid rail a seller can actually collect on.

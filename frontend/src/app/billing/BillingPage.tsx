@@ -3,6 +3,7 @@ import { ArrowUpRight, Check, MessageSquarePlus, Wallet } from 'lucide-react';
 import { subscriptionCheckout, subscriptionVerify, useCancelSubscription, usePlans, useSubscriptionInfo, requestCustomPlan } from '@/api/plans';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRazorpay } from '@/hooks/useRazorpay';
+import { useBusiness } from '@/api/business';
 import { toast } from '@/store/ui';
 import { formatPaise } from '@/lib/money';
 import { formatDate, daysLeft } from '@/lib/date';
@@ -23,6 +24,7 @@ export default function BillingPage() {
   const { data: plans } = usePlans();
   const cancel = useCancelSubscription();
   const openRazorpay = useRazorpay();
+  const { data: business } = useBusiness();
   const qc = useQueryClient();
   const [paying, setPaying] = useState<string | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
@@ -33,7 +35,10 @@ export default function BillingPage() {
     setPaying(planCode);
     try {
       const info = await subscriptionCheckout(planCode);
-      const res = await openRazorpay(info);
+      const res = await openRazorpay(
+        info,
+        business && { name: business.ownerName, contact: business.phone, email: business.email },
+      );
       await subscriptionVerify({
         razorpayOrderId: res.razorpay_order_id,
         razorpayPaymentId: res.razorpay_payment_id,

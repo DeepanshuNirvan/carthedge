@@ -7,6 +7,12 @@ import (
 	"carthedge/internal/middleware"
 )
 
+// input caps for the paid model calls
+const (
+	maxPaste    = 12000
+	maxQuestion = 1000
+)
+
 type Handler struct {
 	svc *Service
 }
@@ -19,6 +25,12 @@ func (h *Handler) Parse(w http.ResponseWriter, r *http.Request) {
 		Conversation string `json:"conversation"`
 	}
 	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	// every character is paid for at the model; a chat this long is a paste of
+	// the whole history, and the order is in the last part of it
+	if len([]rune(in.Conversation)) > maxPaste {
+		httpx.Err(w, http.StatusBadRequest, "that chat is too long — paste just the part with the order (12,000 characters max)")
 		return
 	}
 	draft, err := h.svc.ParseOrder(r.Context(), middleware.BusinessID(r.Context()), in.Conversation)
@@ -73,6 +85,10 @@ func (h *Handler) Reply(w http.ResponseWriter, r *http.Request) {
 		Question string `json:"question"`
 	}
 	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if len([]rune(in.Question)) > maxQuestion {
+		httpx.Err(w, http.StatusBadRequest, "keep the question under 1,000 characters")
 		return
 	}
 	reply, err := h.svc.Reply(r.Context(), middleware.BusinessID(r.Context()), in.Question)

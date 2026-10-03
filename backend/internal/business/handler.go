@@ -1,10 +1,13 @@
 package business
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
+	"carthedge/internal/payment"
 	"carthedge/internal/secure"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -69,65 +72,94 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	bizID := middleware.BusinessID(r.Context())
+	ctx := r.Context()
+	bizID := middleware.BusinessID(ctx)
+	// every field is optional: the profile form sends them all, the quick
+	// settings (COD switch, token, shipping fee, RTO baseline) send one each
 	var in struct {
-		Name               string `json:"name"`
-		OwnerName          string `json:"ownerName"`
-		Phone              string `json:"phone"`
-		WhatsApp           string `json:"whatsapp"`
-		Instagram          string `json:"instagram"`
-		Address            string `json:"address"`
-		City               string `json:"city"`
-		State              string `json:"state"`
-		Pincode            string `json:"pincode"`
-		Gstin              string `json:"gstin"`
-		LogoURL            string `json:"logoUrl"`
-		ShippingFee        *int   `json:"shippingFee"`
-		FreeShippingAbove  *int   `json:"freeShippingAbove"`
-		CodEnabled         *bool  `json:"codEnabled"`
-		CodTokenAmount     *int   `json:"codTokenAmount"`
-		BaselineRtoPercent *int   `json:"baselineRtoPercent"`
+		Name               *string `json:"name"`
+		OwnerName          *string `json:"ownerName"`
+		Phone              *string `json:"phone"`
+		WhatsApp           *string `json:"whatsapp"`
+		Instagram          *string `json:"instagram"`
+		Address            *string `json:"address"`
+		City               *string `json:"city"`
+		State              *string `json:"state"`
+		Pincode            *string `json:"pincode"`
+		Gstin              *string `json:"gstin"`
+		LogoURL            *string `json:"logoUrl"`
+		ShippingFee        *int    `json:"shippingFee"`
+		FreeShippingAbove  *int    `json:"freeShippingAbove"`
+		CodEnabled         *bool   `json:"codEnabled"`
+		CodTokenAmount     *int    `json:"codTokenAmount"`
+		BaselineRtoPercent *int    `json:"baselineRtoPercent"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	if in.Name == "" || in.OwnerName == "" {
+	blank := func(p *string) bool { return p != nil && strings.TrimSpace(*p) == "" }
+	if blank(in.Name) || blank(in.OwnerName) {
 		httpx.Err(w, http.StatusBadRequest, "name and ownerName are required")
 		return
 	}
-	phone, ok := httpx.NormalizePhone(in.Phone)
-	if !ok {
-		httpx.Err(w, http.StatusBadRequest, "invalid phone number")
-		return
+	if in.Phone != nil {
+		phone, ok := httpx.NormalizePhone(*in.Phone)
+		if !ok {
+			httpx.Err(w, http.StatusBadRequest, "invalid phone number")
+			return
+		}
+		// the verified mobile is the account's identity (one trial per number):
+		// swapping it here would free the number for another trial
+		var current string
+		h.pool.QueryRow(ctx, `select phone from businesses where id=$1`, bizID).Scan(&current)
+		if phone != current {
+			httpx.Err(w, http.StatusBadRequest, "your mobile number is your verified login — contact support to change it")
+			return
+		}
 	}
-	if in.Pincode != "" && !httpx.ValidPincode(in.Pincode) {
+	if in.Pincode != nil && *in.Pincode != "" && !httpx.ValidPincode(*in.Pincode) {
 		httpx.Err(w, http.StatusBadRequest, "invalid pincode")
 		return
 	}
-	if in.WhatsApp != "" {
-		whatsapp, ok := httpx.NormalizePhone(in.WhatsApp)
+	if in.WhatsApp != nil && *in.WhatsApp != "" {
+		whatsapp, ok := httpx.NormalizePhone(*in.WhatsApp)
 		if !ok {
 			httpx.Err(w, http.StatusBadRequest, "invalid WhatsApp number")
 			return
 		}
-		in.WhatsApp = whatsapp
+		in.WhatsApp = &whatsapp
 	}
-	in.Instagram = httpx.NormalizeHandle(in.Instagram)
-	_, err := h.pool.Exec(r.Context(), `update businesses set
-		name=$2, owner_name=$3, phone=$4, whatsapp=$5, instagram=$6, address=$7, city=$8, state=$9,
-		pincode=$10, gstin=$11, logo_url=$12,
-		shipping_fee=coalesce($13, shipping_fee),
-		free_shipping_above=coalesce($14, free_shipping_above),
-		cod_enabled=coalesce($15, cod_enabled),
-		cod_token_amount=coalesce($16, cod_token_amount),
-		baseline_rto_percent=coalesce($17, baseline_rto_percent),
+	if in.Instagram != nil {
+		handle := httpx.NormalizeHandle(*in.Instagram)
+		in.Instagram = &handle
+	}
+	for _, amount := range []*int{in.ShippingFee, in.FreeShippingAbove, in.CodTokenAmount} {
+		if amount != nil && *amount < 0 {
+			httpx.Err(w, http.StatusBadRequest, "amounts cannot be negative")
+			return
+		}
+	}
+	if p := in.BaselineRtoPercent; p != nil && (*p < 0 || *p > 100) {
+		httpx.Err(w, http.StatusBadRequest, "baseline RTO must be between 0 and 100 percent")
+		return
+	}
+	_, err := h.pool.Exec(ctx, `update businesses set
+		name=coalesce($2, name), owner_name=coalesce($3, owner_name), whatsapp=coalesce($4, whatsapp),
+		instagram=coalesce($5, instagram), address=coalesce($6, address), city=coalesce($7, city),
+		state=coalesce($8, state), pincode=coalesce($9, pincode), gstin=coalesce($10, gstin),
+		logo_url=coalesce($11, logo_url),
+		shipping_fee=coalesce($12, shipping_fee),
+		free_shipping_above=coalesce($13, free_shipping_above),
+		cod_enabled=coalesce($14, cod_enabled),
+		cod_token_amount=coalesce($15, cod_token_amount),
+		baseline_rto_percent=coalesce($16, baseline_rto_percent),
 		updated_at=now()
 		where id=$1`,
-		bizID, in.Name, in.OwnerName, phone, in.WhatsApp, in.Instagram, in.Address, in.City, in.State,
+		bizID, in.Name, in.OwnerName, in.WhatsApp, in.Instagram, in.Address, in.City, in.State,
 		in.Pincode, in.Gstin, in.LogoURL, in.ShippingFee, in.FreeShippingAbove, in.CodEnabled,
 		in.CodTokenAmount, in.BaselineRtoPercent)
 	if err != nil {
-		// the same mobile / WhatsApp / Instagram cannot sit on two businesses
+		// the same WhatsApp / Instagram cannot sit on two businesses
 		if field, dup := httpx.DuplicateField(err); dup {
 			httpx.Err(w, http.StatusConflict, "this "+field+" already belongs to another business")
 			return
@@ -165,31 +197,73 @@ func (h *Handler) UpdateAI(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdatePayments stores the seller's own Razorpay keys (buyer money goes to
-// the seller's account, never the platform's). Secret is encrypted at rest.
+// the seller's account, never the platform's) and UPI ID. Omitted fields keep
+// their value — the form sends only what the seller touched — and a blank
+// secret keeps the stored one. Secret is encrypted at rest.
 func (h *Handler) UpdatePayments(w http.ResponseWriter, r *http.Request) {
-	bizID := middleware.BusinessID(r.Context())
+	ctx := r.Context()
+	bizID := middleware.BusinessID(ctx)
 	var in struct {
-		RazorpayKeyID     string `json:"razorpayKeyId"`
-		RazorpayKeySecret string `json:"razorpayKeySecret"`
-		UpiID             string `json:"upiId"`
+		RazorpayKeyID     *string `json:"razorpayKeyId"`
+		RazorpayKeySecret *string `json:"razorpayKeySecret"`
+		UpiID             *string `json:"upiId"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	q := `update businesses set razorpay_key_id=$2, upi_id=$3, updated_at=now()`
-	args := []any{bizID, in.RazorpayKeyID, in.UpiID}
-	// a blank secret means "keep the stored one" — the seller can edit the rest of
-	// the form without retyping a key the API never gives back
-	if in.RazorpayKeySecret != "" {
-		enc, err := h.cipher.Encrypt(in.RazorpayKeySecret)
-		if err != nil {
-			httpx.Err(w, http.StatusInternalServerError, "could not store keys")
+	var keyID, secretEnc, upiID string
+	if err := h.pool.QueryRow(ctx, `select razorpay_key_id, razorpay_key_secret, upi_id from businesses where id=$1`,
+		bizID).Scan(&keyID, &secretEnc, &upiID); err != nil {
+		httpx.Err(w, http.StatusNotFound, "business not found")
+		return
+	}
+	if in.UpiID != nil {
+		upiID = strings.TrimSpace(*in.UpiID)
+		if upiID != "" && !httpx.ValidUPI(upiID) {
+			httpx.Err(w, http.StatusBadRequest, "enter a UPI ID like yourname@okhdfcbank")
 			return
 		}
-		q += `, razorpay_key_secret=$4`
-		args = append(args, enc)
 	}
-	if _, err := h.pool.Exec(r.Context(), q+` where id=$1`, args...); err != nil {
+	newKey := keyID
+	if in.RazorpayKeyID != nil {
+		newKey = strings.TrimSpace(*in.RazorpayKeyID)
+	}
+	newSecret := ""
+	if in.RazorpayKeySecret != nil {
+		newSecret = strings.TrimSpace(*in.RazorpayKeySecret)
+	}
+	switch {
+	case newKey == "":
+		secretEnc = "" // removing the key disconnects Razorpay completely
+	case newKey != keyID || newSecret != "":
+		// a changed pair is checked with Razorpay now, not on a buyer's checkout
+		secret := newSecret
+		if secret == "" {
+			secret, _ = h.cipher.Decrypt(secretEnc)
+		}
+		if secret == "" {
+			httpx.Err(w, http.StatusBadRequest, "add the Razorpay key secret too")
+			return
+		}
+		if err := payment.NewClient(newKey, secret).Verify(ctx); err != nil {
+			if errors.Is(err, payment.ErrBadKeys) {
+				httpx.Err(w, http.StatusBadRequest, "Razorpay did not accept these keys — copy the Key ID and Key Secret again from Razorpay Dashboard → API Keys")
+				return
+			}
+			httpx.Err(w, http.StatusBadGateway, "could not reach Razorpay to check the keys — try again")
+			return
+		}
+		if newSecret != "" {
+			enc, err := h.cipher.Encrypt(newSecret)
+			if err != nil {
+				httpx.Err(w, http.StatusInternalServerError, "could not store keys")
+				return
+			}
+			secretEnc = enc
+		}
+	}
+	if _, err := h.pool.Exec(ctx, `update businesses set razorpay_key_id=$2, razorpay_key_secret=$3, upi_id=$4,
+		updated_at=now() where id=$1`, bizID, newKey, secretEnc, upiID); err != nil {
 		httpx.Err(w, http.StatusInternalServerError, "update failed")
 		return
 	}

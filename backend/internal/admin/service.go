@@ -63,8 +63,8 @@ func (s *Service) ChangePassword(ctx context.Context, adminID, current, next str
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(current)) != nil {
 		return errors.New("current password is incorrect")
 	}
-	if len(next) < 8 {
-		return errors.New("new password must be at least 8 characters")
+	if len(next) < 8 || len(next) > 72 {
+		return errors.New("new password must be 8 to 72 characters")
 	}
 	newHash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
 	if err != nil {
@@ -104,7 +104,7 @@ func (s *Service) Overview(ctx context.Context) (httpx.M, error) {
 		return nil, err
 	}
 	err = s.pool.QueryRow(ctx, `select coalesce(sum(amount), 0),
-		coalesce(sum(amount) filter (where created_at > date_trunc('month', now())), 0)
+		coalesce(sum(amount) filter (where created_at > date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata'), 0)
 		from payments where kind = 'subscription' and status = 'paid'`).Scan(
 		ptr(out, "revenueTotal"), ptr(out, "revenueThisMonth"))
 	if err != nil {
@@ -253,8 +253,10 @@ func (s *Service) AssignPlan(ctx context.Context, bizID, planCode string, custom
 	if extendDays < 0 || extendDays > 730 {
 		return errors.New("extendDays must be between 0 and 730")
 	}
+	// a different plan is a new quota period; extending the same one is not
 	ct, err := s.pool.Exec(ctx, `update subscriptions set
 		plan_id = (select id from plans where code=$2 and active),
+		starts_at = case when plan_id = (select id from plans where code=$2) then starts_at else now() end,
 		custom_price = $3,
 		status = 'active',
 		ends_at = greatest(ends_at, now()) + make_interval(days => $4),

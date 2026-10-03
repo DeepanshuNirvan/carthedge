@@ -88,6 +88,39 @@ func (c *Client) SignedUser(raw string) (string, bool) {
 	return "", false
 }
 
+// Owns checks that a token speaks for the account id a seller typed in. The
+// id is the webhook routing key: without this, a seller could enter another
+// shop's number or Instagram id and receive that shop's buyer DMs.
+func (c *Client) Owns(ctx context.Context, channel, externalID, token string) error {
+	switch channel {
+	case "instagram":
+		var me igMe
+		if err := c.getJSON(ctx, "https://graph.instagram.com/"+c.version+"/me?"+url.Values{
+			"fields": {"user_id"}, "access_token": {token},
+		}.Encode(), &me); err != nil {
+			return err
+		}
+		if id, _ := me.account(); id != externalID {
+			return errors.New("the token belongs to another Instagram account")
+		}
+	case "whatsapp":
+		var number struct {
+			ID string `json:"id"`
+		}
+		if err := c.getJSON(ctx, "https://graph.facebook.com/"+c.version+"/"+url.PathEscape(externalID)+"?"+url.Values{
+			"fields": {"id"}, "access_token": {token},
+		}.Encode(), &number); err != nil {
+			return err
+		}
+		if number.ID != externalID {
+			return errors.New("the token cannot reach this WhatsApp number")
+		}
+	default:
+		return errors.New("channel must be whatsapp or instagram")
+	}
+	return nil
+}
+
 // SubscribeInstagram turns on webhook delivery for one connected account.
 // Configuring the callback on the app is not enough under Instagram Login:
 // each account must subscribe, or its DMs never reach /webhooks/meta.

@@ -105,7 +105,9 @@ func Auth(secret string) Middleware {
 			bizID, _ := claims["sub"].(string)
 			bizCode, _ := claims["biz"].(string)
 			role, _ := claims["role"].(string)
-			if bizID == "" || role != "" {
+			// access tokens always carry the store code; the OAuth state shares
+			// the secret and the sub claim, and must not pass for a login
+			if bizID == "" || bizCode == "" || role != "" {
 				httpx.Err(w, http.StatusUnauthorized, "invalid token claims")
 				return
 			}
@@ -192,11 +194,11 @@ func SecurityHeaders(production bool) Middleware {
 	csp := strings.Join([]string{
 		"default-src 'self'",
 		// Razorpay's checkout injects its own inline bootstrap
-		"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
+		"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com",
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: blob: https:",
 		"font-src 'self' data:",
-		"connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com",
+		"connect-src 'self' https://*.razorpay.com",
 		"frame-src https://api.razorpay.com https://checkout.razorpay.com",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
@@ -244,9 +246,12 @@ func RateLimit(rdb *redis.Client, name string, limit int, window time.Duration, 
 // AI routes, where one seller must not be able to burn the whole budget.
 func BusinessKey(r *http.Request) string { return BusinessID(r.Context()) }
 
+// ClientIP keys rate limits. Render serves through Cloudflare, which overwrites
+// CF-Connecting-IP with the address it saw; X-Forwarded-For keeps whatever the
+// client sent in front of the proxies' entries, so it is never trusted here.
 func ClientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		return strings.TrimSpace(strings.Split(fwd, ",")[0])
+	if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
+		return ip
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -264,3 +269,13 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
+
+// Flush and Unwrap keep the SSE stream working through this wrapper:
+// http.Flusher and http.ResponseController both look for them.
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }

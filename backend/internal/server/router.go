@@ -3,6 +3,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"carthedge/internal/admin"
@@ -69,6 +70,9 @@ func New(d Deps) http.Handler {
 	}
 
 	handle := func(pattern string, fn http.HandlerFunc, mws ...middleware.Middleware) {
+		if strings.Contains(pattern, "{id}") {
+			fn = requireID(fn)
+		}
 		mux.Handle(pattern, middleware.Chain(fn, mws...))
 	}
 
@@ -185,7 +189,15 @@ func New(d Deps) http.Handler {
 	// uploads
 	handle("POST /api/v1/uploads", d.Uploads.Upload, authed, active)
 	if d.Cfg.StorageDriver == "local" {
-		mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(d.Cfg.UploadDir))))
+		files := http.StripPrefix("/uploads/", http.FileServer(http.Dir(d.Cfg.UploadDir)))
+		mux.HandleFunc("GET /uploads/", func(w http.ResponseWriter, r *http.Request) {
+			// files only: a folder listing would enumerate every store and image
+			if strings.HasSuffix(r.URL.Path, "/") {
+				http.NotFound(w, r)
+				return
+			}
+			files.ServeHTTP(w, r)
+		})
 	}
 
 	// platform admin (CartHedge staff)
@@ -254,4 +266,16 @@ func New(d Deps) http.Handler {
 		middleware.CORS(d.Cfg.CORSOrigins),
 		middleware.Logging(d.Log),
 	)
+}
+
+// requireID answers a malformed {id} with a plain 404 before any handler runs,
+// instead of Postgres' "invalid input syntax for type uuid" leaking out.
+func requireID(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !httpx.ValidID(r.PathValue("id")) {
+			httpx.Err(w, http.StatusNotFound, "not found")
+			return
+		}
+		fn(w, r)
+	}
 }

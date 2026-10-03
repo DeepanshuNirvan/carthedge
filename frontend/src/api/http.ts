@@ -95,6 +95,8 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     if (res.status === 401 && auth === 'seller') useAuth.getState().clear();
     if (res.status === 401 && auth === 'admin') useAdminAuth.getState().clear();
     if (res.status === 402 && code === 'subscriptionExpired') useUi.getState().setPaywall(true);
+    // suspension is not a billing problem: sign out, and login explains it
+    if (res.status === 403 && code === 'accountSuspended') useAuth.getState().clear();
     if (res.status === 429) message = 'Too many attempts, take a breath and retry in a minute.';
     throw new ApiError(res.status, message, code);
   }

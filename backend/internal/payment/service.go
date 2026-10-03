@@ -17,6 +17,7 @@ import (
 	"carthedge/internal/order"
 	"carthedge/internal/secure"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -55,6 +56,9 @@ type CheckoutInfo struct {
 	UpiIntent string `json:"upiIntent,omitempty"`
 }
 
+// closedStatuses are orders nobody should be charged for any more.
+var closedStatuses = map[string]bool{"cancelled": true, "rto": true, "delivered": true}
+
 // UpiIntent builds the standard NPCI deep link every Indian UPI app accepts.
 // Amount is in rupees with two decimals — the one place paise are formatted.
 func UpiIntent(vpa, payeeName, orderCode string, paise int) string {
@@ -74,17 +78,20 @@ func (s *Service) BuyerCheckout(ctx context.Context, orderCode, kind string) (*C
 	if kind != "order" && kind != "token" {
 		return nil, errors.New("kind must be order or token")
 	}
-	var orderID, bizID, bizName, keyID, secretEnc, upiID, paymentMethod, paymentStatus string
+	var orderID, bizID, bizName, keyID, secretEnc, upiID, paymentMethod, paymentStatus, status string
 	var total, tokenAmount int
 	err := s.pool.QueryRow(ctx, `select o.id, o.business_id, b.name, b.razorpay_key_id, b.razorpay_key_secret,
-		b.upi_id, o.payment_method, o.payment_status, o.total, o.token_amount
+		b.upi_id, o.payment_method, o.payment_status, o.status, o.total, o.token_amount
 		from orders o join businesses b on b.id = o.business_id where o.order_code = $1`, orderCode).Scan(
-		&orderID, &bizID, &bizName, &keyID, &secretEnc, &upiID, &paymentMethod, &paymentStatus, &total, &tokenAmount)
+		&orderID, &bizID, &bizName, &keyID, &secretEnc, &upiID, &paymentMethod, &paymentStatus, &status, &total, &tokenAmount)
 	if err != nil {
 		return nil, errors.New("order not found")
 	}
 	if paymentStatus == "paid" || paymentStatus == "token_paid" {
 		return nil, errors.New("order is already paid")
+	}
+	if closedStatuses[status] {
+		return nil, errors.New("this order is " + status + " and can no longer be paid")
 	}
 	amount := total
 	if kind == "token" {
@@ -130,9 +137,10 @@ func (s *Service) ClaimUpiPayment(ctx context.Context, orderCode, ref string) er
 	var orderID, bizID string
 	err := s.pool.QueryRow(ctx, `update orders set payment_ref=$2, payment_status='claimed', updated_at=now()
 		where order_code=$1 and payment_status in ('pending','failed','claimed')
+		and status not in ('cancelled','rto','delivered')
 		returning id, business_id`, orderCode, ref).Scan(&orderID, &bizID)
 	if err != nil {
-		return errors.New("order not found, or it is already paid")
+		return errors.New("order not found, already paid, or no longer open")
 	}
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'new',$2)`,
 		orderID, "buyer reported a UPI payment, ref "+ref)
@@ -251,52 +259,78 @@ func (s *Service) Webhook(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	entity := event.Payload.Payment.Entity
-	ok, _ := s.rdb.SetNX(ctx, "webhook:"+entity.ID, "1", 0).Result()
-	if !ok {
-		httpx.OK(w, httpx.M{"ok": true})
-		return
-	}
-
-	var paymentID, kind, status, bizID string
+	var paymentID, kind, bizID string
 	var orderID *string
 	var notes []byte
-	err = s.pool.QueryRow(ctx, `select id, kind, status, business_id, order_id, notes from payments
-		where razorpay_order_id = $1`, entity.OrderID).Scan(&paymentID, &kind, &status, &bizID, &orderID, &notes)
-	if err != nil || status == "paid" {
-		httpx.OK(w, httpx.M{"ok": true})
+	if err := s.pool.QueryRow(ctx, `select id, kind, business_id, order_id, notes from payments
+		where razorpay_order_id = $1`, entity.OrderID).Scan(&paymentID, &kind, &bizID, &orderID, &notes); err != nil {
+		httpx.OK(w, httpx.M{"ok": true}) // not one of ours
 		return
 	}
-	ct, _ := s.pool.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
+	// the pending → paid flip is the idempotency guard: a retry, or a client
+	// verify that got here first, finds nothing to flip. Anything that fails
+	// before commit answers 500 so Razorpay retries it.
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "retry")
+		return
+	}
+	defer tx.Rollback(ctx)
+	ct, err := tx.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
 		where id=$1 and status<>'paid'`, paymentID, entity.ID)
-	if ct.RowsAffected() == 0 { // client-side verify beat us here; side-effects already ran
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "retry")
+		return
+	}
+	if ct.RowsAffected() == 0 {
 		httpx.OK(w, httpx.M{"ok": true})
 		return
 	}
-
-	switch kind {
-	case "order", "token":
-		if orderID != nil {
-			if err := s.orders.MarkPaid(ctx, *orderID, kind); err != nil {
-				s.log.Error("webhook markPaid failed", "orderId", *orderID, "err", err)
-			}
-		}
-	case "subscription":
+	if kind == "subscription" {
 		var meta struct {
 			PlanCode string `json:"planCode"`
 		}
 		json.Unmarshal(notes, &meta)
-		// same activation as plan.VerifyCheckout; webhook is the safety net
-		_, err := s.pool.Exec(ctx, `update subscriptions set
-			plan_id = (select id from plans where code = $2),
-			status = 'active',
-			ends_at = greatest(ends_at, now()) + interval '30 days',
-			updated_at = now()
-			where business_id = $1`, bizID, meta.PlanCode)
-		if err != nil {
+		if err := ActivateSubscription(ctx, tx, bizID, meta.PlanCode); err != nil {
 			s.log.Error("webhook subscription activate failed", "businessId", bizID, "err", err)
-		} else {
-			s.rdb.Del(ctx, "sub:"+bizID)
+			httpx.Err(w, http.StatusInternalServerError, "retry")
+			return
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "retry")
+		return
+	}
+	switch {
+	case kind == "subscription":
+		s.rdb.Del(ctx, "sub:"+bizID)
+	case orderID != nil:
+		if err := s.orders.MarkPaid(ctx, *orderID, kind); err != nil {
+			s.log.Error("webhook markPaid failed", "orderId", *orderID, "err", err)
 		}
 	}
 	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// ActivateSubscription switches the plan, starts a fresh usage period (overage
+// is counted from here) and extends by 30 days from now or the current expiry,
+// whichever is later. A negotiated price only survives renewing the same plan.
+// Shared by the client verify (plan package) and the webhook, inside the
+// transaction that flips the payment to paid.
+func ActivateSubscription(ctx context.Context, tx pgx.Tx, bizID, planCode string) error {
+	ct, err := tx.Exec(ctx, `update subscriptions set
+		plan_id = (select id from plans where code = $2),
+		custom_price = case when plan_id = (select id from plans where code = $2) then custom_price end,
+		status = 'active',
+		starts_at = now(),
+		ends_at = greatest(ends_at, now()) + interval '30 days',
+		updated_at = now()
+		where business_id = $1`, bizID, planCode)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return errors.New("subscription not found")
+	}
+	return nil
 }

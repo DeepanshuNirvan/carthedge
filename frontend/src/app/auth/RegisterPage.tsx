@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Smartphone, X } from 'lucide-react';
 import type { StoreCodeStatus } from '@/api/types';
 import { Seo } from '@/lib/seo';
-import { emailSchema, phoneSchema, pincodeSchema, storeCodeSchema, storeCodeSlug } from '@/lib/validators';
+import { emailSchema, phoneSchema, pincodeSchema, storeCodeSchema, storeCodeSlug, upiSchema } from '@/lib/validators';
 import { checkStoreCode, register as apiRegister, sendSignupOtp, verifySignupOtp } from '@/api/auth';
 import { ApiError } from '@/api/http';
 import { toast } from '@/store/ui';
@@ -30,7 +30,7 @@ const registerSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   pincode: pincodeSchema.optional().or(z.literal('')),
-  upiId: z.string().optional(),
+  upiId: upiSchema.optional(),
 });
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -381,7 +381,7 @@ export default function RegisterPage() {
                 <Field label="Pincode" optional error={errors.pincode?.message}>
                   <Input inputMode="numeric" {...register('pincode')} />
                 </Field>
-                <Field label="UPI ID" optional>
+                <Field label="UPI ID" optional error={errors.upiId?.message}>
                   <Input placeholder="you@upi" {...register('upiId')} />
                 </Field>
               </div>

@@ -136,4 +136,16 @@ func DuplicateField(err error) (string, bool) {
 
 var pincodeRe = regexp.MustCompile(`^[1-9][0-9]{5}$`)
 
+// upiRe is the shape of a UPI virtual payment address (handle@psp).
+var upiRe = regexp.MustCompile(`^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9.\-]{1,63}$`)
+
+// ValidUPI reports whether s looks like a UPI ID a buyer's app can pay.
+func ValidUPI(s string) bool { return upiRe.MatchString(s) }
+
 func ValidPincode(s string) bool { return pincodeRe.MatchString(s) }
+
+var idRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// ValidID reports whether s is a row id (UUID). Checked before the database
+// sees it, so a malformed id is a 404 instead of a leaked Postgres error.
+func ValidID(s string) bool { return idRe.MatchString(s) }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 
@@ -22,6 +23,10 @@ import (
 )
 
 var ErrNotFound = errors.New("order not found")
+
+// maxLineQty caps one order line: social-commerce orders are a few pieces, and
+// an absurd quantity on an untracked product would overflow the money columns.
+const maxLineQty = 999
 
 type Event struct {
 	Status    string `json:"status"`
@@ -161,7 +166,24 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 		return nil, errors.New("this seller is not set up for online payments yet — choose cash on delivery")
 	}
 
-	cust, err := s.customers.Upsert(ctx, p.BusinessID, p.Name, p.Phone, p.Email, p.Address)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	// claim the draft first: a second tap on Confirm waits here and then finds
+	// it taken, instead of placing a duplicate order
+	if p.AiDraftID != "" {
+		ct, err := tx.Exec(ctx, `update ai_drafts set status='confirmed' where id=$1 and business_id=$2 and status='pending'`,
+			p.AiDraftID, p.BusinessID)
+		if err != nil {
+			return nil, err
+		}
+		if ct.RowsAffected() == 0 {
+			return nil, errors.New("this draft was already confirmed or discarded")
+		}
+	}
+	cust, err := s.customers.Upsert(ctx, tx, p.BusinessID, p.Name, p.Phone, p.Email, p.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +208,11 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	if len(lines) == 0 {
 		return nil, errors.New("order has no items")
 	}
+	for _, l := range lines {
+		if l.Qty > maxLineQty {
+			return nil, fmt.Errorf("%s: at most %d per order", l.Name, maxLineQty)
+		}
+	}
 
 	subtotal := 0
 	for _, l := range lines {
@@ -201,6 +228,9 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 		shippingFee = 0
 	}
 	total := subtotal - discount + shippingFee
+	if total > math.MaxInt32 { // the money columns are int4
+		return nil, errors.New("order total is too large for one order")
+	}
 
 	tokenAmount := 0
 	if p.PaymentMethod == "cod" {
@@ -222,12 +252,6 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	// COD order already; a second confirmation link would only add friction.
 	// A configured COD token still goes out: that is a payment, not a question.
 	chatCodConfirmed := p.ConversationID != "" && p.PaymentMethod == "cod" && tokenAmount == 0
-
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
 
 	var orderID string
 	err = tx.QueryRow(ctx, `insert into orders (business_id, order_code, link_id, customer_id, items, subtotal,
@@ -264,7 +288,7 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 		tx.Exec(ctx, `update order_links set orders_count = orders_count + 1 where id=$1`, p.LinkID)
 	}
 	if p.AiDraftID != "" {
-		tx.Exec(ctx, `update ai_drafts set status='confirmed', order_id=$2 where id=$1 and business_id=$3`, p.AiDraftID, orderID, p.BusinessID)
+		tx.Exec(ctx, `update ai_drafts set order_id=$2 where id=$1`, p.AiDraftID, orderID)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -468,8 +492,14 @@ func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note
 		return nil, fmt.Errorf("cannot move order from %s to %s", status, newStatus)
 	}
 
-	if _, err := s.pool.Exec(ctx, `update orders set status=$2, updated_at=now() where id=$1`, orderID, newStatus); err != nil {
+	// guarded on the status just read: two clicks (or two tabs) racing to
+	// cancel must not both restock
+	ct, err := s.pool.Exec(ctx, `update orders set status=$2, updated_at=now() where id=$1 and status=$3`, orderID, newStatus, status)
+	if err != nil {
 		return nil, err
+	}
+	if ct.RowsAffected() == 0 {
+		return nil, errors.New("this order was just updated — refresh and try again")
 	}
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,$2,$3)`, orderID, newStatus, note)
 
@@ -503,6 +533,9 @@ func (s *Service) Ship(ctx context.Context, bizID, orderID, courierName, trackin
 	o, err := s.GetByID(ctx, bizID, orderID)
 	if err != nil {
 		return nil, err
+	}
+	if !CanTransition(o.Status, "shipped") {
+		return nil, fmt.Errorf("cannot ship an order that is %s", o.Status)
 	}
 	if courierName == "" {
 		if !s.courier.Enabled() {
@@ -614,11 +647,12 @@ func (f ListFilter) sql(bizID string) (string, []any) {
 	if f.RiskOnly {
 		where += " and (o.risk_flagged or (o.payment_method='cod' and o.cod_confirmed_at is null and o.payment_status <> 'token_paid'))"
 	}
+	// the seller picks dates on an Indian calendar; the column is UTC
 	if f.From != "" {
-		add("o.created_at >= $%d::date", f.From)
+		add("o.created_at >= ($%d::date)::timestamp at time zone 'Asia/Kolkata'", f.From)
 	}
 	if f.To != "" {
-		add("o.created_at < $%d::date + 1", f.To)
+		add("o.created_at < ($%d::date + 1)::timestamp at time zone 'Asia/Kolkata'", f.To)
 	}
 	if f.Search != "" {
 		args = append(args, "%"+f.Search+"%")

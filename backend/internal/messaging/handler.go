@@ -209,6 +209,12 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
+	// typed by hand, so proven before it becomes a routing key (OAuth reads
+	// the id from the token itself)
+	if err := h.client.Owns(r.Context(), in.Channel, in.ExternalID, in.AccessToken); err != nil {
+		httpx.Err(w, http.StatusBadRequest, "that access token does not belong to this account id: "+err.Error())
+		return
+	}
 	if err := h.svc.ConnectChannel(r.Context(), middleware.BusinessID(r.Context()),
 		in.Channel, in.ExternalID, in.AccessToken, in.DisplayName); err != nil {
 		httpx.Err(w, http.StatusBadRequest, err.Error())

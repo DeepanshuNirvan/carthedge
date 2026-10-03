@@ -447,7 +447,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
               </div>
             )}
 
-            <Link to={`/o/${placed.orderCode}`} className={buttonLink('secondary')}>
+            <Link to={`/o/${placed.orderCode}`} state={{ phone }} className={buttonLink('secondary')}>
               Track this order
             </Link>
           </motion.div>

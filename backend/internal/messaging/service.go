@@ -298,8 +298,14 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 // draft for the seller as before. A few run at once so one slow model call
 // does not hold up every other buyer.
 func (s *Service) ingestDue(ctx context.Context) {
-	rows, err := s.pool.Query(ctx, `select id, business_id, channel from conversations
-		where parse_pending and last_inbound_at < now() - make_interval(secs => $1) limit 20`, lull.Seconds())
+	// claim and clear in one statement: with two instances up (a deploy
+	// overlap) select-then-update let both answer the same buyer. Clearing
+	// before the turn also means a failing turn (no LLM key) never loops.
+	rows, err := s.pool.Query(ctx, `update conversations set parse_pending=false
+		where id in (select id from conversations
+			where parse_pending and last_inbound_at < now() - make_interval(secs => $1)
+			limit 20 for update skip locked)
+		returning id, business_id, channel`, lull.Seconds())
 	if err != nil {
 		return
 	}
@@ -315,8 +321,6 @@ func (s *Service) ingestDue(ctx context.Context) {
 	sem := make(chan struct{}, 4)
 	var wg sync.WaitGroup
 	for _, c := range due {
-		// clear the flag first so a failing turn (e.g. no LLM key) never loops
-		s.pool.Exec(ctx, `update conversations set parse_pending=false where id=$1`, c.id)
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(c dueConv) {
