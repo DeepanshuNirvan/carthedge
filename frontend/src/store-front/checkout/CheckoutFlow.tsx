@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BadgeCheck, Banknote, CreditCard, MapPinOff, ShieldCheck, Smartphone, Truck } from 'lucide-react';
-import type { Address, CheckoutInfo, OnlinePayment, OrderRef, PlacedOrder } from '@/api/types';
+import { BadgeCheck, Banknote, CreditCard, MapPinOff, ShieldCheck, Smartphone, Tag, Truck } from 'lucide-react';
+import type { Address, CheckoutInfo, OnlinePayment, OrderRef, PlacedOrder, Quote } from '@/api/types';
 import {
   buyerPay,
   buyerVerifyPayment,
+  fetchQuote,
   placeLinkOrder,
   placeStoreOrder,
   sendOtp,
@@ -45,6 +46,7 @@ const steps = ['Details', 'Verify', 'Pay'];
 const stepIndex: Record<Step, number> = { details: 0, otp: 1, payment: 2, done: 3 };
 
 const emptyAddress: Address = { line: '', city: '', state: '', pincode: '' };
+const gstinShape = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: () => void }) {
   const [step, setStep] = useState<Step>('details');
@@ -62,9 +64,17 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
   // set when the seller collects on UPI instead of a gateway
   const [upiInfo, setUpiInfo] = useState<CheckoutInfo | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
+  // the server prices the cart (coupon, reseller price, free shipping, COD
+  // charge, online discount); the page only shows what it says
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [coupon, setCoupon] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [gstOpen, setGstOpen] = useState(false);
+  const [buyerGstin, setBuyerGstin] = useState('');
+  const [buyerCompany, setBuyerCompany] = useState('');
 
   const openRazorpay = useRazorpay();
-  const total = ctx.subtotal + ctx.shippingFee;
 
   const { data: reach, isFetching: checkingPincode } = useServiceability(ctx.businessCode, address.pincode, ctx.codEnabled);
   const undeliverable = reach?.checked === true && !reach.serviceable;
@@ -72,12 +82,46 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
   const codAvailable = ctx.codEnabled && (reach?.checked !== true || reach.codAvailable);
   const prepaidAvailable = ctx.onlinePayment !== 'none';
   const [method, setMethod] = useState<'prepaid' | 'cod'>(prepaidAvailable ? 'prepaid' : 'cod');
+  const codAllowed = codAvailable && quote?.codAvailable !== false;
+  const totals = quote ? quote[method] : null;
+  const total = totals?.total ?? ctx.subtotal + ctx.shippingFee;
+
+  const loadQuote = async (offerCode: string, token = orderToken) => {
+    const q = await fetchQuote(ctx.businessCode, {
+      items: ctx.items,
+      linkToken: ctx.linkToken,
+      offerCode: offerCode || undefined,
+      phone,
+      orderToken: token || undefined,
+    });
+    setQuote(q);
+    return q;
+  };
+
+  const applyCoupon = async () => {
+    const code = coupon.trim().toUpperCase();
+    setApplying(true);
+    setCouponError('');
+    try {
+      const q = await loadQuote(code);
+      if (q.offerError) {
+        setCouponError(q.offerError);
+        await loadQuote('');
+      } else if (code) {
+        toast('success', `${code} applied`);
+      }
+    } catch (e) {
+      setCouponError(e instanceof Error ? e.message : 'Could not check this code');
+    } finally {
+      setApplying(false);
+    }
+  };
 
   // never leave a method selected that this seller cannot actually accept
   useEffect(() => {
-    if (!codAvailable && method === 'cod' && prepaidAvailable) setMethod('prepaid');
+    if (!codAllowed && method === 'cod' && prepaidAvailable) setMethod('prepaid');
     if (!prepaidAvailable && method === 'prepaid') setMethod('cod');
-  }, [codAvailable, prepaidAvailable, method]);
+  }, [codAllowed, prepaidAvailable, method]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -119,8 +163,10 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
     if (otp.length < 4) return;
     setBusy(true);
     try {
-      const res = await verifyOtp(ctx.businessCode, phone, otp);
+      const res = await verifyOtp(ctx.businessCode, phone, otp, { items: ctx.items, linkToken: ctx.linkToken });
       setOrderToken(res.orderToken);
+      // a verified buyer gets their own price (reseller) and coupon limits
+      loadQuote('', res.orderToken).catch(() => setQuote(null));
       // repeat buyers get their saved details back
       if (res.prefill) {
         if (res.prefill.name && !name) setName(res.prefill.name);
@@ -147,6 +193,9 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
         items: ctx.items,
         paymentMethod: method,
         notes: notes || undefined,
+        offerCode: quote?.offerCode && !quote.offerError ? quote.offerCode : undefined,
+        buyerGstin: gstOpen && buyerGstin.trim() ? buyerGstin.trim().toUpperCase() : undefined,
+        buyerCompany: gstOpen && buyerCompany.trim() ? buyerCompany.trim() : undefined,
       };
       const order = ctx.linkToken
         ? await placeLinkOrder(ctx.businessCode, ctx.linkToken, input)
@@ -285,6 +334,14 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
             <Button size="lg" loading={busy} disabled={undeliverable} onClick={requestOtp}>
               Continue
             </Button>
+            {/* notice at collection (DPDP Act): what the details are for */}
+            <p className="text-center text-xs leading-relaxed text-low">
+              {ctx.businessName} uses these details to deliver this order and message you about it, including one reminder if you
+              verify your number but don’t finish.{' '}
+              <Link to="/privacy" target="_blank" className="underline underline-offset-2 hover:text-mid">
+                How your data is handled
+              </Link>
+            </p>
           </motion.div>
         )}
 
@@ -331,18 +388,69 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
               <dl className="flex flex-col gap-1.5 text-sm">
                 <div className="flex justify-between text-mid">
                   <dt>Items</dt>
-                  <dd><MoneyText paise={ctx.subtotal} /></dd>
+                  <dd><MoneyText paise={totals?.subtotal ?? ctx.subtotal} /></dd>
                 </div>
+                {!!totals?.discount && (
+                  <div className="flex justify-between text-jade-ink">
+                    <dt>Coupon {quote?.offerCode}</dt>
+                    <dd>-<MoneyText paise={totals.discount} /></dd>
+                  </div>
+                )}
+                {!!totals?.prepaidDiscount && (
+                  <div className="flex justify-between text-jade-ink">
+                    <dt>Online payment discount</dt>
+                    <dd>-<MoneyText paise={totals.prepaidDiscount} /></dd>
+                  </div>
+                )}
                 <div className="flex justify-between text-mid">
                   <dt>Shipping</dt>
-                  <dd>{ctx.shippingFee > 0 ? <MoneyText paise={ctx.shippingFee} /> : 'Free'}</dd>
+                  <dd>{(totals?.shipping ?? ctx.shippingFee) > 0 ? <MoneyText paise={totals?.shipping ?? ctx.shippingFee} /> : 'Free'}</dd>
                 </div>
+                {!!totals?.codFee && (
+                  <div className="flex justify-between text-mid">
+                    <dt>Cash on delivery charge</dt>
+                    <dd><MoneyText paise={totals.codFee} /></dd>
+                  </div>
+                )}
                 <div className="flex justify-between border-t pt-2 font-semibold text-hi">
                   <dt>Total</dt>
                   <dd><MoneyText paise={total} /></dd>
                 </div>
               </dl>
             </div>
+
+            <form
+              className="flex flex-col gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                applyCoupon();
+              }}
+            >
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Tag className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" aria-hidden />
+                  <Input
+                    aria-label="Coupon code"
+                    placeholder="Coupon code"
+                    autoCapitalize="characters"
+                    value={coupon}
+                    onChange={(e) => {
+                      setCoupon(e.target.value);
+                      setCouponError('');
+                    }}
+                    className="pl-10 uppercase"
+                  />
+                </div>
+                <Button type="submit" variant="secondary" loading={applying} disabled={!coupon.trim() && !quote?.offerCode}>
+                  {quote?.offerCode && coupon.trim().toUpperCase() === quote.offerCode ? 'Applied' : 'Apply'}
+                </Button>
+              </div>
+              {couponError && (
+                <p role="alert" className="text-xs font-medium text-danger-ink">
+                  {couponError}
+                </p>
+              )}
+            </form>
 
             <fieldset>
               <legend className="mb-2 text-sm font-medium text-hi">Payment method</legend>
@@ -361,6 +469,11 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                         {ctx.onlinePayment === 'upi' ? 'Pay now by UPI' : 'Pay now by UPI or card'}
                       </span>
                       <span className="block text-xs text-low">
+                        {quote?.prepaid.prepaidDiscount ? (
+                          <span className="font-medium text-jade-ink">
+                            Save <MoneyText paise={quote.prepaid.prepaidDiscount} className="text-xs" />.{' '}
+                          </span>
+                        ) : null}
                         {ctx.onlinePayment === 'upi'
                           ? `GPay, PhonePe or Paytm, straight to ${ctx.businessName}`
                           : 'Fastest dispatch, secured by Razorpay'}
@@ -370,7 +483,12 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   </button>
                 )}
 
-                {codAvailable && (
+                {codAvailable && !codAllowed && quote?.codLimit ? (
+                  <p className="rounded-lg p-4 text-xs text-low neu">
+                    Cash on delivery is available on orders up to <MoneyText paise={quote.codLimit} className="text-xs" />.
+                  </p>
+                ) : null}
+                {codAllowed && (
                   <button
                     onClick={() => setMethod('cod')}
                     className={cn(
@@ -381,7 +499,14 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                     <Banknote className={cn('size-5', method === 'cod' ? 'text-gold-ink' : 'text-mid')} />
                     <span className="flex-1">
                       <span className="block text-sm font-medium text-hi">Cash on delivery</span>
-                      <span className="block text-xs text-low">Confirm the order after placing it</span>
+                      <span className="block text-xs text-low">
+                        {quote?.cod.codFee ? (
+                          <>
+                            <MoneyText paise={quote.cod.codFee} className="text-xs" /> extra.{' '}
+                          </>
+                        ) : null}
+                        Confirm the order after placing it
+                      </span>
                     </span>
                     {method === 'cod' && <BadgeCheck className="size-5 text-gold-ink" />}
                   </button>
@@ -389,11 +514,43 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
               </div>
             </fieldset>
 
-            <Button size="lg" loading={busy} onClick={placeOrder}>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setGstOpen((v) => !v)}
+                className="self-start text-xs font-medium text-jade-ink hover:underline"
+                aria-expanded={gstOpen}
+              >
+                {gstOpen ? 'Remove GST details' : 'Buying for a business? Add GST details'}
+              </button>
+              {gstOpen && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="GSTIN"
+                    error={buyerGstin && !gstinShape.test(buyerGstin.trim().toUpperCase()) ? 'Check the 15-character GSTIN' : undefined}
+                  >
+                    <Input value={buyerGstin} maxLength={15} autoCapitalize="characters" onChange={(e) => setBuyerGstin(e.target.value)} className="uppercase" />
+                  </Field>
+                  <Field label="Business name">
+                    <Input value={buyerCompany} maxLength={200} onChange={(e) => setBuyerCompany(e.target.value)} />
+                  </Field>
+                </div>
+              )}
+            </div>
+
+            <Button
+              size="lg"
+              loading={busy}
+              disabled={gstOpen && !!buyerGstin && !gstinShape.test(buyerGstin.trim().toUpperCase())}
+              onClick={placeOrder}
+            >
               {method === 'cod' ? 'Place COD order' : <>Pay <MoneyText paise={total} className="font-semibold" /></>}
             </Button>
-            <p className="flex items-center justify-center gap-1.5 text-xs text-low">
-              <ShieldCheck className="size-3.5" /> Your payment goes directly to {ctx.businessName}
+            <p className="flex flex-wrap items-center justify-center gap-1.5 text-xs text-low">
+              <ShieldCheck className="size-3.5" /> Your payment goes directly to {ctx.businessName}.
+              <Link to={`/s/${ctx.businessCode}/policies`} target="_blank" className="underline underline-offset-2 hover:text-mid">
+                Returns and policies
+              </Link>
             </p>
             {!prepaidAvailable && (
               <p className="text-center text-xs text-low">

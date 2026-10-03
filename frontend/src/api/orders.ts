@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, patch, post } from './http';
-import type { Order, OrderBoard, OrderCreateInput, OrderStatus } from './types';
+import type { AbandonedCheckout, Address, Order, OrderBoard, OrderCreateInput, OrderStatus } from './types';
 
 type OrderFilters = { status?: string; search?: string; payment?: string; page?: number; limit?: number };
 
@@ -75,5 +75,24 @@ export function useOrderMutations() {
         post<{ ok: boolean }>(`/api/v1/orders/${id}/payment/confirm`, { approved }),
       onSuccess: invalidate,
     }),
+    changeAddress: useMutation({
+      mutationFn: ({ id, address }: { id: string; address: Address }) =>
+        patch<Order>(`/api/v1/orders/${id}/address`, { address }),
+      onSuccess: invalidate,
+    }),
+    // each order moves through the same guarded transition; failures are listed, not fatal
+    bulkStatus: useMutation({
+      mutationFn: ({ ids, status }: { ids: string[]; status: OrderStatus }) =>
+        post<{ updated: number; results: { id: string; ok: boolean; error?: string }[] }>('/api/v1/orders/bulk-status', { ids, status }),
+      onSuccess: invalidate,
+    }),
   };
 }
+
+/** Buyers who verified their number at checkout in the last week but did not order. */
+export const useAbandonedCheckouts = () =>
+  useQuery({
+    queryKey: ['orders', 'abandoned'],
+    queryFn: () => get<{ checkouts: AbandonedCheckout[] }>('/api/v1/orders/abandoned'),
+    select: (d) => d.checkouts,
+  });

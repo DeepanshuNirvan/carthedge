@@ -11,6 +11,7 @@ import (
 
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
+	"carthedge/internal/invoice"
 	"carthedge/internal/notify"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -27,6 +28,14 @@ type Service struct {
 	rdb    *redis.Client
 	cfg    *config.Config
 	notify *notify.Notifier
+	// cancelAutopay stops a seller's Razorpay mandate when the admin moves
+	// them to another plan (plan package; set at boot)
+	cancelAutopay func(ctx context.Context, bizID string) error
+}
+
+// SetAutopayCanceller wires plan billing in without an import cycle.
+func (s *Service) SetAutopayCanceller(fn func(ctx context.Context, bizID string) error) {
+	s.cancelAutopay = fn
 }
 
 func NewService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, n *notify.Notifier) *Service {
@@ -229,6 +238,12 @@ func (s *Service) BusinessDetail(ctx context.Context, id string) (httpx.M, error
 		return nil, err
 	}
 	out["usage"] = usage
+	if ai, err := s.AIUsage(ctx, 30, id); err == nil {
+		out["aiUsage"] = ai
+	}
+	if audit, err := s.Audit(ctx, id, 20); err == nil {
+		out["audit"] = audit
+	}
 	return out, nil
 }
 
@@ -236,7 +251,10 @@ func (s *Service) SetBusinessStatus(ctx context.Context, id, status string) erro
 	if status != "active" && status != "suspended" {
 		return errors.New("status must be active or suspended")
 	}
-	ct, err := s.pool.Exec(ctx, `update businesses set status=$2, updated_at=now() where id=$1`, id, status)
+	// "active" on a seller-deleted account restores it; a purged one is gone
+	ct, err := s.pool.Exec(ctx, `update businesses set status=$2,
+		deleted_at = case when $2 = 'active' then null else deleted_at end, updated_at=now()
+		where id=$1 and status <> 'purged'`, id, status)
 	if err != nil {
 		return err
 	}
@@ -253,6 +271,8 @@ func (s *Service) AssignPlan(ctx context.Context, bizID, planCode string, custom
 	if extendDays < 0 || extendDays > 730 {
 		return errors.New("extendDays must be between 0 and 730")
 	}
+	var current string
+	s.pool.QueryRow(ctx, `select p.code from subscriptions s join plans p on p.id = s.plan_id where s.business_id=$1`, bizID).Scan(&current)
 	// a different plan is a new quota period; extending the same one is not
 	ct, err := s.pool.Exec(ctx, `update subscriptions set
 		plan_id = (select id from plans where code=$2 and active),
@@ -269,12 +289,16 @@ func (s *Service) AssignPlan(ctx context.Context, bizID, planCode string, custom
 		return errors.New("subscription not found")
 	}
 	s.rdb.Del(ctx, "sub:"+bizID)
+	// an autopay mandate on the old plan would switch them back on its next charge
+	if current != planCode && s.cancelAutopay != nil {
+		s.cancelAutopay(ctx, bizID)
+	}
 	return nil
 }
 
 // Capabilities are the entitlements a plan can grant. The admin picks from this
 // list; the API gates every paid route against it.
-var Capabilities = []string{"ai", "aiReply", "broadcasts", "offers", "invoices", "courier", "waitlist"}
+var Capabilities = []string{"ai", "aiReply", "broadcasts", "offers", "invoices", "courier", "waitlist", "recovery"}
 
 type PlanInput struct {
 	Code         string   `json:"code"`
@@ -430,8 +454,9 @@ func (s *Service) UpdatePlanRequest(ctx context.Context, id, status, note string
 
 func (s *Service) Payments(ctx context.Context, limit, offset int) ([]httpx.M, error) {
 	rows, err := s.pool.Query(ctx, `select p.id, b.name, b.code, p.amount, p.status, p.razorpay_order_id,
-		coalesce(p.notes->>'planCode', ''), p.created_at
+		coalesce(p.notes->>'planCode', ''), p.created_at, coalesce(i.number, ''), coalesce((p.notes->>'autopay')::boolean, false)
 		from payments p join businesses b on b.id = p.business_id
+		left join platform_invoices i on i.payment_id = p.id
 		where p.kind = 'subscription' order by p.created_at desc limit $1 offset $2`, limit, offset)
 	if err != nil {
 		return nil, err
@@ -439,14 +464,16 @@ func (s *Service) Payments(ctx context.Context, limit, offset int) ([]httpx.M, e
 	defer rows.Close()
 	out := []httpx.M{}
 	for rows.Next() {
-		var id, name, code, status, rzpID, planCode string
+		var id, name, code, status, rzpID, planCode, invoiceNumber string
 		var amount int
 		var createdAt time.Time
-		if err := rows.Scan(&id, &name, &code, &amount, &status, &rzpID, &planCode, &createdAt); err != nil {
+		var autopay bool
+		if err := rows.Scan(&id, &name, &code, &amount, &status, &rzpID, &planCode, &createdAt, &invoiceNumber, &autopay); err != nil {
 			return nil, err
 		}
 		out = append(out, httpx.M{"id": id, "businessName": name, "businessCode": code, "amount": amount,
-			"status": status, "razorpayOrderId": rzpID, "planCode": planCode, "createdAt": createdAt.Format(time.RFC3339)})
+			"status": status, "razorpayOrderId": rzpID, "planCode": planCode, "createdAt": createdAt.Format(time.RFC3339),
+			"invoiceNumber": invoiceNumber, "autopay": autopay})
 	}
 	return out, rows.Err()
 }
@@ -556,6 +583,16 @@ func (s *Service) UpdateSettings(ctx context.Context, settings map[string]json.R
 	for key, value := range settings {
 		if !json.Valid(value) {
 			return fmt.Errorf("invalid value for %q", key)
+		}
+		// CartHedge's own invoice identity must be right before invoices use it
+		if key == "billing" {
+			var b invoice.BillingProfile
+			if err := json.Unmarshal(value, &b); err != nil {
+				return errors.New("billing profile has the wrong shape")
+			}
+			if err := b.Validate(); err != nil {
+				return err
+			}
 		}
 		if _, err := s.pool.Exec(ctx, `insert into site_settings (key, value) values ($1, $2::jsonb)
 			on conflict (key) do update set value = $2::jsonb, updated_at = now()`, key, string(value)); err != nil {

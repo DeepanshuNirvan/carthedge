@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"carthedge/internal/ai"
+	"carthedge/internal/alert"
 	"carthedge/internal/httpx"
 	"carthedge/internal/product"
+	"carthedge/internal/shop"
 )
 
 const (
@@ -41,18 +43,41 @@ func (s *Service) handle(ctx context.Context, c dueConv) {
 	}
 	var autoReply, autoOrder, paused bool
 	var stage string
-	if err := s.pool.QueryRow(ctx, `select b.ai_auto_reply, b.ai_auto_order, coalesce(c.ai_paused_until > now(), false), c.stage
-		from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).Scan(&autoReply, &autoOrder, &paused, &stage); err != nil {
+	var profileRaw []byte
+	if err := s.pool.QueryRow(ctx, `select b.ai_auto_reply, b.ai_auto_order, coalesce(c.ai_paused_until > now(), false), c.stage,
+		b.ai_profile from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).Scan(
+		&autoReply, &autoOrder, &paused, &stage, &profileRaw); err != nil {
 		return
 	}
 	if paused && stage == "handoff" {
 		return // the owner is handling this chat personally; a draft card from it is noise
 	}
-	if !autoReply || paused || !s.can(ctx, c.biz, "aiReply") {
+	var profile shop.AIProfile
+	json.Unmarshal(profileRaw, &profile)
+	open := profile.Hours.OpenAt(time.Now())
+	// "only while I am closed": the seller answers during business hours
+	sellerHours := profile.ReplyWhen == "closed" && open
+	if !autoReply || paused || sellerHours || !s.can(ctx, c.biz, "aiReply") {
+		if !open && !paused && profile.Away != "" {
+			s.sendAway(ctx, c, profile.Away)
+		}
 		s.draftOnly(ctx, c)
 		return
 	}
 	s.converse(ctx, c, autoOrder, false)
+}
+
+// sendAway posts the seller's away message, at most once per chat in 12
+// hours: claimed by stamping away_sent_at, so a burst gets one copy.
+func (s *Service) sendAway(ctx context.Context, c dueConv, text string) {
+	ct, err := s.pool.Exec(ctx, `update conversations set away_sent_at=now() where id=$1
+		and (away_sent_at is null or away_sent_at < now() - interval '12 hours')`, c.id)
+	if err != nil || ct.RowsAffected() == 0 {
+		return
+	}
+	if err := s.send(ctx, c.id, "system", text); err != nil {
+		s.log.Warn("away message not sent", "conversationId", c.id, "err", err)
+	}
 }
 
 // converse runs the assistant on a chat and acts on the result.
@@ -389,29 +414,36 @@ func (s *Service) nudgeQuiet(ctx context.Context) {
 	}
 	rows.Close()
 	for _, d := range list {
-		if !s.can(ctx, d.c.biz, "aiReply") {
+		if !s.can(ctx, d.c.biz, "aiReply") || s.sellerAnswering(ctx, d.c.biz) {
 			continue
 		}
 		s.converse(ctx, d.c, d.autoOrder, true)
 	}
 }
 
+// sellerAnswering reports whether the seller asked to handle chats themselves
+// right now (assistant only outside business hours).
+func (s *Service) sellerAnswering(ctx context.Context, bizID string) bool {
+	var raw []byte
+	if s.pool.QueryRow(ctx, `select ai_profile from businesses where id=$1`, bizID).Scan(&raw) != nil {
+		return false
+	}
+	var p shop.AIProfile
+	json.Unmarshal(raw, &p)
+	return p.ReplyWhen == "closed" && p.Hours.OpenAt(time.Now())
+}
+
 // alertOwner tells the seller a chat needs them: the Inbox shows it, and the
-// owner gets a WhatsApp/email nudge so it is not missed.
+// owner is alerted on their chosen channels so it is not missed.
 func (s *Service) alertOwner(ctx context.Context, c dueConv, reason string) {
-	var phone, email, owner, contact string
-	if err := s.pool.QueryRow(ctx, `select b.phone, b.email, b.owner_name, coalesce(nullif(c.contact_name,''), c.contact_id)
-		from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).
-		Scan(&phone, &email, &owner, &contact); err != nil {
+	var contact string
+	if err := s.pool.QueryRow(ctx, `select coalesce(nullif(contact_name,''), contact_id) from conversations where id=$1`,
+		c.id).Scan(&contact); err != nil {
 		return
 	}
 	s.bus.Publish(ctx, c.biz, "chatNeedsSeller", httpx.M{"conversationId": c.id, "reason": reason})
-	text := fmt.Sprintf("A buyer (%s on %s) needs you: %s. The assistant is paused on that chat — reply from CartHedge → AI desk.",
-		contact, c.channel, reason)
-	s.notify.Async("chatHandoff", func() error {
-		if err := s.notify.WhatsApp(phone, text); err != nil && email != "" {
-			return s.notify.Email(email, "A buyer needs you on "+c.channel, "Hi "+owner+",\n\n"+text+"\n\n— CartHedge")
-		}
-		return nil
-	})
+	s.alerts.Seller(c.biz, alert.Alert{Kind: "chatHandoff",
+		Title: "A buyer needs you on " + c.channel,
+		Body:  fmt.Sprintf("%s: %s. The assistant is paused on that chat — reply from the AI desk.", contact, reason),
+		Path:  "/app/ai?conversation=" + c.id})
 }

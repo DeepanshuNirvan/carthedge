@@ -9,12 +9,14 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
+	"carthedge/internal/shop"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -63,7 +65,17 @@ type Product struct {
 	Trending      bool      `json:"trending"`
 	Active        bool      `json:"active"`
 	Variants      []Variant `json:"variants"`
+	Details       []Detail  `json:"details"`   // fabric, fit, care: shown to buyers and the assistant
+	SizeChart     string    `json:"sizeChart"` // image URL
+	HSN           string    `json:"hsn"`
+	GstRate       int       `json:"gstRate"` // percent; -1 = the store default
 	CreatedAt     string    `json:"createdAt"`
+}
+
+// Detail is one labelled fact about a product ("Fabric": "Pure cotton").
+type Detail struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 // Untracked marks a product or variant that has no counted inventory — the
@@ -84,6 +96,8 @@ type Public struct {
 	InStock      bool            `json:"inStock"`
 	Trending     bool            `json:"trending"`
 	Variants     []PublicVariant `json:"variants"`
+	Details      []Detail        `json:"details"`
+	SizeChart    string          `json:"sizeChart,omitempty"`
 }
 
 type PublicVariant struct {
@@ -100,9 +114,13 @@ func ToPublic(products []Product) []Public {
 		for j, v := range p.Variants {
 			variants[j] = PublicVariant{ID: v.ID, Name: v.Name, Price: v.Price, InStock: v.Stocked()}
 		}
+		details := p.Details
+		if details == nil {
+			details = []Detail{}
+		}
 		out[i] = Public{ID: p.ID, Name: p.Name, Description: p.Description, Category: p.Category,
 			Price: p.Price, ComparePrice: p.ComparePrice, Images: orEmpty(p.Images), InStock: p.InStock,
-			Trending: p.Trending, Variants: variants}
+			Trending: p.Trending, Variants: variants, Details: details, SizeChart: p.SizeChart}
 	}
 	return out
 }
@@ -141,6 +159,11 @@ type Input struct {
 	StockQty      *int      `json:"stockQty"` // omitted = untracked
 	Trending      bool      `json:"trending"`
 	Variants      []Variant `json:"variants"`
+	// omitted (nil) keeps what is stored: a CSV re-import must not wipe them
+	Details   []Detail `json:"details"`
+	SizeChart *string  `json:"sizeChart"`
+	HSN       *string  `json:"hsn"`
+	GstRate   *int     `json:"gstRate"`
 }
 
 // qty resolves the tracked quantity; an omitted or negative value (the API
@@ -178,7 +201,54 @@ func (in *Input) validate() error {
 	if in.Price <= 0 {
 		return errors.New("price must be positive (in paise)")
 	}
+	in.Category = strings.TrimSpace(in.Category)
+	if len([]rune(in.Name)) > 200 || len([]rune(in.Category)) > 60 || len([]rune(in.Description)) > 5000 || len(in.Sku) > 64 {
+		return errors.New("keep the name under 200 characters, the category under 60, the description under 5,000 and the SKU under 64")
+	}
+	if len(in.Details) > 20 {
+		return errors.New("at most 20 product details")
+	}
+	kept := []Detail{}
+	for _, d := range in.Details {
+		d.Label, d.Value = strings.TrimSpace(d.Label), strings.TrimSpace(d.Value)
+		if d.Label == "" && d.Value == "" {
+			continue
+		}
+		if d.Label == "" || d.Value == "" || len([]rune(d.Label)) > 40 || len([]rune(d.Value)) > 300 {
+			return errors.New("each detail needs a label (up to 40 characters) and a value (up to 300)")
+		}
+		kept = append(kept, d)
+	}
+	if in.Details != nil {
+		in.Details = kept
+	}
+	if in.SizeChart != nil {
+		v := strings.TrimSpace(*in.SizeChart)
+		if v != "" && !strings.HasPrefix(v, "https://") && !strings.HasPrefix(v, "http://") && !strings.HasPrefix(v, "/uploads/") {
+			return errors.New("size chart must be an uploaded image")
+		}
+		in.SizeChart = &v
+	}
+	if in.HSN != nil {
+		v := strings.TrimSpace(*in.HSN)
+		if v != "" && !shop.ValidHSN(v) {
+			return errors.New("HSN code must be 4, 6 or 8 digits")
+		}
+		in.HSN = &v
+	}
+	if in.GstRate != nil && *in.GstRate != -1 && !slices.Contains(shop.Rates, *in.GstRate) {
+		return errors.New("GST rate must be one of 0, 3, 5, 12, 18, 28, 40")
+	}
 	return nil
+}
+
+// detailsParam is the details to write: nil keeps the stored ones.
+func detailsParam(d []Detail) any {
+	if d == nil {
+		return nil
+	}
+	b, _ := json.Marshal(d)
+	return string(b)
 }
 
 func (s *Service) Create(ctx context.Context, bizID string, in Input) (*Product, error) {
@@ -195,10 +265,12 @@ func (s *Service) Create(ctx context.Context, bizID string, in Input) (*Product,
 
 	var id string
 	err = tx.QueryRow(ctx, `insert into products
-		(business_id, name, description, category, price, reseller_price, compare_price, sku, images, in_stock, stock_qty, trending)
-		values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12) returning id`,
+		(business_id, name, description, category, price, reseller_price, compare_price, sku, images, in_stock, stock_qty, trending,
+		 details, size_chart, hsn, gst_rate)
+		values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,coalesce($13::jsonb,'[]'),coalesce($14,''),coalesce($15,''),coalesce($16,-1))
+		returning id`,
 		bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
-		string(images), in.stocked(), in.qty(), in.Trending).Scan(&id)
+		string(images), in.stocked(), in.qty(), in.Trending, detailsParam(in.Details), in.SizeChart, in.HSN, in.GstRate).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -234,10 +306,12 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 		compare_price=$8, sku=$9, images=$10::jsonb,
 		in_stock = coalesce($11, case when $12::int is null then in_stock else $12::int <> 0 end),
 		stock_qty = coalesce($12::int, stock_qty),
-		trending=$13, updated_at=now()
+		trending=$13, details=coalesce($14::jsonb, details), size_chart=coalesce($15, size_chart),
+		hsn=coalesce($16, hsn), gst_rate=coalesce($17, gst_rate), updated_at=now()
 		where id=$1 and business_id=$2 returning in_stock`,
 		id, bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
-		string(images), in.InStock, qtyParam(in.StockQty), in.Trending).Scan(&inStock)
+		string(images), in.InStock, qtyParam(in.StockQty), in.Trending,
+		detailsParam(in.Details), in.SizeChart, in.HSN, in.GstRate).Scan(&inStock)
 	if err != nil {
 		return nil, err
 	}
@@ -443,6 +517,7 @@ func (s *Service) Count(ctx context.Context, bizID string, f Filter) (int, error
 func (s *Service) query(ctx context.Context, where, order string, args ...any) ([]Product, error) {
 	rows, err := s.pool.Query(ctx, `select p.id, p.name, p.description, p.category, p.price, p.reseller_price,
 		p.compare_price, p.sku, p.images, p.in_stock, p.stock_qty, p.trending, p.active, p.created_at,
+		p.details, p.size_chart, p.hsn, p.gst_rate,
 		coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'name', v.name, 'price', v.price, 'sku', v.sku,
 			'inStock', v.in_stock, 'stockQty', v.stock_qty)) filter (where v.id is not null), '[]')
 		from products p left join product_variants v on v.product_id = p.id
@@ -454,13 +529,15 @@ func (s *Service) query(ctx context.Context, where, order string, args ...any) (
 	var out []Product
 	for rows.Next() {
 		var p Product
-		var images, variants []byte
+		var images, variants, details []byte
 		var createdAt time.Time
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.ResellerPrice,
-			&p.ComparePrice, &p.Sku, &images, &p.InStock, &p.StockQty, &p.Trending, &p.Active, &createdAt, &variants); err != nil {
+			&p.ComparePrice, &p.Sku, &images, &p.InStock, &p.StockQty, &p.Trending, &p.Active, &createdAt,
+			&details, &p.SizeChart, &p.HSN, &p.GstRate, &variants); err != nil {
 			return nil, err
 		}
 		json.Unmarshal(images, &p.Images)
+		json.Unmarshal(details, &p.Details)
 		json.Unmarshal(variants, &p.Variants)
 		p.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		out = append(out, p)
@@ -574,7 +651,7 @@ func ParseCSV(r io.Reader) ([]Input, error) {
 
 // ResolveLine prices an order line from the live catalog; reseller buyers get
 // the reseller price when one is set.
-func (s *Service) ResolveLine(ctx context.Context, bizID, productID, variantID string, qty int, segment string) (Line, error) {
+func (s *Service) ResolveLine(ctx context.Context, q DB, bizID, productID, variantID string, qty int, segment string) (Line, error) {
 	if qty < 1 {
 		qty = 1
 	}
@@ -587,7 +664,7 @@ func (s *Service) ResolveLine(ctx context.Context, bizID, productID, variantID s
 	}
 	var price, resellerPrice int
 	var inStock bool
-	err := s.pool.QueryRow(ctx, `select name, price, reseller_price, in_stock from products
+	err := q.QueryRow(ctx, `select name, price, reseller_price, in_stock from products
 		where id=$1 and business_id=$2 and active`, productID, bizID).Scan(&l.Name, &price, &resellerPrice, &inStock)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return l, ErrNotFound
@@ -603,7 +680,7 @@ func (s *Service) ResolveLine(ctx context.Context, bizID, productID, variantID s
 		var vName string
 		var vPrice int
 		var vInStock bool
-		err := s.pool.QueryRow(ctx, `select name, price, in_stock from product_variants where id=$1 and product_id=$2`,
+		err := q.QueryRow(ctx, `select name, price, in_stock from product_variants where id=$1 and product_id=$2`,
 			variantID, productID).Scan(&vName, &vPrice, &vInStock)
 		if err != nil {
 			return l, errors.New("variant not found")
@@ -636,14 +713,17 @@ func linePrice(price, resellerPrice, variantPrice int, segment string) int {
 
 // db is satisfied by both *pgxpool.Pool and pgx.Tx, so stock moves can run
 // inside the order transaction or on their own.
-type db interface {
+// DB is a pool or a transaction. Code running inside a transaction must pass
+// the transaction: asking the pool for a second connection while holding one
+// deadlocks once every connection is held by a request doing the same.
+type DB interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 // stockTarget picks the row a line draws from: a variant that carries its own
 // counted stock, otherwise the product. Keeps one line from decrementing twice.
-func stockTarget(ctx context.Context, conn db, l Line) (table, id string) {
+func stockTarget(ctx context.Context, conn DB, l Line) (table, id string) {
 	if l.VariantID != "" {
 		var tracked bool
 		if err := conn.QueryRow(ctx, `select stock_qty >= 0 from product_variants where id=$1`,
@@ -657,7 +737,7 @@ func stockTarget(ctx context.Context, conn db, l Line) (table, id string) {
 // Reserve draws down counted stock for an order. Untracked rows (-1) pass
 // through untouched; a tracked row short of the quantity fails the order rather
 // than selling something the seller cannot ship.
-func Reserve(ctx context.Context, conn db, lines []Line) error {
+func Reserve(ctx context.Context, conn DB, lines []Line) error {
 	for _, l := range lines {
 		if l.ProductID == "" {
 			continue // custom line, nothing in the catalog to draw from
@@ -678,7 +758,7 @@ func Reserve(ctx context.Context, conn db, lines []Line) error {
 }
 
 // Release puts stock back when an order is cancelled or comes back RTO.
-func Release(ctx context.Context, conn db, lines []Line) error {
+func Release(ctx context.Context, conn DB, lines []Line) error {
 	for _, l := range lines {
 		if l.ProductID == "" {
 			continue

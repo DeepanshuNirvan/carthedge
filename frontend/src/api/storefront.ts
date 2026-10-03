@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { get, post } from './http';
+import { get, post, request } from './http';
 import type {
   Address,
   CheckoutInfo,
@@ -7,8 +7,11 @@ import type {
   OtpVerifyResult,
   PlacedOrder,
   PublicProduct,
+  Quote,
   ResolvedLink,
+  ReturnInput,
   StoreHome,
+  StorePolicyPage,
   TrackedOrder,
 } from './types';
 
@@ -65,8 +68,22 @@ export const useResolvedLink = (code: string, token: string) =>
 export const sendOtp = (code: string, phone: string, email?: string) =>
   post<{ ok: boolean }>(`/p/${code}/otp`, { phone, email }, 'none');
 
-export const verifyOtp = (code: string, phone: string, otp: string) =>
-  post<OtpVerifyResult>(`/p/${code}/otp/verify`, { phone, code: otp }, 'none');
+/** cart (items or the link token) lets a buyer who stops here get one reminder */
+export const verifyOtp = (code: string, phone: string, otp: string, cart?: { items?: OrderRef[]; linkToken?: string }) =>
+  post<OtpVerifyResult>(`/p/${code}/otp/verify`, { phone, code: otp, ...cart }, 'none');
+
+/** Server-side pricing for both payment methods: coupon, charges, free shipping. */
+export const fetchQuote = (
+  code: string,
+  input: { items?: OrderRef[]; linkToken?: string; offerCode?: string; phone?: string; orderToken?: string },
+) => post<Quote>(`/p/${code}/quote`, input, 'none');
+
+export const useStorePolicies = (code: string) =>
+  useQuery({
+    queryKey: ['store', code, 'policies'],
+    queryFn: () => get<StorePolicyPage>(`/p/${code}/policies`, undefined, 'none'),
+    staleTime: 60_000,
+  });
 
 export type BuyerOrderInput = {
   orderToken: string;
@@ -78,6 +95,8 @@ export type BuyerOrderInput = {
   paymentMethod: 'cod' | 'prepaid';
   offerCode?: string;
   notes?: string;
+  buyerGstin?: string;
+  buyerCompany?: string;
 };
 
 export const placeStoreOrder = (code: string, input: BuyerOrderInput) =>
@@ -109,3 +128,27 @@ export const buyerVerifyPayment = (payload: {
 // token arrives in the buyer's WhatsApp confirmation link
 export const confirmCod = (orderCode: string, token: string) =>
   post<{ ok: boolean }>(`/p/orders/${orderCode}/confirm`, { token }, 'none');
+
+// buyer self-service on the tracking page; each call carries a fresh OTP token
+type BuyerAuth = { phone: string; orderToken: string };
+
+export const buyerCancel = (orderCode: string, auth: BuyerAuth, reason: string) =>
+  post<{ ok: boolean }>(`/p/orders/${orderCode}/cancel`, { ...auth, reason }, 'none');
+
+export const buyerChangeAddress = (orderCode: string, auth: BuyerAuth, address: Address) =>
+  post<{ ok: boolean }>(`/p/orders/${orderCode}/address`, { ...auth, address }, 'none');
+
+export const buyerRequestReturn = (orderCode: string, auth: BuyerAuth, input: ReturnInput) =>
+  post<{ code: string; status: string }>(`/p/orders/${orderCode}/returns`, { ...auth, ...input }, 'none');
+
+export const buyerWithdrawReturn = (orderCode: string, returnId: string, auth: BuyerAuth) =>
+  post<{ ok: boolean }>(`/p/orders/${orderCode}/returns/${returnId}/withdraw`, auth, 'none');
+
+export async function buyerUploadPhoto(orderCode: string, auth: BuyerAuth, file: File) {
+  const formData = new FormData();
+  formData.append('phone', auth.phone);
+  formData.append('orderToken', auth.orderToken);
+  formData.append('file', file);
+  const { url } = await request<{ url: string }>(`/p/orders/${orderCode}/uploads`, { method: 'POST', formData, auth: 'none' });
+  return url;
+}

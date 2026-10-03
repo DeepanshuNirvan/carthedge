@@ -29,6 +29,7 @@ type Customer struct {
 	OrdersCount int     `json:"ordersCount"`
 	TotalSpent  int64   `json:"totalSpent"`
 	CodRefusals int     `json:"codRefusals"`
+	Returns     int     `json:"returnsCount"`
 	RiskFlagged bool    `json:"riskFlagged"`
 	LastOrderAt string  `json:"lastOrderAt,omitempty"`
 	CreatedAt   string  `json:"createdAt"`
@@ -69,6 +70,56 @@ func (s *Service) Upsert(ctx context.Context, tx pgx.Tx, bizID, name, phone, ema
 		return nil, err
 	}
 	return &ref, nil
+}
+
+// Ref reads a buyer's ledger entry without counting a new order — an
+// exchange shipment is not a new purchase.
+func (s *Service) Ref(ctx context.Context, tx pgx.Tx, bizID, phone string) (*Ref, error) {
+	var ref Ref
+	err := tx.QueryRow(ctx, `select id, segment, risk_flagged, cod_refusals from customers
+		where business_id=$1 and phone=$2`, bizID, phone).Scan(&ref.ID, &ref.Segment, &ref.RiskFlagged, &ref.CodRefusals)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return &ref, err
+}
+
+// Erase removes one buyer's personal data on their request (DPDP Act). Orders
+// keep items and money for the seller's books; name, phone, email, addresses,
+// notes and their WhatsApp chats go. Issued invoices are kept as the law
+// requires.
+func (s *Service) Erase(ctx context.Context, bizID, id string) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var phone string
+	err = tx.QueryRow(ctx, `select phone from customers where business_id=$1 and id=$2 for update`, bizID, id).Scan(&phone)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	steps := []struct {
+		sql  string
+		args []any
+	}{
+		{`update customers set name='Erased customer', phone='erased-'||id::text, email='', last_address='{}'::jsonb,
+			updated_at=now() where id=$1`, []any{id}},
+		{`update orders set address='{"line":"","city":"","state":"","pincode":""}'::jsonb, notes='', payment_ref=''
+			where customer_id=$1`, []any{id}},
+		{`delete from conversations where business_id=$1 and channel='whatsapp' and contact_id=$2`, []any{bizID, phone}},
+		{`delete from checkout_sessions where business_id=$1 and phone=$2`, []any{bizID, phone}},
+		{`delete from waitlist where business_id=$1 and phone=$2`, []any{bizID, phone}},
+	}
+	for _, st := range steps {
+		if _, err := tx.Exec(ctx, st.sql, st.args...); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // Lookup powers repeat-buyer autofill on the checkout page.
@@ -160,7 +211,7 @@ func (s *Service) RecordRto(ctx context.Context, customerID string) error {
 }
 
 const baseSelect = `select id, name, phone, email, segment, last_address, orders_count, total_spent,
-	cod_refusals, risk_flagged, coalesce(to_char(last_order_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
+	cod_refusals, returns_count, risk_flagged, coalesce(to_char(last_order_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
 	to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from customers`
 
 type scannable interface {
@@ -171,7 +222,7 @@ func (s *Service) scanOne(row scannable) (*Customer, error) {
 	var c Customer
 	var addr []byte
 	if err := row.Scan(&c.ID, &c.Name, &c.Phone, &c.Email, &c.Segment, &addr, &c.OrdersCount,
-		&c.TotalSpent, &c.CodRefusals, &c.RiskFlagged, &c.LastOrderAt, &c.CreatedAt); err != nil {
+		&c.TotalSpent, &c.CodRefusals, &c.Returns, &c.RiskFlagged, &c.LastOrderAt, &c.CreatedAt); err != nil {
 		return nil, err
 	}
 	json.Unmarshal(addr, &c.LastAddress)

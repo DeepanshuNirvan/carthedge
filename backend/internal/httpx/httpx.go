@@ -1,11 +1,17 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type M map[string]any
@@ -149,3 +155,30 @@ var idRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
 // ValidID reports whether s is a row id (UUID). Checked before the database
 // sees it, so a malformed id is a 404 instead of a leaked Postgres error.
 func ValidID(s string) bool { return idRe.MatchString(s) }
+
+// Internal reports whether err is an infrastructure failure (database,
+// network, timeout) rather than a message meant for the user. Those carry
+// hosts, SQL and payloads, so handlers log them and answer generically.
+func Internal(err error) bool {
+	var pgErr *pgconn.PgError
+	var netErr net.Error
+	return errors.As(err, &pgErr) || errors.As(err, &netErr) ||
+		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) ||
+		strings.Contains(err.Error(), "SQLSTATE") || strings.Contains(err.Error(), "conn closed")
+}
+
+// ErrOrInternal answers err as a 4xx with its own text, or — when it is an
+// infrastructure failure — logs it and answers a plain 500.
+func ErrOrInternal(w http.ResponseWriter, status int, err error) {
+	if errors.Is(err, context.Canceled) {
+		slog.Warn("client went away before the answer", "err", err)
+		Err(w, http.StatusInternalServerError, "something went wrong on our side — try again in a moment")
+		return
+	}
+	if Internal(err) {
+		slog.Error("request failed", "err", err)
+		Err(w, http.StatusInternalServerError, "something went wrong on our side — try again in a moment")
+		return
+	}
+	Err(w, status, err.Error())
+}

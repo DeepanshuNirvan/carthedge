@@ -222,6 +222,77 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
+// ChangePassword is the signed-in seller setting a new password; every other
+// device is signed out and this one gets fresh tokens.
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if msg := passwordProblem(in.NewPassword); msg != "" {
+		httpx.Err(w, http.StatusBadRequest, msg)
+		return
+	}
+	if in.NewPassword == in.CurrentPassword {
+		httpx.Err(w, http.StatusBadRequest, "choose a new password, not the current one")
+		return
+	}
+	tokens, err := h.svc.ChangePassword(r.Context(), middleware.BusinessID(r.Context()), in.CurrentPassword, in.NewPassword)
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, tokens)
+}
+
+// EndOtherSessions signs out every other device.
+func (h *Handler) EndOtherSessions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tokens, err := h.svc.EndOtherSessions(ctx, middleware.BusinessID(ctx), middleware.BusinessCode(ctx))
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not sign out other devices")
+		return
+	}
+	httpx.OK(w, tokens)
+}
+
+// Export sends the seller everything they keep in CartHedge as a JSON file.
+func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", `attachment; filename="carthedge-`+middleware.BusinessCode(ctx)+`-export.json"`)
+	if err := h.svc.Export(ctx, middleware.BusinessID(ctx), w); err != nil {
+		h.svc.log.Error("data export failed", "err", err)
+	}
+}
+
+// DeleteAccount schedules the account for deletion (30 days to restore).
+func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Password string `json:"password"`
+		Confirm  string `json:"confirm"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := h.svc.ScheduleDeletion(r.Context(), middleware.BusinessID(r.Context()), in.Password, in.Confirm); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
+func (h *Handler) RestoreAccount(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.Restore(r.Context(), middleware.BusinessID(r.Context())); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
 // passwordProblem enforces the length rules; bcrypt refuses anything past 72
 // bytes, which used to surface as a 500 "registration failed".
 func passwordProblem(p string) string {

@@ -87,5 +87,13 @@ export function useOfferMutations() {
         patch<{ ok: boolean }>(`/api/v1/offers/${id}`, { active }),
       onSuccess: invalidate,
     }),
+    update: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: Omit<Offer, 'id'> }) => put<{ ok: boolean }>(`/api/v1/offers/${id}`, input),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => del<{ ok: boolean }>(`/api/v1/offers/${id}`),
+      onSuccess: invalidate,
+    }),
   };
 }

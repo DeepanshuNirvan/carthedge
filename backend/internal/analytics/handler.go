@@ -45,7 +45,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	err := h.pool.QueryRow(ctx, `select
 		count(*) filter (where (created_at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date and status <> 'cancelled'),
 		coalesce(sum(total) filter (where (created_at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date and status not in ('cancelled','rto')), 0),
-		count(*) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') and status <> 'cancelled'),
+		count(*) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') and status <> 'cancelled' and replacement_of is null),
 		coalesce(sum(total) filter (where created_at >= (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') and status not in ('cancelled','rto')), 0),
 		count(*) filter (where status in ('new','confirmed')),
 		count(*) filter (where payment_method='cod' and status in ('new','confirmed','packed','shipped')

@@ -11,6 +11,7 @@ import (
 
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
+	"carthedge/internal/middleware"
 	"carthedge/internal/notify"
 	"carthedge/internal/otp"
 	"carthedge/internal/secure"
@@ -48,7 +49,13 @@ type Service struct {
 	notify *notify.Notifier
 	otp    *otp.Service
 	log    *slog.Logger
+	// onDelete runs when a seller deletes their account (billing stops
+	// autopay); set at boot to avoid an import cycle
+	onDelete func(ctx context.Context, bizID string)
 }
+
+// SetDeleteHook lets billing react to an account being deleted.
+func (s *Service) SetDeleteHook(fn func(ctx context.Context, bizID string)) { s.onDelete = fn }
 
 func NewService(pool *pgxpool.Pool, rdb *redis.Client, cfg *config.Config, n *notify.Notifier, otpSvc *otp.Service, log *slog.Logger) *Service {
 	return &Service{pool: pool, rdb: rdb, cfg: cfg, notify: n, otp: otpSvc, log: log}
@@ -131,6 +138,11 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, clientIP strin
 		return nil, err
 	}
 
+	// read before the transaction: a pool query while holding its connection
+	// can deadlock the pool under load
+	// a mobile that already had an account (since deleted) had its trial
+	trialUsed := s.trialUsed(ctx, in.Phone)
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -159,10 +171,13 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, clientIP strin
 		return nil, err
 	}
 
-	trialEnds := time.Now().AddDate(0, 0, s.cfg.TrialDays)
+	trialEnds, subStatus := time.Now().AddDate(0, 0, s.cfg.TrialDays), "trial"
+	if trialUsed {
+		trialEnds, subStatus = time.Now(), "expired"
+	}
 	if _, err := tx.Exec(ctx, `insert into subscriptions (business_id, plan_id, status, ends_at)
-		select $1, id, 'trial', $2 from plans where code = $3`,
-		bizID, trialEnds, s.cfg.TrialPlanCode); err != nil {
+		select $1, id, $4, $2 from plans where code = $3`,
+		bizID, trialEnds, s.cfg.TrialPlanCode, subStatus); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -197,8 +212,12 @@ func (s *Service) Login(ctx context.Context, email, password string) (*Session, 
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
 		return nil, ErrBadLogin
 	}
-	if status != "active" {
+	// a deleted account may still sign in during its grace period, to restore it
+	if status == "suspended" {
 		return nil, ErrSuspended
+	}
+	if status != "active" && status != "deleted" {
+		return nil, ErrBadLogin
 	}
 	tokens, err := s.issueTokens(ctx, bizID, code)
 	if err != nil {
@@ -224,13 +243,11 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*Tokens, er
 		issued, _ = strconv.ParseInt(parts[2], 10, 64)
 	}
 	// a password reset ends every session that started before it
-	if revoked, err := s.rdb.Get(ctx, revokedKey(bizID)).Int64(); err == nil && issued < revoked {
+	if revoked, err := s.rdb.Get(ctx, middleware.RevokedKey(bizID)).Int64(); err == nil && issued < revoked {
 		return nil, ErrBadRefresh
 	}
 	return s.issueTokens(ctx, bizID, code)
 }
-
-func revokedKey(bizID string) string { return "auth:revoked:" + bizID }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) {
 	s.rdb.Del(ctx, "auth:refresh:"+refreshToken)
@@ -277,8 +294,8 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return err
 	}
 	s.rdb.Del(ctx, "auth:reset:"+token)
-	// whoever held the old password may also hold a live refresh token
-	s.rdb.Set(ctx, revokedKey(bizID), time.Now().UnixMilli(), s.cfg.RefreshTTL)
+	// whoever held the old password may also hold a live session
+	s.rdb.Set(ctx, middleware.RevokedKey(bizID), time.Now().UnixMilli(), s.cfg.RefreshTTL)
 	return nil
 }
 

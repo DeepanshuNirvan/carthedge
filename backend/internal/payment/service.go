@@ -13,6 +13,7 @@ import (
 
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
+	"carthedge/internal/invoice"
 	"carthedge/internal/middleware"
 	"carthedge/internal/order"
 	"carthedge/internal/secure"
@@ -31,6 +32,14 @@ type Service struct {
 	cipher *secure.Cipher
 	cfg    *config.Config
 	log    *slog.Logger
+	// subscriptionEvents handles Razorpay autopay webhooks (plan package,
+	// which imports this one — hence a hook set at boot)
+	subscriptionEvents func(ctx context.Context, event string, body []byte) error
+}
+
+// SetSubscriptionEvents routes subscription.* webhooks to billing.
+func (s *Service) SetSubscriptionEvents(fn func(ctx context.Context, event string, body []byte) error) {
+	s.subscriptionEvents = fn
 }
 
 func NewService(pool *pgxpool.Pool, rdb *redis.Client, orders *order.Service, cipher *secure.Cipher, cfg *config.Config, log *slog.Logger) *Service {
@@ -253,7 +262,20 @@ func (s *Service) Webhook(w http.ResponseWriter, r *http.Request) {
 			} `json:"payment"`
 		} `json:"payload"`
 	}
-	if err := json.Unmarshal(body, &event); err != nil || event.Event != "payment.captured" {
+	if err := json.Unmarshal(body, &event); err != nil {
+		httpx.OK(w, httpx.M{"ok": true})
+		return
+	}
+	if strings.HasPrefix(event.Event, "subscription.") && s.subscriptionEvents != nil {
+		if err := s.subscriptionEvents(r.Context(), event.Event, body); err != nil {
+			s.log.Error("subscription webhook failed", "event", event.Event, "err", err)
+			httpx.Err(w, http.StatusInternalServerError, "retry")
+			return
+		}
+		httpx.OK(w, httpx.M{"ok": true})
+		return
+	}
+	if event.Event != "payment.captured" {
 		httpx.OK(w, httpx.M{"ok": true})
 		return
 	}
@@ -291,7 +313,7 @@ func (s *Service) Webhook(w http.ResponseWriter, r *http.Request) {
 			PlanCode string `json:"planCode"`
 		}
 		json.Unmarshal(notes, &meta)
-		if err := ActivateSubscription(ctx, tx, bizID, meta.PlanCode); err != nil {
+		if err := ActivateSubscription(ctx, tx, bizID, meta.PlanCode, paymentID); err != nil {
 			s.log.Error("webhook subscription activate failed", "businessId", bizID, "err", err)
 			httpx.Err(w, http.StatusInternalServerError, "retry")
 			return
@@ -315,9 +337,10 @@ func (s *Service) Webhook(w http.ResponseWriter, r *http.Request) {
 // ActivateSubscription switches the plan, starts a fresh usage period (overage
 // is counted from here) and extends by 30 days from now or the current expiry,
 // whichever is later. A negotiated price only survives renewing the same plan.
-// Shared by the client verify (plan package) and the webhook, inside the
-// transaction that flips the payment to paid.
-func ActivateSubscription(ctx context.Context, tx pgx.Tx, bizID, planCode string) error {
+// Shared by the client verify, the webhook and autopay charges, inside the
+// transaction that flips the payment to paid; it also issues CartHedge's GST
+// invoice for that payment.
+func ActivateSubscription(ctx context.Context, tx pgx.Tx, bizID, planCode, paymentID string) error {
 	ct, err := tx.Exec(ctx, `update subscriptions set
 		plan_id = (select id from plans where code = $2),
 		custom_price = case when plan_id = (select id from plans where code = $2) then custom_price end,
@@ -332,5 +355,5 @@ func ActivateSubscription(ctx context.Context, tx pgx.Tx, bizID, planCode string
 	if ct.RowsAffected() == 0 {
 		return errors.New("subscription not found")
 	}
-	return nil
+	return invoice.IssuePlatformInvoice(ctx, tx, paymentID)
 }

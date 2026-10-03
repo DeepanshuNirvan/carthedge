@@ -4,7 +4,7 @@ package order
 var Statuses = []string{"new", "confirmed", "packed", "shipped", "delivered", "rto", "cancelled"}
 
 var transitions = map[string][]string{
-	"new":       {"confirmed", "cancelled"},
+	"new": {"confirmed", "cancelled"},
 	// sellers who do not use "packed" ship straight from confirmed (the order
 	// drawer offers Ship there)
 	"confirmed": {"packed", "shipped", "cancelled"},

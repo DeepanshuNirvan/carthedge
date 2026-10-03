@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"carthedge/internal/admin"
+	"carthedge/internal/aftersale"
 	"carthedge/internal/ai"
+	"carthedge/internal/alert"
 	"carthedge/internal/analytics"
 	"carthedge/internal/auth"
 	"carthedge/internal/broadcast"
@@ -80,6 +83,12 @@ func main() {
 	}
 
 	notifier := notify.New(cfg, log)
+	pusher, err := alert.NewPusher(cfg.EncryptionKey, pushSubject(cfg))
+	if err != nil {
+		log.Error("web push init failed", "err", err)
+		os.Exit(1)
+	}
+	alerts := alert.New(pool, notifier, pusher, log, cfg.PublicBaseURL)
 	otpSvc := otp.New(rdb, notifier)
 	shiprocket := courier.New(cfg.ShiprocketEmail, cfg.ShiprocketPassword, rdb)
 	platformRzp := payment.NewClient(cfg.RazorpayKeyID, cfg.RazorpayKeySecret)
@@ -87,21 +96,32 @@ func main() {
 	bus := events.New(rdb, log)
 	customerSvc := customer.NewService(pool)
 	productSvc := product.NewService(pool, notifier, log)
-	orderSvc := order.NewService(pool, rdb, customerSvc, productSvc, notifier, shiprocket, bus, log, cfg.PublicBaseURL)
+	orderSvc := order.NewService(pool, rdb, customerSvc, productSvc, notifier, alerts, shiprocket, bus, log, cfg.PublicBaseURL)
 	linkSvc := link.NewService(pool, productSvc, cfg.PublicBaseURL)
 	planSvc := plan.NewService(pool, rdb, cfg, platformRzp, notifier, log)
 	paySvc := payment.NewService(pool, rdb, orderSvc, cipher, cfg, log)
+	paySvc.SetSubscriptionEvents(planSvc.HandleRazorpayEvent)
 	authSvc := auth.NewService(pool, rdb, cfg, notifier, otpSvc, log)
+	authSvc.SetDeleteHook(func(ctx context.Context, bizID string) { planSvc.CancelAutopay(ctx, bizID) })
+	afterSvc := aftersale.New(pool, orderSvc, alerts, notifier, cipher, bus, log, cfg.PublicBaseURL)
+	afterSvc.SetCreditNoteIssuer(invoice.IssueCreditNote)
+	// money already paid on a cancelled or RTO order becomes a refund due
+	orderSvc.SetCloseHook(afterSvc.OnOrderClosed)
 	broadcastSvc := broadcast.NewService(pool, notifier, log)
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg, log)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log, cfg.PublicBaseURL)
 	metaClient := messaging.NewClient(cfg.MetaGraphVersion, cfg.MetaAppSecret, cfg.MetaIgAppSecret)
-	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, notifier, planSvc.HasFeature, log)
+	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, alerts, planSvc.HasFeature, log)
 	messagingSvc.Start(ctx)
 	// orders placed from a DM chat are confirmed and tracked on that chat
 	orderSvc.SetDirectMessenger(messagingSvc.SendToConversation)
-	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL).Start(ctx)
+	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL, jobs.Extra{
+		PurgeDeleted: authSvc.PurgeDeleted, BillOverage: planSvc.BillOverage, HasFeature: planSvc.HasFeature,
+	}).Start(ctx)
+	adminSvc := admin.NewService(pool, rdb, cfg, notifier)
+	adminSvc.SetAutopayCanceller(planSvc.CancelAutopay)
+	uploads := storage.NewHandler(store)
 
 	spa, err := web.New(pool, cfg.FrontendDir, cfg.PublicBaseURL, log)
 	if err != nil {
@@ -123,9 +143,10 @@ func main() {
 		Broadcasts: broadcast.NewHandler(broadcastSvc),
 		Invoices:   invoice.NewHandler(pool),
 		AI:         ai.NewHandler(aiSvc),
-		Uploads:    storage.NewHandler(store),
-		Public:     publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc, shiprocket),
-		Admin:      admin.NewHandler(admin.NewService(pool, rdb, cfg, notifier)),
+		Uploads:    uploads,
+		Public: publicapi.NewHandler(pool, linkSvc, orderSvc, otpSvc, paySvc, planSvc, productSvc, customerSvc, shiprocket,
+			afterSvc, uploads),
+		Admin: admin.NewHandler(adminSvc),
 		Messaging: messaging.NewHandler(messaging.HandlerDeps{
 			Service: messagingSvc, Client: metaClient, Rdb: rdb,
 			VerifyToken: cfg.MetaVerifyToken, JWTSecret: cfg.JWTSecret, AppBaseURL: cfg.PublicBaseURL,
@@ -135,9 +156,11 @@ func main() {
 				RedirectURL: cfg.MetaOAuthRedirect, Version: cfg.MetaGraphVersion,
 			},
 		}),
-		PaySvc: paySvc,
-		Events: bus,
-		Web:    spa,
+		PaySvc:    paySvc,
+		Alerts:    alerts,
+		AfterSale: afterSvc,
+		Events:    bus,
+		Web:       spa,
 	})
 
 	srv := &http.Server{
@@ -161,4 +184,16 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(shutdownCtx)
+}
+
+// pushSubject is the contact push services may use about our notifications
+// (RFC 8292): a mailto or an https URL.
+func pushSubject(cfg *config.Config) string {
+	switch {
+	case cfg.AdminEmail != "":
+		return "mailto:" + cfg.AdminEmail
+	case strings.HasPrefix(cfg.PublicBaseURL, "https://"):
+		return cfg.PublicBaseURL
+	}
+	return "mailto:hello@carthedge.in"
 }

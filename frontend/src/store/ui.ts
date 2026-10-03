@@ -10,9 +10,12 @@ export type Toast = {
 type UiState = {
   toasts: Toast[];
   paywallOpen: boolean;
+  /** the API said this account is scheduled for deletion */
+  accountDeleted: boolean;
   toast: (kind: Toast['kind'], title: string, message?: string) => void;
   dismissToast: (id: number) => void;
   setPaywall: (open: boolean) => void;
+  setAccountDeleted: (deleted: boolean) => void;
 };
 
 let nextId = 1;
@@ -20,6 +23,7 @@ let nextId = 1;
 export const useUi = create<UiState>()((set, get) => ({
   toasts: [],
   paywallOpen: false,
+  accountDeleted: false,
   toast: (kind, title, message) => {
     const id = nextId++;
     set({ toasts: [...get().toasts, { id, kind, title, message }] });
@@ -27,6 +31,7 @@ export const useUi = create<UiState>()((set, get) => ({
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   setPaywall: (open) => set({ paywallOpen: open }),
+  setAccountDeleted: (accountDeleted) => set({ accountDeleted }),
 }));
 
 export const toast = (kind: Toast['kind'], title: string, message?: string) =>

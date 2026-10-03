@@ -189,6 +189,26 @@ func (h *Handler) ListOffers(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"offers": offers})
 }
 
+func (h *Handler) UpdateOffer(w http.ResponseWriter, r *http.Request) {
+	var in Offer
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if err := h.svc.UpdateOffer(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), in); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
+func (h *Handler) DeleteOffer(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteOffer(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id")); err != nil {
+		httpx.Err(w, http.StatusNotFound, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}
+
 func (h *Handler) SetOfferActive(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Active bool `json:"active"`

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"carthedge/internal/admin"
+	"carthedge/internal/aftersale"
 	"carthedge/internal/ai"
+	"carthedge/internal/alert"
 	"carthedge/internal/analytics"
 	"carthedge/internal/auth"
 	"carthedge/internal/broadcast"
@@ -52,6 +54,8 @@ type Deps struct {
 	Admin      *admin.Handler
 	Messaging  *messaging.Handler
 	PaySvc     *payment.Service
+	Alerts     *alert.Service
+	AfterSale  *aftersale.Service
 	Events     *events.Bus
 	Web        *web.Handler // nil in dev, where Vite serves the SPA
 }
@@ -59,7 +63,7 @@ type Deps struct {
 func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	authed := middleware.Auth(d.Cfg.JWTSecret)
+	authed := middleware.Auth(d.Cfg.JWTSecret, d.Rdb)
 	adminAuthed := middleware.AdminAuth(d.Cfg.JWTSecret)
 	active := middleware.Middleware(d.PlanSvc.RequireActive)
 	byIP := func(name string, limit int, window time.Duration) middleware.Middleware {
@@ -92,11 +96,26 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/auth/forgot-password", d.Auth.ForgotPassword, byIP("forgot", 5, time.Minute))
 	handle("POST /api/v1/auth/reset-password", d.Auth.ResetPassword, byIP("reset", 10, time.Minute))
 
+	// account: reachable when the plan lapsed or the account awaits deletion
+	handle("PUT /api/v1/auth/password", d.Auth.ChangePassword, authed, byBusiness("changePassword", 10, time.Hour))
+	handle("POST /api/v1/auth/sessions/revoke", d.Auth.EndOtherSessions, authed, byBusiness("revokeSessions", 10, time.Hour))
+	handle("GET /api/v1/account/export", d.Auth.Export, authed, byBusiness("export", 5, time.Hour))
+	handle("POST /api/v1/account/delete", d.Auth.DeleteAccount, authed, byBusiness("deleteAccount", 5, time.Hour))
+	handle("POST /api/v1/account/restore", d.Auth.RestoreAccount, authed)
+
+	// owner alerts on this device (web push)
+	handle("GET /api/v1/push/key", d.Alerts.PushKey, authed)
+	handle("POST /api/v1/push/subscriptions", d.Alerts.Subscribe, authed, byBusiness("pushSubscribe", 30, time.Hour))
+	handle("DELETE /api/v1/push/subscriptions", d.Alerts.Unsubscribe, authed)
+	handle("POST /api/v1/push/test", d.Alerts.Test, authed, byBusiness("pushTest", 10, time.Hour))
+
 	// business profile & settings
 	handle("GET /api/v1/business", d.Business.Get, authed)
 	handle("PUT /api/v1/business", d.Business.Update, authed)
 	handle("PUT /api/v1/business/payments", d.Business.UpdatePayments, authed)
 	handle("PUT /api/v1/business/ai", d.Business.UpdateAI, authed)
+	// policies | ai | checkout | gst | alerts
+	handle("PUT /api/v1/business/settings/{section}", d.Business.UpdateSettings, authed)
 
 	// plans & subscription (reachable when expired, so sellers can pay)
 	handle("GET /api/v1/plans", d.Plans.List)
@@ -105,6 +124,10 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/subscription/verify", d.Plans.Verify, authed)
 	handle("POST /api/v1/subscription/cancel", d.Plans.Cancel, authed)
 	handle("POST /api/v1/plans/custom-request", d.Plans.CustomRequest, authed)
+	handle("GET /api/v1/subscription/invoices", d.Invoices.PlatformInvoices, authed)
+	handle("POST /api/v1/subscription/autopay", d.Plans.StartAutopay, authed, byBusiness("autopay", 10, time.Hour))
+	handle("POST /api/v1/subscription/autopay/verify", d.Plans.VerifyAutopay, authed)
+	handle("DELETE /api/v1/subscription/autopay", d.Plans.CancelAutopay, authed)
 
 	// catalog
 	handle("GET /api/v1/products", d.Products.List, authed, active)
@@ -120,6 +143,8 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/offers", d.Products.ListOffers, authed, active, offers)
 	handle("POST /api/v1/offers", d.Products.CreateOffer, authed, active, offers)
 	handle("PATCH /api/v1/offers/{id}", d.Products.SetOfferActive, authed, active, offers)
+	handle("PUT /api/v1/offers/{id}", d.Products.UpdateOffer, authed, active, offers)
+	handle("DELETE /api/v1/offers/{id}", d.Products.DeleteOffer, authed, active, offers)
 
 	// links
 	handle("GET /api/v1/links", d.Links.List, authed, active)
@@ -136,6 +161,21 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/orders/{id}/resend-confirmation", d.Orders.ResendCodConfirmation, authed, active)
 	// seller's verdict on a UPI transfer a buyer says they made
 	handle("POST /api/v1/orders/{id}/payment/confirm", d.PaySvc.ConfirmUpi, authed, active)
+	handle("POST /api/v1/orders/bulk-status", d.Orders.BulkStatus, authed, active, byBusiness("bulkStatus", 30, time.Minute))
+	handle("GET /api/v1/orders/abandoned", d.Orders.Abandoned, authed, active)
+	handle("PATCH /api/v1/orders/{id}/address", d.Orders.ChangeAddress, authed, active)
+
+	// after-sales: returns, exchanges, refunds
+	handle("GET /api/v1/orders/{id}/aftersale", d.AfterSale.HandleOrderView, authed, active)
+	handle("POST /api/v1/orders/{id}/returns", d.AfterSale.HandleCreate, authed, active)
+	handle("POST /api/v1/orders/{id}/refunds", d.AfterSale.HandleRefund, authed, active, byBusiness("refund", 30, time.Minute))
+	handle("GET /api/v1/returns", d.AfterSale.HandleList, authed, active)
+	handle("GET /api/v1/returns/{id}", d.AfterSale.HandleGet, authed, active)
+	handle("POST /api/v1/returns/{id}/status", d.AfterSale.HandleStatus, authed, active)
+	handle("POST /api/v1/returns/{id}/replacement", d.AfterSale.HandleReplacement, authed, active)
+	handle("GET /api/v1/refunds/pending", d.AfterSale.HandlePendingRefunds, authed, active)
+	handle("POST /api/v1/refunds/{id}/process", d.AfterSale.HandleProcessRefund, authed, active, byBusiness("refund", 30, time.Minute))
+	handle("POST /api/v1/refunds/{id}/cancel", d.AfterSale.HandleCancelRefund, authed, active)
 
 	// live order board (SSE; EventSource passes the JWT as ?accessToken=)
 	handle("GET /api/v1/events", func(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +186,8 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/customers", d.Customers.List, authed, active)
 	handle("GET /api/v1/customers/{id}", d.Customers.Get, authed, active)
 	handle("PATCH /api/v1/customers/{id}", d.Customers.Patch, authed, active)
+	// a buyer's DPDP erasure request
+	handle("POST /api/v1/customers/{id}/erase", d.Customers.Erase, authed, active)
 
 	// analytics & reports
 	handle("GET /api/v1/dashboard", d.Analytics.Dashboard, authed, active)
@@ -175,6 +217,9 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/ai/drafts/{id}/discard", d.AI.Discard, authed, active, aiFeature)
 	handle("POST /api/v1/ai/reply", d.AI.Reply, authed, active,
 		middleware.RequireFeature("aiReply"), byBusiness("aiReply", 60, time.Minute))
+	// the seller trying their own assistant: real model calls, so capped
+	handle("POST /api/v1/ai/practice", d.AI.Practice, authed, active,
+		middleware.RequireFeature("aiReply"), byBusiness("aiPractice", 20, time.Minute))
 
 	// automated DM capture (Instagram + WhatsApp) — feeds the same AI draft pipeline as manual paste
 	handle("GET /api/v1/channels", d.Messaging.ListChannels, authed, active, aiFeature)
@@ -208,6 +253,8 @@ func New(d Deps) http.Handler {
 	handle("GET /api/v1/admin/businesses/{id}", d.Admin.BusinessDetail, adminAuthed)
 	handle("PATCH /api/v1/admin/businesses/{id}/status", d.Admin.SetBusinessStatus, adminAuthed)
 	handle("POST /api/v1/admin/businesses/{id}/plan", d.Admin.AssignPlan, adminAuthed)
+	handle("POST /api/v1/admin/businesses/{id}/impersonate", d.Admin.Impersonate, adminAuthed)
+	handle("GET /api/v1/admin/ai-usage", d.Admin.AIUsage, adminAuthed)
 	handle("GET /api/v1/admin/plans", d.Admin.Plans, adminAuthed)
 	handle("POST /api/v1/admin/plans", d.Admin.CreatePlan, adminAuthed)
 	handle("PUT /api/v1/admin/plans/{id}", d.Admin.UpdatePlan, adminAuthed)
@@ -229,6 +276,8 @@ func New(d Deps) http.Handler {
 	handle("GET /p/{businessCode}/store/products/{id}", d.Public.StoreProduct)
 	handle("GET /p/{businessCode}/serviceability", d.Public.Serviceability, byIP("serviceability", 60, time.Minute))
 	handle("POST /p/{businessCode}/store/order", d.Public.StoreOrder, byIP("order", 10, time.Minute))
+	handle("POST /p/{businessCode}/quote", d.Public.Quote, byIP("quote", 60, time.Minute))
+	handle("GET /p/{businessCode}/policies", d.Public.Policies)
 
 	// buyer-facing public API (link checkout, no login)
 	handle("GET /p/{businessCode}/{token}", d.Public.ResolveLink)
@@ -236,10 +285,17 @@ func New(d Deps) http.Handler {
 	handle("POST /p/{businessCode}/otp/verify", d.Public.VerifyOtp, byIP("otpVerify", 20, 10*time.Minute))
 	handle("POST /p/{businessCode}/{token}/order", d.Public.CreateOrder, byIP("order", 10, time.Minute))
 	handle("POST /p/{businessCode}/waitlist", d.Public.Waitlist, byIP("waitlist", 10, time.Minute))
-	handle("GET /p/orders/{code}/track", d.Public.Track)
+	handle("GET /p/orders/{code}/track", d.Public.Track, byIP("track", 60, time.Minute)) // the costliest public read
 	handle("POST /p/orders/{code}/pay", d.Public.Pay, byIP("pay", 20, time.Minute))
 	handle("POST /p/orders/{code}/upi-claim", d.Public.ClaimUpi, byIP("upiClaim", 10, 10*time.Minute))
 	handle("POST /p/orders/{code}/confirm", d.Public.ConfirmCod, byIP("codConfirm", 20, time.Minute))
+	// buyer self-service from the tracking page (phone re-verified by OTP)
+	buyerAction := byIP("buyerAction", 30, 10*time.Minute)
+	handle("POST /p/orders/{code}/cancel", d.Public.BuyerCancel, buyerAction)
+	handle("POST /p/orders/{code}/address", d.Public.BuyerAddress, buyerAction)
+	handle("POST /p/orders/{code}/returns", d.Public.BuyerReturn, buyerAction)
+	handle("POST /p/orders/{code}/returns/{id}/withdraw", d.Public.BuyerWithdrawReturn, buyerAction)
+	handle("POST /p/orders/{code}/uploads", d.Public.BuyerUpload, byIP("buyerUpload", 20, 10*time.Minute))
 	handle("POST /p/payments/verify", d.Public.VerifyPayment, byIP("payVerify", 30, time.Minute))
 
 	// razorpay webhook (platform account)

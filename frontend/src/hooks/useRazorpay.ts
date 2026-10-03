@@ -25,19 +25,22 @@ export type RazorpaySuccess = {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+  /** set instead of the order id when an autopay mandate was authorised */
+  razorpay_subscription_id?: string;
 };
 
-/** Opens Razorpay checkout for a backend-created order; resolves with the signature payload. */
+/** Opens Razorpay checkout for a backend-created order (or an autopay
+ *  subscription); resolves with the signature payload. */
 export function useRazorpay() {
   return useCallback(
-    async (info: CheckoutInfo, prefill?: { name?: string; contact?: string; email?: string }) => {
+    async (info: CheckoutInfo & { subscriptionId?: string }, prefill?: { name?: string; contact?: string; email?: string }) => {
       await loadScript();
       return new Promise<RazorpaySuccess>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: info.razorpayKeyId,
-          order_id: info.razorpayOrderId,
-          amount: info.amount,
-          currency: info.currency,
+          ...(info.subscriptionId
+            ? { subscription_id: info.subscriptionId }
+            : { order_id: info.razorpayOrderId, amount: info.amount, currency: info.currency }),
           name: info.businessName,
           description: info.orderCode,
           prefill,

@@ -10,6 +10,8 @@ Things automation could not do (real Meta accounts, real phones, third-party pay
 - [ ] Rotate every secret that was pasted into chat: OpenAI key, Razorpay key secret + webhook secret, Meta app secret + IG app secret, Neon DB password, `JWT_SECRET` (logs everyone out), Mailtrap password. Do **not** rotate `ENCRYPTION_KEY` without re-encrypting stored Razorpay secrets and channel tokens.
 - [ ] Decide OTP delivery (OPS-1): until a WhatsApp/SMS provider is configured, signup and buyer OTPs only reach the server log.
 - [ ] Optional cleanup: QA data from this pass is prefixed `qa-` (stores `qa-*`, emails `qa.*@example.com`, phones `9000xxxxxx`); test subscription payments show in admin revenue/MRR.
+- [ ] Admin → Site content → **Invoice identity**: enter CartHedge's legal name, GSTIN, address and billing email. Until then subscription invoices are issued without GST (as an unregistered supplier).
+- [ ] Razorpay dashboard → Webhooks: subscribe the existing webhook to all `subscription.*` events (`authenticated`, `activated`, `charged`, `pending`, `halted`, `resumed`, `cancelled`, `completed`) as well as `payment.captured` (autopay renewals are booked from these).
 
 ## 1. Instagram (real account, needs Meta app live + tester added)
 
@@ -57,8 +59,20 @@ Things automation could not do (real Meta accounts, real phones, third-party pay
 - [ ] Seller app on a phone: bottom tab bar, order drawer, product form and settings are usable one-handed; dark and light themes.
 - [ ] Print an invoice (Invoices → open → Print) on a real printer/PDF.
 
-## 6. Production deploy checks (Render)
+## 6. Features from the 3 Oct build (real devices / real money)
+
+- [ ] **Device notifications:** Settings → Account → This device → Turn on, on Chrome (Android and desktop) and on an iPhone with CartHedge added to the home screen (iOS only allows web push for installed apps). "Send a test" arrives; a real order from another phone arrives with the app closed, and tapping it opens that order.
+- [ ] **Autopay:** Billing → Turn on autopay → approve the mandate in Razorpay (test card or UPI AutoPay) → Billing shows "Autopay on". After the first charge, Billing history lists the CartHedge GST invoice and it prints cleanly. Cancel renewal → Razorpay shows the subscription cancelled.
+- [ ] **Refund through Razorpay:** on a store where the seller has their own Razorpay keys, a captured test payment → cancel the order → Pay the pending refund → Razorpay shows the refund and the order shows it processed with the Razorpay reference.
+- [ ] **Alerts and reminders on WhatsApp/email** (after OPS-1): a new order, a return request, a buyer cancellation and a dropped-checkout reminder (1–24 h after a buyer verifies their number without ordering) actually arrive.
+- [ ] **Printing:** packing slips (one per page, QR scans to the order page), the pick list and a GST invoice with CGST/SGST and one with IGST on a real printer and as PDF.
+- [ ] **Store policies page** on the live domain (`/s/<store>/policies`) is what you give Razorpay/Meta as the refund, shipping, terms and contact pages; check it reads right for a store with full policies filled in.
+- [ ] **Account deletion:** delete a throwaway seller account → logging in shows the restore screen → restore works. (The 30-day purge runs in the hourly job; check one purged test account after 30 days.)
+- [ ] **Buyer self-service on a phone:** from the order page cancel an unshipped order, change an address, and raise an exchange with a photo taken on the phone camera.
+
+## 7. Production deploy checks (Render)
 
 - [ ] After deploy, from two different networks hit `/api/v1/auth/login` repeatedly → each network is limited separately (confirms Render passes `CF-Connecting-IP`; if every client shares one limit, tell me).
 - [ ] Watch the logs through one deploy: no duplicate AI replies or COD nudges while old and new instances overlap.
 - [ ] `/robots.txt`, `/sitemap.xml`, `/privacy`, `/terms`, `/data-deletion` return 200 on the live domain (Meta app review needs them).
+- [ ] **Speed:** the Neon database is in AWS us-east-2 (Ohio). Check the Render service's region — if it is not Ohio (US East), every query crosses continents (~200 ms each, pages take seconds). Move the Render service to Ohio, or the database to the Render region; this matters more than any code change.

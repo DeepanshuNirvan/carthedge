@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, post } from './http';
-import type { AiDraft, DraftData } from './types';
+import type { AiDraft, ChatCart, ChatStage, DraftData, PracticeTurn } from './types';
 
 export const useDrafts = () =>
   useQuery({
@@ -35,3 +35,11 @@ export function useAiMutations() {
     }),
   };
 }
+
+/** One real assistant turn on a chat the seller types; nothing is placed. */
+export const practiceTurn = (input: {
+  messages: { who: 'buyer' | 'shop'; text: string }[];
+  cart?: ChatCart;
+  stage?: ChatStage;
+  summaryHash?: string;
+}) => post<PracticeTurn>('/api/v1/ai/practice', input);

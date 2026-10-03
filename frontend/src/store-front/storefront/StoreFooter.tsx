@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Instagram, MessageCircle, PackageSearch } from 'lucide-react';
+import { FileText, Instagram, MessageCircle, PackageSearch } from 'lucide-react';
 import type { StoreBusiness } from '@/api/types';
 import { LogoMark } from '@/marketing/Wordmark';
 import { whatsappHref } from '@/lib/validators';
@@ -8,13 +8,22 @@ export function StoreFooter({ business }: { business: StoreBusiness }) {
   return (
     <footer className="mt-10 border-t px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 text-center">
-        <Link
-          to="/track"
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-jade-ink hover:underline"
-        >
-          <PackageSearch className="size-4" />
-          Track your order
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-x-6">
+          <Link
+            to="/track"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-jade-ink hover:underline"
+          >
+            <PackageSearch className="size-4" />
+            Track your order
+          </Link>
+          <Link
+            to={`/s/${business.code}/policies`}
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-jade-ink hover:underline"
+          >
+            <FileText className="size-4" />
+            Returns and policies
+          </Link>
+        </div>
 
         {/* the DM is where these buyers came from and where they ask questions —
             give both channels a real, thumb-sized target, not just a header icon */}

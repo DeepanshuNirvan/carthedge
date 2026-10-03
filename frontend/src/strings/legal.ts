@@ -14,7 +14,7 @@ export type LegalDoc = {
 };
 
 const CONTACT = 'privacy@carthedge.in';
-const UPDATED = '20 August 2026';
+const UPDATED = '3 October 2026';
 
 export const legalDocs = {
   privacy: {
@@ -40,7 +40,9 @@ export const legalDocs = {
           'Account and business details you enter: name, email address, phone number, WhatsApp and Instagram handles, business address, and GSTIN where provided.',
           'Payment gateway credentials for your own Razorpay account, stored encrypted at rest. Buyer payments settle directly to you — CartHedge never holds your money.',
           'Access tokens for any Instagram or WhatsApp account you connect, stored encrypted at rest and used only to read and send messages for your business.',
-          'Usage records needed to run your subscription: order counts, plan and billing status.',
+          'Usage records needed to run your subscription: order counts, plan and billing status, and how many AI requests your account made (counts only, not message content).',
+          'Your plan payments are processed by Razorpay. If you turn on autopay, the card or UPI AutoPay mandate is held by Razorpay; we keep only its reference, the amounts charged and the GST invoices we issue you.',
+          'If you turn on notifications on a device, the push address your browser gives us for it. It is removed when you turn notifications off or the browser stops accepting them.',
         ],
       },
       {
@@ -49,7 +51,10 @@ export const legalDocs = {
           'Buyers never create an account. At checkout we collect the name, phone number and delivery address needed to fulfil the order, plus the order contents.',
           'A phone number is verified by one-time password. That verification token is short-lived and consumed when the order is created.',
           'Buyer information is processed on behalf of the seller you are ordering from. That seller is responsible for how they use it.',
-          'Card and UPI details are handled entirely by Razorpay. CartHedge never sees or stores them.',
+          'If you return or exchange an item, the request details, any photos you upload and the record of any refund.',
+          'If you buy for a business, the GSTIN and company name you add for a tax invoice.',
+          'If you verify your number but do not finish checking out, the store may send you one reminder about the order. That record is deleted after 30 days.',
+          'Card and UPI details are handled entirely by Razorpay. CartHedge never sees or stores them; we keep only Razorpay’s payment and refund references, amounts and status, for refunds and tax records.',
         ],
       },
       {
@@ -58,14 +63,15 @@ export const legalDocs = {
           'Connecting an account is optional and always initiated by the seller through Meta’s own login screen. We never ask for, see, or store your Instagram or WhatsApp password.',
           'Once connected, we receive messages and comments sent to that business account from the moment of connection onward. We do not download or read your message history from before you connected.',
           'Message content is used for one purpose: drafting an order card that you review and confirm. We also use it to send replies and order updates that you or your configured automations trigger.',
-          'Message text is sent to our AI provider (Google Gemini) to extract order details such as item, size, address and payment preference. It is not used to train third-party models.',
+          'Message text is sent to our AI provider (OpenAI or Google Gemini) to understand the buyer, draft the assistant’s replies and extract order details such as item, size, address and payment preference. It is not used to train third-party models.',
           'You can disconnect an account at any time from Settings. Disconnecting immediately stops all message access and deletes the stored access token.',
         ],
       },
       {
         heading: 'Who we share data with',
         body: [
-          'Service providers that operate the platform: our hosting and database providers, Razorpay for payments, Google Gemini for order parsing, our email provider for transactional mail, and courier partners when you hand an order over for shipping.',
+          'Service providers that operate the platform: our hosting and database providers, Razorpay for payments, our AI providers (OpenAI, Google Gemini), our email and messaging providers, the browser makers’ push services that deliver device notifications, and courier partners when you hand an order over for shipping.',
+          'CartHedge support staff can open a read-only view of a seller’s workspace to help with a request. They cannot change anything in it, and every such access is recorded.',
           'We do not sell personal information, and we do not share it for advertising.',
           'Each seller’s data is isolated. One seller can never see another seller’s orders, customers or messages.',
         ],
@@ -76,15 +82,16 @@ export const legalDocs = {
           'Seller account and order records are kept while the account is active, and for as long afterwards as tax and accounting rules require.',
           'Buyer order records are kept as part of the seller’s order history, since the seller needs them for fulfilment, returns and invoicing.',
           'Encrypted channel access tokens are deleted as soon as the channel is disconnected.',
+          'When a seller deletes their account, the store closes at once and its data is erased after 30 days; signing in before then restores it. GST invoices CartHedge issued for the subscription, and the matching payment records, are kept as tax law requires.',
         ],
       },
       {
         heading: 'Your choices',
         body: [
-          'You can access and correct your business details at any time from Settings.',
+          'You can access and correct your business details at any time from Settings, and download all your store data from Settings → Account.',
           'You can disconnect Instagram or WhatsApp without closing your CartHedge account.',
-          'You can request deletion of your account and associated data — see the data deletion page.',
-          'Buyers who want an order record removed should contact the seller they ordered from, or write to us and we will pass the request on.',
+          'You can delete your account yourself from Settings → Account — see the data deletion page.',
+          'Buyers who want their details removed should contact the seller they ordered from; the seller can erase a buyer’s personal details while keeping the order for their accounts. You can also write to us and we will pass the request on.',
         ],
       },
       {
@@ -139,6 +146,8 @@ export const legalDocs = {
         heading: 'Subscription and billing',
         body: [
           'Plans are billed monthly and include a monthly order quota. Orders beyond the quota are charged a per-order fee at the rate shown on the pricing page.',
+          'You can renew by hand each month or turn on autopay. With autopay, your plan renews automatically through Razorpay on the card or UPI AutoPay mandate you approve, and fees for orders beyond the quota are added to that charge. Razorpay sends the notices that card and UPI rules require before each charge. You can turn autopay off at any time in Billing.',
+          'Every subscription payment comes with a GST invoice from CartHedge, available in Billing.',
           'You can cancel at any time. Access continues until the end of the paid period. Fees already paid are not refunded except where required by law.',
           'If a subscription lapses, seller access and the public storefront are paused until it is renewed. Your data is retained.',
         ],
@@ -184,9 +193,9 @@ export const legalDocs = {
       {
         heading: 'Delete your whole account',
         body: [
-          `Email ${CONTACT} from the address registered on the account, with the subject "Delete my account".`,
-          'We confirm the request, then delete your business profile, products, customer records, orders, messages and stored credentials.',
-          'We aim to complete deletions within 30 days. We will tell you when it is done.',
+          'Sign in, open Settings → Account and choose Delete account. You can download all your data there first.',
+          'Your store closes and the assistant stops at once. After 30 days we delete your business profile, products, customer records, orders, messages and stored credentials. Signing in before then restores everything.',
+          `If you cannot sign in, email ${CONTACT} from the address registered on the account, with the subject "Delete my account".`,
         ],
       },
       {

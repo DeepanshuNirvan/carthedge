@@ -32,7 +32,26 @@ type Client struct {
 	providers []provider
 	hc        *http.Client
 	log       *slog.Logger
+	// usage records the tokens of every successful call against the seller
+	// on the context (see forBusiness); set by the service at boot
+	usage func(ctx context.Context, model string, in, out int)
 }
+
+type bizKey struct{}
+
+// forBusiness tags a context with the seller an AI call is made for, so its
+// cost is booked against them.
+func forBusiness(ctx context.Context, bizID string) context.Context {
+	return context.WithValue(ctx, bizKey{}, bizID)
+}
+
+func businessOf(ctx context.Context) string {
+	v, _ := ctx.Value(bizKey{}).(string)
+	return v
+}
+
+// tokens is what a provider reports a call used.
+type tokens struct{ in, out int }
 
 func NewClient(cfg *config.Config, log *slog.Logger) *Client {
 	// any OpenAI-compatible endpoint works here (Azure, OpenRouter, a local model)
@@ -86,10 +105,14 @@ func (c *Client) Complete(ctx context.Context, system, user string, jsonMode boo
 				case <-time.After(wait):
 				}
 			}
+			var used tokens
 			if p.name == "gemini" {
-				out, lastErr = c.gemini(ctx, p, system, user, jsonMode)
+				out, used, lastErr = c.gemini(ctx, p, system, user, jsonMode)
 			} else {
-				out, lastErr = c.openai(ctx, p, system, user, jsonMode)
+				out, used, lastErr = c.openai(ctx, p, system, user, jsonMode)
+			}
+			if lastErr == nil && c.usage != nil {
+				c.usage(ctx, p.model, used.in, used.out)
 			}
 			var busy *busyError
 			if lastErr == nil || !errors.As(lastErr, &busy) {
@@ -109,7 +132,7 @@ func (c *Client) Complete(ctx context.Context, system, user string, jsonMode boo
 	return "", lastErr
 }
 
-func (c *Client) openai(ctx context.Context, p provider, system, user string, jsonMode bool) (string, error) {
+func (c *Client) openai(ctx context.Context, p provider, system, user string, jsonMode bool) (string, tokens, error) {
 	payload := map[string]any{
 		"model": p.model,
 		"messages": []map[string]string{
@@ -123,13 +146,13 @@ func (c *Client) openai(ctx context.Context, p provider, system, user string, js
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return "", err
+		return "", tokens{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.key)
 	raw, err := c.do(req, p.name)
 	if err != nil {
-		return "", err
+		return "", tokens{}, err
 	}
 	var out struct {
 		Choices []struct {
@@ -137,14 +160,18 @@ func (c *Client) openai(ctx context.Context, p provider, system, user string, js
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			Prompt     int `json:"prompt_tokens"`
+			Completion int `json:"completion_tokens"`
+		} `json:"usage"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil || len(out.Choices) == 0 {
-		return "", errors.New("openai returned unexpected response")
+		return "", tokens{}, errors.New("openai returned unexpected response")
 	}
-	return out.Choices[0].Message.Content, nil
+	return out.Choices[0].Message.Content, tokens{out.Usage.Prompt, out.Usage.Completion}, nil
 }
 
-func (c *Client) gemini(ctx context.Context, p provider, system, user string, jsonMode bool) (string, error) {
+func (c *Client) gemini(ctx context.Context, p provider, system, user string, jsonMode bool) (string, tokens, error) {
 	payload := map[string]any{
 		"systemInstruction": map[string]any{"parts": []map[string]string{{"text": system}}},
 		"contents":          []map[string]any{{"parts": []map[string]string{{"text": user}}}},
@@ -156,14 +183,14 @@ func (c *Client) gemini(ctx context.Context, p provider, system, user string, js
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", p.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return "", err
+		return "", tokens{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	// header, not ?key= — query strings end up in proxy and access logs
 	req.Header.Set("x-goog-api-key", p.key)
 	raw, err := c.do(req, p.name)
 	if err != nil {
-		return "", err
+		return "", tokens{}, err
 	}
 	var out struct {
 		Candidates []struct {
@@ -173,11 +200,16 @@ func (c *Client) gemini(ctx context.Context, p provider, system, user string, js
 				} `json:"parts"`
 			} `json:"content"`
 		} `json:"candidates"`
+		Usage struct {
+			Prompt   int `json:"promptTokenCount"`
+			Output   int `json:"candidatesTokenCount"`
+			Thoughts int `json:"thoughtsTokenCount"` // billed as output
+		} `json:"usageMetadata"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil || len(out.Candidates) == 0 || len(out.Candidates[0].Content.Parts) == 0 {
-		return "", errors.New("gemini returned unexpected response")
+		return "", tokens{}, errors.New("gemini returned unexpected response")
 	}
-	return out.Candidates[0].Content.Parts[0].Text, nil
+	return out.Candidates[0].Content.Parts[0].Text, tokens{out.Usage.Prompt, out.Usage.Output + out.Usage.Thoughts}, nil
 }
 
 func (c *Client) do(req *http.Request, providerName string) ([]byte, error) {

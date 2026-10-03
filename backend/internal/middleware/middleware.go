@@ -23,7 +23,19 @@ const (
 	bizCodeKey
 	adminIDKey
 	featuresKey
+	impersonatorKey
 )
+
+// RevokedKey holds the moment (unix ms) a seller's sessions were ended — a
+// password change or "log out other devices". Tokens issued before it stop
+// working: refresh tokens in auth, access tokens here.
+func RevokedKey(bizID string) string { return "auth:revoked:" + bizID }
+
+// Impersonator is the admin behind a read-only support session, if any.
+func Impersonator(ctx context.Context) string {
+	v, _ := ctx.Value(impersonatorKey).(string)
+	return v
+}
 
 func BusinessID(ctx context.Context) string {
 	v, _ := ctx.Value(bizIDKey).(string)
@@ -94,7 +106,8 @@ func parseToken(r *http.Request, secret string) (jwt.MapClaims, error) {
 }
 
 // Auth validates a seller Bearer JWT and puts business id/code on the context.
-func Auth(secret string) Middleware {
+// rdb may be nil (tests): revocation is then not checked.
+func Auth(secret string, rdb *redis.Client) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, err := parseToken(r, secret)
@@ -111,8 +124,24 @@ func Auth(secret string) Middleware {
 				httpx.Err(w, http.StatusUnauthorized, "invalid token claims")
 				return
 			}
+			// iat is whole seconds: a token from the same second as the
+			// revocation is let through, so the fresh one issued with it works
+			if iat, ok := claims["iat"].(float64); ok && rdb != nil {
+				if revoked, err := rdb.Get(r.Context(), RevokedKey(bizID)).Int64(); err == nil && int64(iat)*1000+999 < revoked {
+					httpx.Err(w, http.StatusUnauthorized, "this session was signed out — log in again")
+					return
+				}
+			}
 			ctx := context.WithValue(r.Context(), bizIDKey, bizID)
 			ctx = context.WithValue(ctx, bizCodeKey, bizCode)
+			// a support session opened by an admin reads, never writes
+			if admin, _ := claims["imp"].(string); admin != "" {
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					httpx.JSON(w, http.StatusForbidden, httpx.M{"error": "support view is read-only", "code": "readOnly"})
+					return
+				}
+				ctx = context.WithValue(ctx, impersonatorKey, admin)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

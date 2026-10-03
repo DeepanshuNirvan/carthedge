@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, KanbanSquare, LayoutList, Search } from 'lucide-react';
 import type { Order, OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrderBoard, useOrderMutations, useOrders } from '@/api/orders';
+import { useReturns } from '@/api/aftersale';
 import { PageHeader } from '../shell/PageHeader';
 import { OrderDrawer } from './OrderDrawer';
+import { BulkBar, DroppedView, ReturnsView } from './OrdersExtras';
 import { toast } from '@/store/ui';
 import { cn } from '@/lib/cn';
 import { timeAgo } from '@/lib/date';
@@ -113,11 +116,20 @@ function LaneFallback({
 }
 
 export default function OrdersPage() {
-  const [view, setView] = useState<'board' | 'table'>('board');
+  const [view, setView] = useState<'board' | 'table' | 'returns' | 'dropped'>('board');
   const [search, setSearch] = useState('');
   const [payment, setPayment] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  // ?order= opens a card directly: alerts and notifications link here
+  const [params, setParams] = useSearchParams();
+  const openOrderId = params.get('order');
+  const setOpenOrderId = (id: string | null) => {
+    if (id) params.set('order', id);
+    else params.delete('order');
+    setParams(params, { replace: !id });
+  };
+  const [selected, setSelected] = useState<string[]>([]);
+  const { data: openReturns } = useReturns('open');
   const [pendingMove, setPendingMove] = useState<{ id: string; status: OrderStatus; name: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<OrderStatus | null>(null);
 
@@ -200,10 +212,18 @@ export default function OrdersPage() {
       <PageHeader
         title="Orders"
         subtitle={
-          <>
-            <span className="lg:hidden">Tap a card to open it and move it along</span>
-            <span className="hidden lg:inline">Click a card to open it, or drag it to another column</span>
-          </>
+          view === 'board' ? (
+            <>
+              <span className="lg:hidden">Tap a card to open it and move it along</span>
+              <span className="hidden lg:inline">Click a card to open it, or drag it to another column</span>
+            </>
+          ) : view === 'table' ? (
+            'Tick orders to move, print or cancel them together'
+          ) : view === 'returns' ? (
+            'Return and exchange requests from buyers and from you'
+          ) : (
+            'Buyers who verified their number but did not place the order'
+          )
         }
         actions={
           <>
@@ -226,15 +246,25 @@ export default function OrdersPage() {
               tabs={[
                 { value: 'board', label: 'Board' },
                 { value: 'table', label: 'List' },
+                { value: 'returns', label: 'Returns', count: openReturns?.length || undefined },
+                { value: 'dropped', label: 'Dropped' },
               ]}
               value={view}
-              onChange={setView}
+              onChange={(v) => {
+                setView(v);
+                setSelected([]);
+              }}
+              className="max-w-full overflow-x-auto"
             />
           </>
         }
       />
 
-      {view === 'board' ? (
+      {view === 'returns' ? (
+        <ReturnsView onOpen={setOpenOrderId} />
+      ) : view === 'dropped' ? (
+        <DroppedView />
+      ) : view === 'board' ? (
         <>
         {/* the board is wider than the screen: say so where the eye already is, not in a scrollbar below the fold */}
         <div className="mb-2 hidden items-center justify-end gap-1 sm:flex">
@@ -298,11 +328,11 @@ export default function OrdersPage() {
         </>
       ) : (
         <>
-          <div className="mb-3">
+          <div className="mb-3 sm:w-40">
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-11 sm:h-10 sm:w-40"
+              className="h-11 sm:h-10"
               aria-label="Status filter"
             >
               <option value="">All statuses</option>
@@ -319,6 +349,15 @@ export default function OrdersPage() {
             <Table>
               <thead>
                 <tr>
+                  <Th className="w-10">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all orders shown"
+                      className="size-4 accent-jade-500"
+                      checked={selected.length > 0 && selected.length === tableOrders.length}
+                      onChange={(e) => setSelected(e.target.checked ? tableOrders.map((o) => o.id) : [])}
+                    />
+                  </Th>
                   <Th>Order</Th>
                   <Th>Buyer</Th>
                   <Th className="hidden sm:table-cell">Items</Th>
@@ -330,6 +369,15 @@ export default function OrdersPage() {
               <tbody>
                 {tableOrders.map((o) => (
                   <Tr key={o.id} onClick={() => setOpenOrderId(o.id)} className="cursor-pointer">
+                    <Td onClick={(e) => e.stopPropagation()} className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select order ${o.code}`}
+                        className="size-4 accent-jade-500"
+                        checked={selected.includes(o.id)}
+                        onChange={(e) => setSelected((s) => (e.target.checked ? [...s, o.id] : s.filter((x) => x !== o.id)))}
+                      />
+                    </Td>
                     <Td className="font-mono text-xs">{o.code}</Td>
                     <Td>
                       <p className="font-medium text-hi">{o.customerName}</p>
@@ -358,6 +406,8 @@ export default function OrdersPage() {
           )}
         </>
       )}
+
+      {view === 'table' && selected.length > 0 && <BulkBar ids={selected} onClear={() => setSelected([])} />}
 
       <OrderDrawer orderId={openOrderId} onClose={() => setOpenOrderId(null)} />
 

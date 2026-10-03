@@ -1,6 +1,20 @@
 import { useState } from 'react';
-import { ArrowUpRight, Check, MessageSquarePlus, Wallet } from 'lucide-react';
-import { subscriptionCheckout, subscriptionVerify, useCancelSubscription, usePlans, useSubscriptionInfo, requestCustomPlan } from '@/api/plans';
+import { createPortal } from 'react-dom';
+import { ArrowUpRight, Check, FileText, MessageSquarePlus, Printer, RefreshCw, Wallet } from 'lucide-react';
+import {
+  requestCustomPlan,
+  startAutopay,
+  subscriptionCheckout,
+  subscriptionVerify,
+  useCancelAutopay,
+  useCancelSubscription,
+  usePlans,
+  useSubscriptionInfo,
+  verifyAutopay,
+} from '@/api/plans';
+import { usePlatformInvoices } from '@/api/invoices';
+import type { PlatformInvoice } from '@/api/types';
+import { GstDocument } from '../invoices/GstDocument';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useBusiness } from '@/api/business';
@@ -16,7 +30,123 @@ import { Field, Input, Textarea } from '@/ui/Input';
 import { Modal } from '@/ui/Modal';
 import { MoneyText } from '@/ui/MoneyText';
 import { SkeletonRows } from '@/ui/Skeleton';
+import { Table, Td, Th, Tr } from '@/ui/Table';
 import { cn } from '@/lib/cn';
+
+/** Autopay: a Razorpay mandate renews the plan, card or UPI AutoPay. */
+function AutopayRow({ planCode, planName, endsAt, state }: { planCode: string; planName: string; endsAt: string; state: string }) {
+  const openRazorpay = useRazorpay();
+  const { data: business } = useBusiness();
+  const cancel = useCancelAutopay();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const setUp = async () => {
+    setBusy(true);
+    try {
+      const info = await startAutopay(planCode);
+      const res = await openRazorpay(info, business && { name: business.ownerName, contact: business.phone, email: business.email });
+      await verifyAutopay({
+        razorpayPaymentId: res.razorpay_payment_id,
+        razorpaySubscriptionId: res.razorpay_subscription_id ?? info.subscriptionId,
+        signature: res.razorpay_signature,
+      });
+      qc.invalidateQueries({ queryKey: ['subscription'] });
+      toast('success', 'Autopay is on', info.firstChargeAt ? `First charge on ${formatDate(info.firstChargeAt)}.` : 'Your plan renews by itself now.');
+    } catch (e) {
+      toast('error', 'Autopay not set up', e instanceof Error ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const line =
+    state === 'active'
+      ? `Autopay is on: ${planName} renews by itself around ${formatDate(endsAt)}.`
+      : state === 'pending'
+        ? 'Autopay is waiting for you to approve the mandate in Razorpay.'
+        : state === 'halted'
+          ? 'Autopay stopped after renewal charges failed. Set it up again or renew by hand below.'
+          : `Renew ${planName} automatically with your card or UPI AutoPay. Nothing is charged before ${formatDate(endsAt)}.`;
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t px-5 py-4 sm:px-6">
+      <RefreshCw className={cn('size-4 shrink-0', state === 'active' ? 'text-jade-ink' : 'text-low')} aria-hidden />
+      <p className="min-w-0 flex-1 basis-60 text-[13px] text-mid">{line}</p>
+      {state === 'active' ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={cancel.isPending}
+          onClick={() =>
+            cancel.mutate(undefined, {
+              onSuccess: () => toast('info', 'Autopay off', 'You keep access until the current period ends.'),
+              onError: (e) => toast('error', 'Could not turn off autopay', e.message),
+            })
+          }
+        >
+          Turn off autopay
+        </Button>
+      ) : (
+        <Button size="sm" variant="secondary" loading={busy} onClick={setUp}>
+          {state === 'pending' || state === 'halted' ? 'Set up again' : 'Turn on autopay'}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** CartHedge's GST invoices for what the seller paid. */
+function BillingHistory() {
+  const { data: invoices } = usePlatformInvoices();
+  const { data: business } = useBusiness();
+  const [open, setOpen] = useState<PlatformInvoice | null>(null);
+  if (!invoices || invoices.length === 0) return null;
+  const doc = open && <GstDocument doc={open.doc} number={open.number} date={open.createdAt} />;
+  return (
+    <>
+      <h2 className="mb-3 mt-8 text-[15px] font-semibold text-hi">Payments and invoices</h2>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Invoice</Th>
+            <Th className="hidden sm:table-cell">Plan</Th>
+            <Th>Date</Th>
+            <Th className="text-right">Amount</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoices.map((inv) => (
+            <Tr key={inv.id} onClick={() => setOpen(inv)} className="cursor-pointer">
+              <Td className="font-mono text-xs font-medium text-jade-ink">
+                <span className="inline-flex items-center gap-1.5">
+                  <FileText className="size-3.5" /> {inv.number}
+                </span>
+              </Td>
+              <Td className="hidden text-mid sm:table-cell">{inv.doc.lines[0]?.description}</Td>
+              <Td className="text-xs text-low">{formatDate(inv.createdAt)}</Td>
+              <Td className="text-right">
+                <MoneyText paise={inv.total} />
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+      {!business?.gstin && (
+        <p className="mt-2 text-xs text-low">Add your GSTIN under Settings → GST so future invoices carry it for input credit.</p>
+      )}
+      <Modal open={!!open} onClose={() => setOpen(null)} title={`Invoice ${open?.number ?? ''}`} wide>
+        {doc}
+        <div className="mt-4 flex gap-2">
+          <Button icon={<Printer className="size-4" />} onClick={() => window.print()}>
+            Print or save PDF
+          </Button>
+          <Button variant="ghost" onClick={() => setOpen(null)}>
+            Close
+          </Button>
+        </div>
+      </Modal>
+      {doc && createPortal(<div data-print className="hidden print:block">{doc}</div>, document.body)}
+    </>
+  );
+}
 
 export default function BillingPage() {
   const { data: info, isLoading } = useSubscriptionInfo();
@@ -120,17 +250,20 @@ export default function BillingPage() {
                     loading={cancel.isPending}
                     onClick={() =>
                       cancel.mutate(undefined, {
-                        onSuccess: () => toast('info', 'Auto-renew cancelled', 'You keep access until the period ends.'),
+                        onSuccess: () => toast('info', 'Renewal cancelled', 'You keep access until the period ends.'),
                       })
                     }
                   >
-                    Cancel auto-renew
+                    Cancel renewal
                   </Button>
                 )}
               </div>
             </div>
           ) : (
             <p className="p-6 text-sm text-mid">No subscription found. Pick a plan below.</p>
+          )}
+          {sub && sub.status !== 'expired' && (
+            <AutopayRow planCode={sub.autopayPlan || sub.planCode} planName={sub.planName} endsAt={sub.endsAt} state={sub.autopay} />
           )}
         </Card>
 
@@ -192,6 +325,8 @@ export default function BillingPage() {
           </span>
           <ArrowUpRight className="size-4 text-gold-ink" aria-hidden />
         </button>
+
+        <BillingHistory />
       </div>
 
       <Modal open={customOpen} onClose={() => setCustomOpen(false)} title="Request a custom plan">

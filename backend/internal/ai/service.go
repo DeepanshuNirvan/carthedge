@@ -85,7 +85,25 @@ type Service struct {
 }
 
 func NewService(pool *pgxpool.Pool, client *Client, orders *order.Service, products *product.Service, log *slog.Logger, baseURL string) *Service {
-	return &Service{pool: pool, client: client, orders: orders, products: products, log: log, baseURL: baseURL}
+	s := &Service{pool: pool, client: client, orders: orders, products: products, log: log, baseURL: baseURL}
+	client.usage = s.recordUsage
+	return s
+}
+
+// recordUsage books one model call against the seller, per IST day and model,
+// for the admin's cost view. A failed write never fails the reply.
+func (s *Service) recordUsage(ctx context.Context, model string, in, out int) {
+	bizID := businessOf(ctx)
+	if bizID == "" {
+		return
+	}
+	if _, err := s.pool.Exec(context.WithoutCancel(ctx), `insert into ai_usage (business_id, day, model, calls, input_tokens, output_tokens)
+		values ($1, (now() at time zone 'Asia/Kolkata')::date, $2, 1, $3, $4)
+		on conflict (business_id, day, model) do update set calls = ai_usage.calls + 1,
+		input_tokens = ai_usage.input_tokens + excluded.input_tokens,
+		output_tokens = ai_usage.output_tokens + excluded.output_tokens`, bizID, model, in, out); err != nil {
+		s.log.Warn("ai usage not recorded", "businessId", bizID, "err", err)
+	}
 }
 
 // ParseOrder reads a pasted DM thread and drafts an order card for one-tap confirm.
@@ -100,6 +118,7 @@ func (s *Service) ParseConversation(ctx context.Context, bizID, conversation, so
 }
 
 func (s *Service) parse(ctx context.Context, bizID, conversation, source, conversationID string) (*Draft, error) {
+	ctx = forBusiness(ctx, bizID)
 	if conversation == "" {
 		return nil, errors.New("conversation is required")
 	}
@@ -261,6 +280,7 @@ func (s *Service) ListDrafts(ctx context.Context, bizID string, limit, offset in
 
 // Reply drafts an answer to a buyer's pre-sales question from store context.
 func (s *Service) Reply(ctx context.Context, bizID, question string) (string, error) {
+	ctx = forBusiness(ctx, bizID)
 	if question == "" {
 		return "", errors.New("question is required")
 	}

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BellRing, Check, Minus, PackageX, Plus, ShieldCheck, Store, Truck } from 'lucide-react';
-import type { PublicVariant } from '@/api/types';
+import { ArrowLeft, BellRing, Check, Minus, PackageX, Plus, Ruler, ShieldCheck, Store, Truck } from 'lucide-react';
+import type { ProductDetail, PublicVariant } from '@/api/types';
 import { joinWaitlist, useStore, useStoreProduct } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { cn } from '@/lib/cn';
@@ -89,6 +89,35 @@ function Gallery({
             </button>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ProductFacts({ details, sizeChart, name }: { details: ProductDetail[]; sizeChart?: string; name: string }) {
+  const [open, setOpen] = useState(false);
+  if (details.length === 0 && !sizeChart) return null;
+  return (
+    <div className="mt-5">
+      {details.length > 0 && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-sm">
+          {details.map((d, i) => (
+            <div key={i} className="contents">
+              <dt className="text-low">{d.label}</dt>
+              <dd className="text-hi">{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {sizeChart && (
+        <>
+          <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-jade-ink hover:underline">
+            <Ruler className="size-4" aria-hidden /> Size chart
+          </button>
+          <Modal open={open} onClose={() => setOpen(false)} title="Size chart" wide>
+            <img src={sizeChart} alt={`Size chart for ${name}`} className="w-full rounded-lg" />
+          </Modal>
+        </>
       )}
     </div>
   );
@@ -234,6 +263,8 @@ export default function ProductPage() {
               <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-mid">{product.description}</p>
             )}
 
+            <ProductFacts details={product.details ?? []} sizeChart={product.sizeChart} name={product.name} />
+
             {needsVariant && (
               <fieldset className="mt-5">
                 <legend className="mb-2 text-sm font-medium text-hi">Choose an option</legend>
@@ -289,7 +320,14 @@ export default function ProductPage() {
                 <Truck className="size-4 text-jade-ink" aria-hidden />
                 {store.business.shippingFee > 0 ? (
                   <span>
-                    Shipping <MoneyText paise={store.business.shippingFee} />, delivered by courier
+                    Shipping <MoneyText paise={store.business.shippingFee} />
+                    {store.business.freeShippingAbove > 0 ? (
+                      <>
+                        , free above <MoneyText paise={store.business.freeShippingAbove} />
+                      </>
+                    ) : (
+                      ', delivered by courier'
+                    )}
                   </span>
                 ) : (
                   'Free shipping on this store'

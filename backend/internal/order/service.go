@@ -7,15 +7,20 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
+	"carthedge/internal/alert"
 	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/events"
+	"carthedge/internal/gst"
+	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
 	"carthedge/internal/product"
 	"carthedge/internal/secure"
+	"carthedge/internal/shop"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,21 +40,29 @@ type Event struct {
 }
 
 type Order struct {
-	ID              string           `json:"id"`
-	Code            string           `json:"code"`
-	Status          string           `json:"status"`
-	PaymentMethod   string           `json:"paymentMethod"`
-	PaymentStatus   string           `json:"paymentStatus"`
-	PaymentRef      string           `json:"paymentRef,omitempty"` // UTR of a claimed UPI transfer
-	Source          string           `json:"source"`
-	Items           []product.Line   `json:"items"`
-	Subtotal        int              `json:"subtotal"`
-	Discount        int              `json:"discount"`
-	Shipping        int              `json:"shipping"`
-	Total           int              `json:"total"`
-	TokenAmount     int              `json:"tokenAmount"`
-	OfferCode       string           `json:"offerCode,omitempty"`
-	Notes           string           `json:"notes,omitempty"`
+	ID              string         `json:"id"`
+	Code            string         `json:"code"`
+	Status          string         `json:"status"`
+	PaymentMethod   string         `json:"paymentMethod"`
+	PaymentStatus   string         `json:"paymentStatus"`
+	PaymentRef      string         `json:"paymentRef,omitempty"` // UTR of a claimed UPI transfer
+	Source          string         `json:"source"`
+	Items           []product.Line `json:"items"`
+	Subtotal        int            `json:"subtotal"`
+	Discount        int            `json:"discount"`
+	PrepaidDiscount int            `json:"prepaidDiscount"`
+	Shipping        int            `json:"shipping"`
+	CodFee          int            `json:"codFee"`
+	Total           int            `json:"total"`
+	TokenAmount     int            `json:"tokenAmount"`
+	OfferCode       string         `json:"offerCode,omitempty"`
+	Notes           string         `json:"notes,omitempty"`
+	BuyerGstin      string         `json:"buyerGstin,omitempty"`
+	BuyerCompany    string         `json:"buyerCompany,omitempty"`
+	// ReplacementOf is the order an exchange ships against (its code and id)
+	ReplacementOf   string           `json:"replacementOf,omitempty"`
+	ReplacementOfID string           `json:"replacementOfId,omitempty"`
+	InvoiceID       string           `json:"invoiceId,omitempty"` // set once the seller has invoiced it
 	CustomerID      string           `json:"customerId"`
 	CustomerName    string           `json:"customerName"`
 	CustomerPhone   string           `json:"customerPhone"`
@@ -90,6 +103,15 @@ type CreateParams struct {
 	// ConversationID links an order placed from a DM chat: the buyer is
 	// answered on that chat, and the chat starts fresh for the next order.
 	ConversationID string
+	// optional B2B details for a GST invoice
+	BuyerGstin   string
+	BuyerCompany string
+	// ReplacementOf makes this the exchange shipment for a returned order:
+	// Credit (the returned items' value) comes off, Shipping is the re-ship
+	// charge the seller chose, and it is not a new order for the plan quota.
+	ReplacementOf string
+	Credit        int
+	Shipping      int
 }
 
 type Service struct {
@@ -98,6 +120,7 @@ type Service struct {
 	customers *customer.Service
 	products  *product.Service
 	notify    *notify.Notifier
+	alerts    *alert.Service
 	courier   *courier.Shiprocket
 	events    *events.Bus
 	log       *slog.Logger
@@ -105,6 +128,14 @@ type Service struct {
 	// dm sends a message on the buyer's chat; set by messaging at boot (it
 	// imports order, so it cannot be a constructor argument)
 	dm func(ctx context.Context, conversationID, text string) error
+	// onClose runs after an order is cancelled or comes back RTO; after-sales
+	// turns money already paid into a refund due (set at boot, same reason)
+	onClose func(ctx context.Context, bizID, orderID, status string)
+}
+
+// SetCloseHook lets after-sales react to cancelled and RTO orders.
+func (s *Service) SetCloseHook(fn func(ctx context.Context, bizID, orderID, status string)) {
+	s.onClose = fn
 }
 
 // SetDirectMessenger lets orders placed from a chat be answered on that chat.
@@ -112,9 +143,9 @@ func (s *Service) SetDirectMessenger(fn func(ctx context.Context, conversationID
 	s.dm = fn
 }
 
-// tellBuyer reaches the buyer on the chat the order came from, and falls back
+// TellBuyer reaches the buyer on the chat the order came from, and falls back
 // to WhatsApp when there is no chat or its messaging window has closed.
-func (s *Service) tellBuyer(name, convID, phone, text string) {
+func (s *Service) TellBuyer(name, convID, phone, text string) {
 	s.notify.Async(name, func() error {
 		if convID != "" && s.dm != nil {
 			err := s.dm(context.Background(), convID, text)
@@ -128,49 +159,192 @@ func (s *Service) tellBuyer(name, convID, phone, text string) {
 }
 
 func NewService(pool *pgxpool.Pool, rdb *redis.Client, customers *customer.Service, products *product.Service,
-	n *notify.Notifier, sr *courier.Shiprocket, bus *events.Bus, log *slog.Logger, baseURL string) *Service {
-	return &Service{pool: pool, rdb: rdb, customers: customers, products: products, notify: n,
+	n *notify.Notifier, alerts *alert.Service, sr *courier.Shiprocket, bus *events.Bus, log *slog.Logger, baseURL string) *Service {
+	return &Service{pool: pool, rdb: rdb, customers: customers, products: products, notify: n, alerts: alerts,
 		courier: sr, events: bus, log: log, baseURL: baseURL}
 }
 
-// Create builds a priced order from the live catalog, applies offers, runs the
-// COD-risk check and kicks off the buyer confirmation flow.
-func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
-	if p.PaymentMethod != "prepaid" && p.PaymentMethod != "cod" {
-		return nil, errors.New("paymentMethod must be prepaid or cod")
+// resolve prices refs and custom lines from the live catalog for one buyer
+// segment; shared by Create (inside its transaction) and Quote (on the pool)
+// so both see the same lines.
+func (s *Service) resolve(ctx context.Context, q product.DB, bizID string, refs []Ref, custom []product.Line, segment string) ([]product.Line, int, error) {
+	lines := make([]product.Line, 0, len(refs)+len(custom))
+	for _, ref := range refs {
+		line, err := s.products.ResolveLine(ctx, q, bizID, ref.ProductID, ref.VariantID, ref.Qty, segment)
+		if err != nil {
+			return nil, 0, err
+		}
+		lines = append(lines, line)
 	}
-	if p.Address.Line == "" || p.Address.Pincode == "" {
-		return nil, errors.New("address line and pincode are required")
+	for _, cl := range custom {
+		if cl.Name == "" || cl.Price <= 0 {
+			return nil, 0, errors.New("custom items need a name and positive price (paise)")
+		}
+		if cl.Qty < 1 {
+			cl.Qty = 1
+		}
+		lines = append(lines, cl)
 	}
-	if p.Name == "" || p.Phone == "" {
-		return nil, errors.New("customer name and phone are required")
+	if len(lines) == 0 {
+		return nil, 0, errors.New("order has no items")
 	}
+	subtotal := 0
+	for _, l := range lines {
+		if l.Qty > maxLineQty {
+			return nil, 0, fmt.Errorf("%s: at most %d per order", l.Name, maxLineQty)
+		}
+		subtotal += l.Price * l.Qty
+	}
+	return lines, subtotal, nil
+}
 
-	var bizName, bizWhatsApp, razorpayKeyID, upiID string
-	var shippingFee, codTokenAmount, freeShippingAbove int
-	var codEnabled bool
-	err := s.pool.QueryRow(ctx, `select name, whatsapp, shipping_fee, cod_enabled, cod_token_amount,
-		free_shipping_above, razorpay_key_id, upi_id
-		from businesses where id=$1 and status='active'`, p.BusinessID).Scan(
-		&bizName, &bizWhatsApp, &shippingFee, &codEnabled, &codTokenAmount, &freeShippingAbove,
-		&razorpayKeyID, &upiID)
+// codLimitError is the policy's COD ceiling in the buyer's words.
+func codLimitError(limit int) error {
+	return fmt.Errorf("cash on delivery is available on orders up to %s — please pay online for this one", notify.Rupees(limit))
+}
+
+// QuoteParams is a cart the buyer is about to pay for.
+type QuoteParams struct {
+	BusinessID string
+	Refs       []Ref
+	Custom     []product.Line
+	OfferCode  string
+	Phone      string // verified buyer: reseller prices and per-buyer coupon rules apply
+}
+
+// Quote is what checkout shows before the order exists: the same lines,
+// coupon and charges Create will bill, for both payment methods.
+type Quote struct {
+	Lines        []product.Line `json:"lines"`
+	OfferCode    string         `json:"offerCode,omitempty"`
+	OfferError   string         `json:"offerError,omitempty"`
+	Prepaid      shop.Totals    `json:"prepaid"`
+	Cod          shop.Totals    `json:"cod"`
+	CodLimit     int            `json:"codLimit,omitempty"` // policy ceiling, paise
+	CodAvailable bool           `json:"codAvailable"`
+}
+
+func (s *Service) Quote(ctx context.Context, p QuoteParams) (*Quote, error) {
+	settings, err := shop.Load(ctx, s.pool, p.BusinessID)
 	if err != nil {
 		return nil, errors.New("business not found")
+	}
+	segment, customerID := "retail", ""
+	if p.Phone != "" {
+		if c, err := s.customers.Lookup(ctx, p.BusinessID, p.Phone); err == nil {
+			segment, customerID = c.Segment, c.ID
+		}
+	}
+	lines, subtotal, err := s.resolve(ctx, s.pool, p.BusinessID, p.Refs, p.Custom, segment)
+	if err != nil {
+		return nil, err
+	}
+	q := &Quote{Lines: lines}
+	discount := 0
+	if code := strings.ToUpper(strings.TrimSpace(p.OfferCode)); code != "" {
+		q.OfferCode = code
+		if discount, err = s.products.ApplyOffer(ctx, s.pool, p.BusinessID, code, lines, customerID); err != nil {
+			q.OfferError, discount = err.Error(), 0
+		}
+	}
+	q.Prepaid = settings.Checkout.Totals(subtotal, discount, "prepaid")
+	q.Cod = settings.Checkout.Totals(subtotal, discount, "cod")
+	q.CodLimit = settings.Policies.CodMaxOrder
+	q.CodAvailable = q.CodLimit == 0 || q.Cod.Total <= q.CodLimit
+	return q, nil
+}
+
+// Create builds a priced order from the live catalog, applies offers and the
+// seller's checkout charges, runs the COD-risk check and kicks off the buyer
+// confirmation flow.
+func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
+	if err := p.check(); err != nil {
+		return nil, err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	pl, err := s.place(ctx, tx, &p)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return s.Announce(ctx, p, pl)
+}
+
+// CreateIn places an order inside the caller's transaction — an exchange
+// holds its return row while its replacement is made — so it never asks the
+// pool for a second connection. The caller commits, then calls Announce.
+func (s *Service) CreateIn(ctx context.Context, tx pgx.Tx, p CreateParams) (*Placed, error) {
+	if err := p.check(); err != nil {
+		return nil, err
+	}
+	return s.place(ctx, tx, &p)
+}
+
+// Placed is an order written in a transaction but not yet announced.
+type Placed struct {
+	OrderID, Code, BizName string
+	Lines                  []product.Line
+	Totals                 shop.Totals
+	TokenAmount            int
+	ChatCodConfirmed       bool
+}
+
+// check is what an order is refused for before the database is touched.
+func (p *CreateParams) check() error {
+	if p.PaymentMethod != "prepaid" && p.PaymentMethod != "cod" {
+		return errors.New("paymentMethod must be prepaid or cod")
+	}
+	if p.Address.Line == "" || p.Address.Pincode == "" {
+		return errors.New("address line and pincode are required")
+	}
+	if p.Name == "" || p.Phone == "" {
+		return errors.New("customer name and phone are required")
+	}
+	p.BuyerGstin = strings.ToUpper(strings.TrimSpace(p.BuyerGstin))
+	if p.BuyerGstin != "" && !gst.ValidGSTIN(p.BuyerGstin) {
+		return errors.New("that GSTIN does not look right — check it or leave it empty")
+	}
+	if p.BuyerCompany = strings.TrimSpace(p.BuyerCompany); len([]rune(p.BuyerCompany)) > 200 {
+		return errors.New("company name is too long")
+	}
+	return nil
+}
+
+// place writes the order, every read and write through tx.
+func (s *Service) place(ctx context.Context, tx pgx.Tx, p *CreateParams) (*Placed, error) {
+	replacement := p.ReplacementOf != ""
+
+	var bizName, razorpayKeyID, upiID string
+	var codTokenAmount int
+	var codEnabled bool
+	err := tx.QueryRow(ctx, `select name, cod_enabled, cod_token_amount, razorpay_key_id, upi_id
+		from businesses where id=$1 and status='active'`, p.BusinessID).Scan(
+		&bizName, &codEnabled, &codTokenAmount, &razorpayKeyID, &upiID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errors.New("business not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	settings, err := shop.Load(ctx, tx, p.BusinessID)
+	if err != nil {
+		return nil, err
 	}
 	if p.PaymentMethod == "cod" && !codEnabled {
 		return nil, errors.New("cash on delivery is not available for this seller")
 	}
 	// a seller with neither a gateway nor a UPI ID cannot be paid online; taking
 	// the order anyway strands the buyer on a checkout that can never complete
-	if p.PaymentMethod == "prepaid" && razorpayKeyID == "" && upiID == "" && p.Source != "manual" {
+	if p.PaymentMethod == "prepaid" && razorpayKeyID == "" && upiID == "" && p.Source != "manual" && !replacement {
 		return nil, errors.New("this seller is not set up for online payments yet — choose cash on delivery")
 	}
 
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
 	// claim the draft first: a second tap on Confirm waits here and then finds
 	// it taken, instead of placing a duplicate order
 	if p.AiDraftID != "" {
@@ -183,57 +357,43 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 			return nil, errors.New("this draft was already confirmed or discarded")
 		}
 	}
-	cust, err := s.customers.Upsert(ctx, tx, p.BusinessID, p.Name, p.Phone, p.Email, p.Address)
+	// an exchange ships to a buyer already in the ledger and is not a new order
+	var cust *customer.Ref
+	if replacement {
+		cust, err = s.customers.Ref(ctx, tx, p.BusinessID, p.Phone)
+	} else {
+		cust, err = s.customers.Upsert(ctx, tx, p.BusinessID, p.Name, p.Phone, p.Email, p.Address)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	lines := make([]product.Line, 0, len(p.Refs)+len(p.CustomLines))
-	for _, ref := range p.Refs {
-		line, err := s.products.ResolveLine(ctx, p.BusinessID, ref.ProductID, ref.VariantID, ref.Qty, cust.Segment)
-		if err != nil {
-			return nil, err
-		}
-		lines = append(lines, line)
+	lines, subtotal, err := s.resolve(ctx, tx, p.BusinessID, p.Refs, p.CustomLines, cust.Segment)
+	if err != nil {
+		return nil, err
 	}
-	for _, cl := range p.CustomLines {
-		if cl.Name == "" || cl.Price <= 0 {
-			return nil, errors.New("custom items need a name and positive price (paise)")
+	var t shop.Totals
+	if replacement {
+		t = shop.Totals{Subtotal: subtotal, Discount: min(max(p.Credit, 0), subtotal), Shipping: max(p.Shipping, 0)}
+		t.Total = t.Subtotal - t.Discount + t.Shipping
+	} else {
+		discount := 0
+		if p.OfferCode != "" {
+			if discount, err = s.products.ApplyOffer(ctx, tx, p.BusinessID, p.OfferCode, lines, cust.ID); err != nil {
+				return nil, err
+			}
 		}
-		if cl.Qty < 1 {
-			cl.Qty = 1
-		}
-		lines = append(lines, cl)
-	}
-	if len(lines) == 0 {
-		return nil, errors.New("order has no items")
-	}
-	for _, l := range lines {
-		if l.Qty > maxLineQty {
-			return nil, fmt.Errorf("%s: at most %d per order", l.Name, maxLineQty)
+		t = settings.Checkout.Totals(subtotal, discount, p.PaymentMethod)
+		if limit := settings.Policies.CodMaxOrder; p.PaymentMethod == "cod" && p.Source != "manual" && limit > 0 && t.Total > limit {
+			return nil, codLimitError(limit)
 		}
 	}
-
-	subtotal := 0
-	for _, l := range lines {
-		subtotal += l.Price * l.Qty
-	}
-	discount := 0
-	if p.OfferCode != "" {
-		if discount, err = s.products.ApplyOffer(ctx, p.BusinessID, p.OfferCode, lines); err != nil {
-			return nil, err
-		}
-	}
-	if freeShippingAbove > 0 && subtotal-discount >= freeShippingAbove {
-		shippingFee = 0
-	}
-	total := subtotal - discount + shippingFee
-	if total > math.MaxInt32 { // the money columns are int4
+	if t.Total > math.MaxInt32 { // the money columns are int4
 		return nil, errors.New("order total is too large for one order")
 	}
 
 	tokenAmount := 0
-	if p.PaymentMethod == "cod" {
+	if p.PaymentMethod == "cod" && !replacement {
 		tokenAmount = codTokenAmount
 	}
 	riskFlagged := p.PaymentMethod == "cod" && (cust.RiskFlagged || cust.CodRefusals > 0)
@@ -241,12 +401,20 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	code := "CH-" + strings.ToUpper(secure.Token(8))
 	itemsJSON, _ := json.Marshal(lines)
 	addrJSON, _ := json.Marshal(p.Address)
-	var linkID, convID any
+	var linkID, convID, replacementOf any
 	if p.LinkID != "" {
 		linkID = p.LinkID
 	}
 	if p.ConversationID != "" {
 		convID = p.ConversationID
+	}
+	// an even exchange owes nothing: it is settled and confirmed from the start
+	status, paymentStatus, note := "new", "pending", "order placed"
+	if replacement {
+		replacementOf, note = p.ReplacementOf, "exchange order"
+		if t.Total == 0 {
+			status, paymentStatus, note = "confirmed", "paid", "exchange order — nothing to pay"
+		}
 	}
 	// a buyer who said yes to the exact summary in their chat has confirmed the
 	// COD order already; a second confirmation link would only add friction.
@@ -255,14 +423,16 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 
 	var orderID string
 	err = tx.QueryRow(ctx, `insert into orders (business_id, order_code, link_id, customer_id, items, subtotal,
-		discount, shipping, total, offer_code, payment_method, token_amount, address, source, notes, risk_flagged, conversation_id)
-		values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17) returning id`,
-		p.BusinessID, code, linkID, cust.ID, string(itemsJSON), subtotal, discount, shippingFee, total,
-		strings.ToUpper(p.OfferCode), p.PaymentMethod, tokenAmount, string(addrJSON), p.Source, p.Notes, riskFlagged, convID).Scan(&orderID)
+		discount, shipping, total, offer_code, payment_method, token_amount, address, source, notes, risk_flagged,
+		conversation_id, prepaid_discount, cod_fee, buyer_gstin, buyer_company, replacement_of, status, payment_status)
+		values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) returning id`,
+		p.BusinessID, code, linkID, cust.ID, string(itemsJSON), t.Subtotal, t.Discount, t.Shipping, t.Total,
+		strings.ToUpper(p.OfferCode), p.PaymentMethod, tokenAmount, string(addrJSON), p.Source, p.Notes, riskFlagged,
+		convID, t.PrepaidDiscount, t.CodFee, p.BuyerGstin, p.BuyerCompany, replacementOf, status, paymentStatus).Scan(&orderID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'new','order placed')`, orderID); err != nil {
+	if _, err := tx.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,$2,$3)`, orderID, status, note); err != nil {
 		return nil, err
 	}
 	if chatCodConfirmed {
@@ -290,21 +460,44 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 	if p.AiDraftID != "" {
 		tx.Exec(ctx, `update ai_drafts set order_id=$2 where id=$1`, p.AiDraftID, orderID)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
+	return &Placed{OrderID: orderID, Code: code, BizName: bizName, Lines: lines, Totals: t,
+		TokenAmount: tokenAmount, ChatCodConfirmed: chatCodConfirmed}, nil
+}
+
+// Announce tells the buyer and the seller about a committed order and returns it.
+func (s *Service) Announce(ctx context.Context, p CreateParams, pl *Placed) (*Order, error) {
+	replacement := p.ReplacementOf != ""
+	t, code, lines, orderID := pl.Totals, pl.Code, pl.Lines, pl.OrderID
+	bizName, tokenAmount, chatCodConfirmed := pl.BizName, pl.TokenAmount, pl.ChatCodConfirmed
+	// they ordered: no "you left something in your cart" reminder
+	s.pool.Exec(ctx, `delete from checkout_sessions where business_id=$1 and phone=$2`, p.BusinessID, p.Phone)
 
 	switch {
+	case replacement && t.Total == 0:
+		s.TellBuyer("exchangePlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+			"Your exchange is confirmed: order %s (%s). We will ship it soon.\nTrack it: %s (enter %s on the page)",
+			code, itemSummary(lines), s.trackURL(code), p.Phone))
 	case chatCodConfirmed:
-		s.tellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+		s.TellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
 			"✅ Order confirmed: %s\nTotal %s, pay cash on delivery.\nTrack it anytime: %s (enter %s on the page)",
-			code, notify.Rupees(total), s.trackURL(code), p.Phone))
+			code, notify.Rupees(t.Total), s.trackURL(code), p.Phone))
 	case p.PaymentMethod == "cod":
-		s.startCodFlow(code, p.Phone, bizName, total, tokenAmount, p.ConversationID)
+		s.startCodFlow(code, p.Phone, bizName, t.Total, tokenAmount, p.ConversationID)
 	default:
-		s.tellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+		s.TellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
 			"Order %s placed at %s for %s. Complete payment here to confirm it: %s (enter %s on the page)",
-			code, bizName, notify.Rupees(total), s.trackURL(code), p.Phone))
+			code, bizName, notify.Rupees(t.Total), s.trackURL(code), p.Phone))
+	}
+	// the seller hears about orders they did not type in themselves
+	if p.Source != "manual" && !replacement {
+		method := "online payment"
+		if p.PaymentMethod == "cod" {
+			method = "cash on delivery"
+		}
+		s.alerts.Seller(p.BusinessID, alert.Alert{Kind: "newOrder",
+			Title: fmt.Sprintf("New order %s · %s", code, notify.Rupees(t.Total)),
+			Body:  fmt.Sprintf("%s ordered %s (%s, via %s).", p.Name, itemSummary(lines), method, sourceLabel(p.Source)),
+			Path:  "/app/orders?order=" + orderID})
 	}
 
 	o, err := s.GetByID(ctx, p.BusinessID, orderID)
@@ -312,6 +505,39 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Order, error) {
 		s.events.Publish(ctx, p.BusinessID, "orderCreated", o)
 	}
 	return o, err
+}
+
+// itemSummary names an order's items the way a person would: "2 × Kurti (M),
+// Jhumka +1 more".
+func itemSummary(lines []product.Line) string {
+	var parts []string
+	for i, l := range lines {
+		if i == 2 {
+			parts = append(parts, fmt.Sprintf("+%d more", len(lines)-2))
+			break
+		}
+		n := l.Name
+		if l.Variant != "" {
+			n += " (" + l.Variant + ")"
+		}
+		if l.Qty > 1 {
+			n = fmt.Sprintf("%d × %s", l.Qty, n)
+		}
+		parts = append(parts, n)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func sourceLabel(source string) string {
+	switch source {
+	case "store":
+		return "your storefront"
+	case "link":
+		return "a share link"
+	case "ai":
+		return "a DM chat"
+	}
+	return source
 }
 
 // startCodFlow sends the RTO-cutting confirmation sequence: summary + address
@@ -324,7 +550,7 @@ func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount i
 	if tokenAmount > 0 {
 		msg += fmt.Sprintf("\nPay a %s token now to guarantee your order (adjusted in the COD amount).", notify.Rupees(tokenAmount))
 	}
-	s.tellBuyer("codConfirm", convID, phone, msg)
+	s.TellBuyer("codConfirm", convID, phone, msg)
 }
 
 // ConfirmCod is hit from the buyer's WhatsApp confirmation link.
@@ -437,7 +663,7 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 		note = "COD token payment received"
 	}
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed',$2)`, orderID, note)
-	s.tellBuyer("paid", convID, phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
+	s.TellBuyer("paid", convID, phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
 	s.publishOrder(ctx, bizID, orderID, "orderPaid")
 	return nil
 }
@@ -445,22 +671,16 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 // NotifyUpiClaim tells the seller a buyer says they have transferred to the
 // seller's UPI ID. It is a prompt to check their bank alert, not a payment.
 func (s *Service) NotifyUpiClaim(ctx context.Context, bizID, orderID, ref string) error {
-	var code, ownerPhone, email, ownerName string
+	var code string
 	var total int
-	if err := s.pool.QueryRow(ctx, `select o.order_code, o.total, b.phone, b.email, b.owner_name
-		from orders o join businesses b on b.id = o.business_id
-		where o.id=$1 and o.business_id=$2`, orderID, bizID).Scan(&code, &total, &ownerPhone, &email, &ownerName); err != nil {
+	if err := s.pool.QueryRow(ctx, `select order_code, total from orders where id=$1 and business_id=$2`,
+		orderID, bizID).Scan(&code, &total); err != nil {
 		return ErrNotFound
 	}
-	body := fmt.Sprintf("Hi %s,\n\nA buyer reported paying %s for order %s by UPI (reference %s).\nCheck your bank alert and confirm or reject it on the order card: %s/app/orders\n\n— CartHedge",
-		ownerName, notify.Rupees(total), code, ref, s.baseURL)
-	s.notify.Async("upiClaim", func() error {
-		if err := s.notify.WhatsApp(ownerPhone, fmt.Sprintf("Order %s: buyer reported a UPI payment of %s, ref %s. Verify it in CartHedge.",
-			code, notify.Rupees(total), ref)); err != nil && email != "" {
-			return s.notify.Email(email, "Verify a UPI payment — order "+code, body)
-		}
-		return nil
-	})
+	s.alerts.Seller(bizID, alert.Alert{Kind: "upiClaim",
+		Title: fmt.Sprintf("Verify a UPI payment · %s", code),
+		Body:  fmt.Sprintf("The buyer reported paying %s for order %s by UPI (reference %s). Check your bank alert, then confirm or reject it on the order.", notify.Rupees(total), code, ref),
+		Path:  "/app/orders?order=" + orderID})
 	s.publishOrder(ctx, bizID, orderID, "paymentClaimed")
 	return nil
 }
@@ -512,18 +732,65 @@ func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note
 	case "cancelled":
 		s.restock(ctx, orderID)
 	}
+	if s.onClose != nil && (newStatus == "cancelled" || newStatus == "rto") {
+		s.onClose(ctx, bizID, orderID, newStatus)
+	}
 	if msg, ok := buyerStatusMessage[newStatus]; ok {
 		text := fmt.Sprintf(msg, code)
 		if newStatus == "shipped" && courierName != "" {
 			text += fmt.Sprintf(" Courier: %s, tracking id %s.", courierName, courierTracking)
 		}
 		text += " Track: " + s.trackURL(code)
-		s.tellBuyer("statusUpdate", convID, phone, text)
+		s.TellBuyer("statusUpdate", convID, phone, text)
 	}
 
 	o, err := s.GetByID(ctx, bizID, orderID)
 	if err == nil {
 		s.events.Publish(ctx, bizID, "orderStatusChanged", o)
+	}
+	return o, err
+}
+
+// ChangeAddress moves where an order goes, up to the moment it ships. by is
+// who asked ("buyer" or "seller"); the other side hears about it.
+func (s *Service) ChangeAddress(ctx context.Context, bizID, orderID string, addr customer.Address, by string) (*Order, error) {
+	addr = customer.Address{Line: strings.TrimSpace(addr.Line), City: strings.TrimSpace(addr.City),
+		State: strings.TrimSpace(addr.State), Pincode: strings.TrimSpace(addr.Pincode)}
+	if addr.Line == "" || !httpx.ValidPincode(addr.Pincode) {
+		return nil, errors.New("enter the full address with a valid 6-digit pincode")
+	}
+	if len([]rune(addr.Line)) > 300 || len([]rune(addr.City))+len([]rune(addr.State)) > 120 {
+		return nil, errors.New("that address is too long")
+	}
+	addrJSON, _ := json.Marshal(addr)
+	var customerID, code, phone, convID string
+	err := s.pool.QueryRow(ctx, `update orders o set address=$3::jsonb, updated_at=now()
+		from customers c where c.id = o.customer_id and o.id=$1 and o.business_id=$2
+		and o.status in ('new','confirmed','packed')
+		returning o.customer_id, o.order_code, c.phone, coalesce(o.conversation_id::text, '')`,
+		orderID, bizID, string(addrJSON)).Scan(&customerID, &code, &phone, &convID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errors.New("the address can only be changed before the order ships")
+	}
+	if err != nil {
+		return nil, err
+	}
+	s.pool.Exec(ctx, `update customers set last_address=$2::jsonb, updated_at=now() where id=$1`, customerID, string(addrJSON))
+	where := strings.Join(slices.DeleteFunc([]string{addr.Line, addr.City, addr.State, addr.Pincode},
+		func(v string) bool { return v == "" }), ", ")
+	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'address_changed',$2)`,
+		orderID, "new delivery address from the "+by+": "+where)
+	if by == "buyer" {
+		s.alerts.Seller(bizID, alert.Alert{Kind: "addressChanged", Title: "Address changed · " + code,
+			Body: "The buyer changed the delivery address to: " + where + ". Check it before you pack.",
+			Path: "/app/orders?order=" + orderID})
+	} else {
+		s.TellBuyer("addressChanged", convID, phone, fmt.Sprintf("The delivery address for order %s is now: %s. Track: %s",
+			code, where, s.trackURL(code)))
+	}
+	o, err := s.GetByID(ctx, bizID, orderID)
+	if err == nil {
+		s.events.Publish(ctx, bizID, "orderUpdated", o)
 	}
 	return o, err
 }
@@ -570,18 +837,21 @@ func (s *Service) GetByCode(ctx context.Context, bizID, code string) (*Order, er
 	return s.getOne(ctx, `o.order_code=$2 and o.business_id=$1`, bizID, code)
 }
 
+// TrackedStore is the seller behind a tracked order.
+type TrackedStore struct{ ID, Name, Code string }
+
 // TrackByCode powers the public tracking page; phone must match the buyer.
-func (s *Service) TrackByCode(ctx context.Context, code, phone string) (*Order, string, error) {
-	var bizID, bizName string
-	err := s.pool.QueryRow(ctx, `select o.business_id, b.name from orders o
+func (s *Service) TrackByCode(ctx context.Context, code, phone string) (*Order, TrackedStore, error) {
+	var st TrackedStore
+	err := s.pool.QueryRow(ctx, `select o.business_id, b.name, b.code from orders o
 		join businesses b on b.id = o.business_id
 		join customers c on c.id = o.customer_id
-		where o.order_code=$1 and c.phone=$2`, code, phone).Scan(&bizID, &bizName)
+		where o.order_code=$1 and c.phone=$2`, code, phone).Scan(&st.ID, &st.Name, &st.Code)
 	if err != nil {
-		return nil, "", ErrNotFound
+		return nil, st, ErrNotFound
 	}
-	o, err := s.getOne(ctx, `o.order_code=$2 and o.business_id=$1`, bizID, code)
-	return o, bizName, err
+	o, err := s.getOne(ctx, `o.order_code=$2 and o.business_id=$1`, st.ID, code)
+	return o, st, err
 }
 
 func (s *Service) getOne(ctx context.Context, where string, args ...any) (*Order, error) {
@@ -697,11 +967,15 @@ func (s *Service) Board(ctx context.Context, bizID string) (map[string]any, erro
 func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]Order, error) {
 	rows, err := s.pool.Query(ctx, `select o.id, o.order_code, o.status, o.payment_method, o.payment_status,
 		o.payment_ref, o.source,
-		o.items, o.subtotal, o.discount, o.shipping, o.total, o.token_amount, o.offer_code, o.notes,
+		o.items, o.subtotal, o.discount, o.prepaid_discount, o.shipping, o.cod_fee, o.total, o.token_amount,
+		o.offer_code, o.notes, o.buyer_gstin, o.buyer_company,
+		coalesce(ro.order_code, ''), coalesce(o.replacement_of::text, ''), coalesce(inv.id::text, ''),
 		o.customer_id, c.name, c.phone, o.address, o.courier_name, o.courier_tracking_id, o.risk_flagged,
 		coalesce(to_char(o.cod_confirmed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
 		to_char(o.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-		from orders o join customers c on c.id = o.customer_id where `+whereOrder, args...)
+		from orders o join customers c on c.id = o.customer_id
+		left join orders ro on ro.id = o.replacement_of
+		left join invoices inv on inv.order_id = o.id where `+whereOrder, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -711,7 +985,8 @@ func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]
 		var o Order
 		var items, addr []byte
 		if err := rows.Scan(&o.ID, &o.Code, &o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.PaymentRef, &o.Source,
-			&items, &o.Subtotal, &o.Discount, &o.Shipping, &o.Total, &o.TokenAmount, &o.OfferCode, &o.Notes,
+			&items, &o.Subtotal, &o.Discount, &o.PrepaidDiscount, &o.Shipping, &o.CodFee, &o.Total, &o.TokenAmount,
+			&o.OfferCode, &o.Notes, &o.BuyerGstin, &o.BuyerCompany, &o.ReplacementOf, &o.ReplacementOfID, &o.InvoiceID,
 			&o.CustomerID, &o.CustomerName, &o.CustomerPhone, &addr, &o.CourierName, &o.CourierTracking,
 			&o.RiskFlagged, &o.CodConfirmedAt, &o.CreatedAt); err != nil {
 			return nil, err
@@ -725,4 +1000,135 @@ func (s *Service) query(ctx context.Context, whereOrder string, args ...any) ([]
 
 func (s *Service) trackURL(code string) string {
 	return s.baseURL + "/o/" + code
+}
+
+// RemindAbandoned sends one WhatsApp reminder to buyers who verified their
+// number at checkout but did not order: an hour after, within a day, at most
+// once a week per buyer, for sellers whose plan includes recovery (can) and
+// who keep it on. Claimed by stamping reminded_at, so instances never double up.
+func (s *Service) RemindAbandoned(ctx context.Context, can func(ctx context.Context, bizID, feature string) bool) (int, error) {
+	// keep a dropped checkout only as long as it is useful: the weekly
+	// reminder cap looks back 7 days, the seller's list shows this week
+	if _, err := s.pool.Exec(ctx, `delete from checkout_sessions where verified_at < now() - interval '30 days'`); err != nil {
+		return 0, err
+	}
+	rows, err := s.pool.Query(ctx, `update checkout_sessions cs set reminded_at=now()
+		from businesses b
+		where b.id = cs.business_id and b.status='active'
+		and cs.verified_at between now() - interval '24 hours' and now() - interval '1 hour'
+		and (cs.reminded_at is null or cs.reminded_at < now() - interval '7 days')
+		and coalesce((b.checkout_rules->>'recovery')::boolean, true)
+		and not exists (select 1 from orders o join customers c on c.id = o.customer_id
+			where o.business_id = cs.business_id and c.phone = cs.phone and o.created_at > cs.verified_at)
+		returning cs.business_id, cs.phone, cs.items, cs.link_token, b.code, b.name`)
+	if err != nil {
+		return 0, err
+	}
+	type due struct {
+		bizID, phone, token, code, name string
+		items                           []Ref
+	}
+	var list []due
+	for rows.Next() {
+		var d due
+		var raw []byte
+		if rows.Scan(&d.bizID, &d.phone, &raw, &d.token, &d.code, &d.name) == nil {
+			json.Unmarshal(raw, &d.items)
+			list = append(list, d)
+		}
+	}
+	rows.Close()
+	sent := 0
+	for _, d := range list {
+		if !can(ctx, d.bizID, "recovery") {
+			continue
+		}
+		link := s.baseURL + "/s/" + d.code
+		if d.token != "" {
+			link = s.baseURL + "/l/" + d.code + "/" + d.token
+		}
+		what := "your cart"
+		if names := s.cartNames(ctx, d.bizID, d.items); names != "" {
+			what = names
+		}
+		msg := fmt.Sprintf("Hi! You were checking out %s at %s. It is still waiting for you — finish your order here: %s", what, d.name, link)
+		if err := s.notify.WhatsApp(d.phone, msg); err != nil {
+			s.log.Warn("abandoned checkout reminder failed", "businessId", d.bizID, "err", err)
+			continue
+		}
+		sent++
+	}
+	return sent, nil
+}
+
+// cartNames names up to two products of a saved cart.
+func (s *Service) cartNames(ctx context.Context, bizID string, refs []Ref) string {
+	var ids []string
+	for _, r := range refs {
+		if httpx.ValidID(r.ProductID) {
+			ids = append(ids, r.ProductID)
+		}
+	}
+	if len(ids) == 0 {
+		return ""
+	}
+	rows, err := s.pool.Query(ctx, `select name from products where business_id=$1 and id = any($2::uuid[]) limit 3`, bizID, ids)
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if rows.Scan(&n) == nil {
+			names = append(names, n)
+		}
+	}
+	if len(names) > 2 {
+		return names[0] + ", " + names[1] + " and more"
+	}
+	return strings.Join(names, " and ")
+}
+
+// Abandoned is a buyer who verified their number but has not ordered yet.
+type Abandoned struct {
+	Phone      string `json:"phone"`
+	Name       string `json:"name,omitempty"` // when they ordered before
+	Items      string `json:"items"`
+	VerifiedAt string `json:"verifiedAt"`
+	RemindedAt string `json:"remindedAt,omitempty"`
+}
+
+// AbandonedCheckouts lists the last week's dropped checkouts for the seller
+// to follow up; ordering removes a buyer from it.
+func (s *Service) AbandonedCheckouts(ctx context.Context, bizID string) ([]Abandoned, error) {
+	rows, err := s.pool.Query(ctx, `select cs.phone, coalesce(c.name, ''), cs.items,
+		to_char(cs.verified_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+		coalesce(to_char(cs.reminded_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
+		from checkout_sessions cs left join customers c on c.business_id = cs.business_id and c.phone = cs.phone
+		where cs.business_id=$1 and cs.verified_at > now() - interval '7 days'
+		order by cs.verified_at desc limit 100`, bizID)
+	if err != nil {
+		return nil, err
+	}
+	type row struct {
+		a    Abandoned
+		refs []Ref
+	}
+	var list []row
+	for rows.Next() {
+		var r row
+		var raw []byte
+		if rows.Scan(&r.a.Phone, &r.a.Name, &raw, &r.a.VerifiedAt, &r.a.RemindedAt) == nil {
+			json.Unmarshal(raw, &r.refs)
+			list = append(list, r)
+		}
+	}
+	rows.Close()
+	out := make([]Abandoned, 0, len(list))
+	for _, r := range list {
+		r.a.Items = s.cartNames(ctx, bizID, r.refs)
+		out = append(out, r.a)
+	}
+	return out, nil
 }

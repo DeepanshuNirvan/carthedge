@@ -1,9 +1,11 @@
 package publicapi
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
+	"carthedge/internal/aftersale"
 	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
@@ -13,6 +15,7 @@ import (
 	"carthedge/internal/payment"
 	"carthedge/internal/plan"
 	"carthedge/internal/product"
+	"carthedge/internal/storage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,13 +31,15 @@ type Handler struct {
 	products  *product.Service
 	customers *customer.Service
 	courier   *courier.Shiprocket
+	aftersale *aftersale.Service
+	uploads   *storage.Handler
 }
 
 func NewHandler(pool *pgxpool.Pool, links *link.Service, orders *order.Service, otpSvc *otp.Service,
 	payments *payment.Service, plans *plan.Service, products *product.Service, customers *customer.Service,
-	sr *courier.Shiprocket) *Handler {
+	sr *courier.Shiprocket, after *aftersale.Service, uploads *storage.Handler) *Handler {
 	return &Handler{pool: pool, links: links, orders: orders, otp: otpSvc, payments: payments,
-		plans: plans, products: products, customers: customers, courier: sr}
+		plans: plans, products: products, customers: customers, courier: sr, aftersale: after, uploads: uploads}
 }
 
 // ResolveLink renders the checkout payload; a lapsed seller subscription
@@ -83,6 +88,9 @@ func (h *Handler) VerifyOtp(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Phone string `json:"phone"`
 		Code  string `json:"code"`
+		// what is in the cart, so a buyer who stops here can get one reminder
+		Items     []order.Ref `json:"items"`
+		LinkToken string      `json:"linkToken"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
@@ -104,6 +112,17 @@ func (h *Handler) VerifyOtp(w http.ResponseWriter, r *http.Request) {
 		if c, err := h.customers.Lookup(r.Context(), bizID, phone); err == nil {
 			out["prefill"] = httpx.M{"name": c.Name, "email": c.Email, "address": c.LastAddress}
 		}
+		if len(in.Items) > 0 || in.LinkToken != "" {
+			if len(in.Items) > 50 || len(in.LinkToken) > 64 {
+				in.Items, in.LinkToken = in.Items[:min(len(in.Items), 50)], ""
+			}
+			items, _ := json.Marshal(in.Items)
+			// a reminder already sent this week stays sent: reminded_at is kept
+			h.pool.Exec(r.Context(), `insert into checkout_sessions (business_id, phone, items, link_token)
+				values ($1,$2,$3::jsonb,$4) on conflict (business_id, phone) do update set
+				items=excluded.items, link_token=excluded.link_token, verified_at=now()`,
+				bizID, phone, string(items), in.LinkToken)
+		}
 	}
 	httpx.OK(w, out)
 }
@@ -120,6 +139,8 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		PaymentMethod string           `json:"paymentMethod"`
 		OfferCode     string           `json:"offerCode"`
 		Notes         string           `json:"notes"`
+		BuyerGstin    string           `json:"buyerGstin"`
+		BuyerCompany  string           `json:"buyerCompany"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
@@ -161,6 +182,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		BusinessID: res.Business.ID, LinkID: res.LinkID, Source: "link",
 		Name: in.Name, Phone: phone, Email: in.Email, Address: in.Address,
 		PaymentMethod: in.PaymentMethod, OfferCode: in.OfferCode, Notes: in.Notes,
+		BuyerGstin: in.BuyerGstin, BuyerCompany: in.BuyerCompany,
 	}
 	if res.Kind == "custom" {
 		params.CustomLines = []product.Line{{Name: res.Title, Qty: 1, Price: res.Amount}}
@@ -214,18 +236,24 @@ func (h *Handler) Track(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, "phone query parameter is required")
 		return
 	}
-	o, bizName, err := h.orders.TrackByCode(r.Context(), r.PathValue("code"), phone)
+	o, store, err := h.orders.TrackByCode(r.Context(), r.PathValue("code"), phone)
 	if err != nil {
 		httpx.Err(w, http.StatusNotFound, "order not found for this phone number")
 		return
 	}
-	httpx.OK(w, httpx.M{
-		"orderCode": o.Code, "businessName": bizName, "status": o.Status,
+	out := httpx.M{
+		"orderCode": o.Code, "businessName": store.Name, "businessCode": store.Code, "status": o.Status,
 		"paymentMethod": o.PaymentMethod, "paymentStatus": o.PaymentStatus, "paymentRef": o.PaymentRef,
-		"items": o.Items, "subtotal": o.Subtotal, "discount": o.Discount, "shipping": o.Shipping,
+		"items": o.Items, "subtotal": o.Subtotal, "discount": o.Discount, "prepaidDiscount": o.PrepaidDiscount,
+		"shipping": o.Shipping, "codFee": o.CodFee, "tokenAmount": o.TokenAmount,
 		"total": o.Total, "courierName": o.CourierName, "courierTrackingId": o.CourierTracking,
+		"address": o.Address, "replacementOf": o.ReplacementOf,
 		"events": o.Events, "createdAt": o.CreatedAt,
-	})
+	}
+	if v, err := h.aftersale.BuyerView(r.Context(), store.ID, o); err == nil {
+		out["afterSale"] = v
+	}
+	httpx.OK(w, out)
 }
 
 // Pay starts a Razorpay checkout for the full amount or the COD token.

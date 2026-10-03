@@ -38,10 +38,10 @@ func TestTokenRoleSeparation(t *testing.T) {
 	seller := sign(t, jwt.MapClaims{"sub": "biz-1", "biz": "demo-store"})
 	adminTok := sign(t, jwt.MapClaims{"sub": "admin-1", "role": "admin"})
 
-	if got := status(Auth(secret), seller); got != http.StatusOK {
+	if got := status(Auth(secret, nil), seller); got != http.StatusOK {
 		t.Errorf("seller token on seller API: got %d, want 200", got)
 	}
-	if got := status(Auth(secret), adminTok); got != http.StatusUnauthorized {
+	if got := status(Auth(secret, nil), adminTok); got != http.StatusUnauthorized {
 		t.Errorf("admin token on seller API: got %d, want 401", got)
 	}
 	if got := status(AdminAuth(secret), adminTok); got != http.StatusOK {
@@ -50,13 +50,13 @@ func TestTokenRoleSeparation(t *testing.T) {
 	if got := status(AdminAuth(secret), seller); got != http.StatusUnauthorized {
 		t.Errorf("seller token on admin API: got %d, want 401", got)
 	}
-	if got := status(Auth(secret), "not-a-token"); got != http.StatusUnauthorized {
+	if got := status(Auth(secret, nil), "not-a-token"); got != http.StatusUnauthorized {
 		t.Errorf("garbage token: got %d, want 401", got)
 	}
 	// the OAuth state is signed with the same secret and names the business,
 	// but it travels through Meta's URLs — it must never work as a login
 	state := sign(t, jwt.MapClaims{"sub": "biz-1", "channel": "instagram", "jti": "n1"})
-	if got := status(Auth(secret), state); got != http.StatusUnauthorized {
+	if got := status(Auth(secret, nil), state); got != http.StatusUnauthorized {
 		t.Errorf("oauth state token on seller API: got %d, want 401", got)
 	}
 }
@@ -86,5 +86,20 @@ func TestLoggingKeepsFlusher(t *testing.T) {
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/v1/events", nil))
 	if !flushable {
 		t.Error("handler behind Logging cannot flush — SSE breaks")
+	}
+}
+
+// An admin's support session can look but not touch.
+func TestSupportSessionIsReadOnly(t *testing.T) {
+	tok := sign(t, jwt.MapClaims{"sub": "biz-1", "biz": "demo-store", "imp": "admin-1"})
+	if got := status(Auth(secret, nil), tok); got != http.StatusOK {
+		t.Fatalf("support GET = %d, want 200", got)
+	}
+	req := httptest.NewRequest("PUT", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+	Auth(secret, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("support PUT = %d, want 403", rec.Code)
 	}
 }

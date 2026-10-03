@@ -60,3 +60,16 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.OK(w, httpx.M{"ok": true})
 }
+
+// Erase deletes a buyer's personal data at their request.
+func (h *Handler) Erase(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.Erase(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id")); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			httpx.Err(w, http.StatusNotFound, err.Error())
+			return
+		}
+		httpx.Err(w, http.StatusInternalServerError, "could not erase this customer")
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}

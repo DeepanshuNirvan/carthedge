@@ -28,7 +28,7 @@ export default function PaymentsPage() {
                 <Th className="hidden sm:table-cell">Plan</Th>
                 <Th className="text-right">Amount</Th>
                 <Th>Status</Th>
-                <Th className="hidden md:table-cell">Razorpay order</Th>
+                <Th className="hidden md:table-cell">Invoice</Th>
                 <Th className="hidden sm:table-cell">When</Th>
               </tr>
             </thead>
@@ -46,7 +46,10 @@ export default function PaymentsPage() {
                   <Td>
                     <StatusChip status={p.status} />
                   </Td>
-                  <Td className="hidden font-mono text-xs text-low md:table-cell">{p.razorpayOrderId}</Td>
+                  <Td className="hidden text-xs md:table-cell">
+                    <p className="font-mono text-mid">{p.invoiceNumber || '-'}</p>
+                    <p className="font-mono text-low">{p.autopay ? 'Autopay' : p.razorpayOrderId}</p>
+                  </Td>
                   <Td className="hidden text-xs text-low sm:table-cell">{formatDateTime(p.createdAt)}</Td>
                 </Tr>
               ))}

@@ -369,7 +369,7 @@
   }
 }
 
-/* ---------- print: an invoice prints as a document, not as the app ---------- */
+/* ---------- print: a document (invoice, packing slip) prints alone, not as the app ---------- */
 @media print {
   @page {
     margin: 12mm;
@@ -380,12 +380,16 @@
   body > * {
     display: none !important;
   }
-  body > #invoice-print {
+  body > [data-print] {
     display: block !important;
   }
-  #invoice-print article {
+  [data-print] article {
     box-shadow: none !important;
     padding: 0 !important;
+  }
+  /* one packing slip per sheet */
+  [data-print] .print-page + .print-page {
+    break-before: page;
   }
   .grain::after {
     display: none !important;

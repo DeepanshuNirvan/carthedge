@@ -68,11 +68,73 @@ export type BusinessProfile = {
   aiAutoOrder: boolean;
   /** facts the assistant may quote: delivery time, exchange policy, sizing */
   aiNotes: string;
+  freeShippingAbove: number;
+  policies: StorePolicies;
+  aiProfile: AiProfile;
+  checkout: CheckoutRules;
+  gst: GstProfile;
+  alerts: AlertPrefs;
+  /** set while a deleted account waits out its 30-day restore window */
+  deletionScheduledAt?: string;
 };
+
+// seller settings documents (mirror internal/shop in Go)
+export const returnReasons = ['size', 'damaged', 'wrong_item', 'quality', 'not_as_described', 'changed_mind', 'other'] as const;
+export type ReturnReason = (typeof returnReasons)[number];
+export type ReturnPolicy = {
+  windowDays: number;
+  exchange: boolean;
+  refund: boolean;
+  reasons: ReturnReason[] | null;
+  photoRequired: boolean;
+  pickup: '' | 'pickup' | 'self_ship';
+  conditions: string;
+};
+export type Faq = { q: string; a: string };
+export type StorePolicies = {
+  returns: ReturnPolicy;
+  cancelBefore: '' | 'confirmed' | 'packed' | 'shipped' | 'never';
+  delivery: { dispatchDays: number; metro: string; rest: string; note: string };
+  codMaxOrder: number;
+  warranty: string;
+  terms: string;
+  supportEmail: string;
+  supportPhone: string;
+  faqs: Faq[] | null;
+};
+export type OpenDay = { open: boolean; from: string; to: string };
+export type AiProfile = {
+  tone: '' | 'warm' | 'formal' | 'fun';
+  language: '' | 'auto' | 'english' | 'hinglish' | 'hindi';
+  emoji: '' | 'light' | 'none' | 'lots';
+  address: '' | 'aap' | 'tum';
+  hours: { enabled: boolean; days: OpenDay[] };
+  away: string;
+  replyWhen: '' | 'always' | 'closed';
+  handles: { bargain: boolean; returns: boolean; cancel: boolean; bulk: boolean; offers: boolean };
+  handoffAbove: number;
+};
+export type Charge = { kind: '' | 'flat' | 'percent'; value: number; max: number };
+export type CheckoutRules = {
+  codFee: Charge & { freeAbove: number };
+  prepaidDiscount: Charge & { minOrder: number };
+  /** abandoned-checkout reminder; null = on */
+  recovery: boolean | null;
+};
+export type GstProfile = {
+  registration: '' | 'unregistered' | 'regular' | 'composition';
+  legalName: string;
+  defaultRate: number | null;
+  defaultHsn: string;
+  prefix: string;
+  note: string;
+};
+export type AlertPrefs = { email: boolean | null; whatsapp: boolean | null; push: boolean | null };
+export const gstRates = [0, 3, 5, 12, 18, 28, 40] as const;
 
 // plans & subscription
 /** Entitlement keys the API gates paid routes on — mirrors admin.Capabilities in Go. */
-export type Capability = 'ai' | 'aiReply' | 'broadcasts' | 'offers' | 'invoices' | 'courier' | 'waitlist';
+export type Capability = 'ai' | 'aiReply' | 'broadcasts' | 'offers' | 'invoices' | 'courier' | 'waitlist' | 'recovery';
 
 export type Plan = {
   id: string;
@@ -98,6 +160,9 @@ export type Subscription = {
   endsAt: string;
   capabilities: Capability[];
   ordersUsed: number;
+  /** Razorpay mandate: '' never set up | pending | active | halted | cancelled */
+  autopay: '' | 'pending' | 'active' | 'halted' | 'cancelled';
+  autopayPlan?: string;
 };
 /** How the buyer pays: a Razorpay checkout, or a direct UPI transfer to the
  *  seller's own VPA when they have no gateway. Money never routes via CartHedge
@@ -117,7 +182,8 @@ export type CheckoutInfo = {
 };
 
 // catalog
-export type Variant = { id?: string; name: string; price: number; sku: string; inStock: boolean };
+export type Variant = { id?: string; name: string; price: number; sku: string; inStock: boolean; stockQty?: number };
+export type ProductDetail = { label: string; value: string };
 export type Product = {
   id: string;
   name: string;
@@ -134,6 +200,11 @@ export type Product = {
   trending: boolean;
   active: boolean;
   variants: Variant[];
+  details: ProductDetail[] | null;
+  sizeChart: string;
+  hsn: string;
+  /** percent; -1 = the store default */
+  gstRate: number;
   createdAt: string;
 };
 export type ProductInput = {
@@ -148,6 +219,12 @@ export type ProductInput = {
   inStock: boolean;
   trending: boolean;
   variants: Variant[];
+  /** omitted keeps the counted stock on an edit; -1 = untracked */
+  stockQty?: number;
+  details?: ProductDetail[];
+  sizeChart?: string;
+  hsn?: string;
+  gstRate?: number;
 };
 export type Offer = {
   id: string;
@@ -158,6 +235,13 @@ export type Offer = {
   productIds?: string[];
   active: boolean;
   expiresAt?: string;
+  /** limits: 0 / false = none */
+  maxDiscount?: number;
+  maxUses?: number;
+  maxPerCustomer?: number;
+  firstOrderOnly?: boolean;
+  /** orders that used it, cancelled excluded (seller list only) */
+  uses?: number;
 };
 
 // links
@@ -187,7 +271,7 @@ export type LinkCreateInput = {
 // orders
 export const orderStatuses = ['new', 'confirmed', 'packed', 'shipped', 'delivered', 'rto', 'cancelled'] as const;
 export type OrderStatus = (typeof orderStatuses)[number];
-export type OrderLine = { productId?: string; name: string; variant?: string; qty: number; price: number };
+export type OrderLine = { productId?: string; variantId?: string; name: string; variant?: string; qty: number; price: number };
 export type OrderEvent = { status: string; note: string; createdAt: string };
 export type Order = {
   id: string;
@@ -204,11 +288,19 @@ export type Order = {
   items: OrderLine[];
   subtotal: number;
   discount: number;
+  prepaidDiscount: number;
   shipping: number;
+  codFee: number;
   total: number;
   tokenAmount: number;
   offerCode?: string;
   notes?: string;
+  buyerGstin?: string;
+  buyerCompany?: string;
+  /** the order an exchange ships against */
+  replacementOf?: string;
+  replacementOfId?: string;
+  invoiceId?: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
@@ -248,6 +340,7 @@ export type Customer = {
   ordersCount: number;
   totalSpent: number;
   codRefusals: number;
+  returnsCount: number;
   riskFlagged: boolean;
   lastOrderAt?: string;
   createdAt: string;
@@ -313,6 +406,47 @@ export type Broadcast = {
 };
 
 // invoices
+export type GstParty = {
+  name: string;
+  legalName?: string;
+  address: string;
+  state: string;
+  stateCode: string;
+  gstin?: string;
+  phone?: string;
+};
+export type GstLine = {
+  description: string;
+  hsn: string;
+  qty: number;
+  rate: number;
+  gross: number;
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+};
+/** The printable GST document, computed and frozen by the server. */
+export type GstDoc = {
+  type: 'tax_invoice' | 'bill_of_supply' | 'invoice' | 'credit_note';
+  seller: GstParty;
+  buyer: GstParty;
+  placeOfSupply: string;
+  intra: boolean;
+  lines: GstLine[];
+  discount: number;
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
+  orderCode: string;
+  orderDate: string;
+  paymentMethod: string;
+  note?: string;
+  againstInvoice?: string;
+};
+export type CreditNote = { id: string; number: string; total: number; doc: GstDoc; createdAt: string };
 export type Invoice = {
   id: string;
   invoiceNumber: string;
@@ -325,11 +459,115 @@ export type Invoice = {
   gstRate: number;
   gstAmount: number;
   total: number;
+  docType: 'tax_invoice' | 'bill_of_supply' | 'invoice';
+  /** detail view only; absent on invoices issued before GST snapshots */
+  doc?: GstDoc;
+  creditNotes?: CreditNote[];
   createdAt: string;
+};
+export type InvoiceCreateInput = {
+  orderId: string;
+  gstRate?: number;
+  placeOfSupply?: string;
+  buyerGstin?: string;
+  buyerName?: string;
+};
+export type PlatformInvoice = { id: string; number: string; total: number; doc: GstDoc; createdAt: string };
+
+// after-sales
+export type ReturnStatus = 'requested' | 'approved' | 'picked_up' | 'received' | 'completed' | 'rejected' | 'cancelled';
+export type ReturnItem = {
+  index: number;
+  productId?: string;
+  variantId?: string;
+  name: string;
+  variant?: string;
+  qty: number;
+  price: number;
+  restock: boolean;
+  exchangeVariantId?: string;
+  exchangeLabel?: string;
+};
+export type ReturnRequest = {
+  id: string;
+  code: string;
+  orderId: string;
+  orderCode: string;
+  kind: 'return' | 'exchange';
+  reason: ReturnReason;
+  note?: string;
+  photos: string[];
+  items: ReturnItem[];
+  value: number;
+  status: ReturnStatus;
+  resolution?: string;
+  source: 'buyer' | 'seller';
+  sellerNote?: string;
+  pickupCourier?: string;
+  pickupTracking?: string;
+  replacementOrderId?: string;
+  replacementOrderCode?: string;
+  customerName: string;
+  customerPhone: string;
+  refunded: number;
+  nextStatuses: ReturnStatus[];
+  createdAt: string;
+  updatedAt: string;
+};
+export type RefundMethod = 'razorpay' | 'upi' | 'bank' | 'cash' | 'other';
+export type Refund = {
+  id: string;
+  orderId: string;
+  orderCode: string;
+  returnId?: string;
+  amount: number;
+  method: RefundMethod | '';
+  status: 'pending' | 'processed' | 'failed' | 'cancelled';
+  reference?: string;
+  reason?: string;
+  createdAt: string;
+  processedAt?: string;
+};
+export type OrderAfterSale = {
+  returns: ReturnRequest[];
+  refunds: Refund[];
+  paid: number;
+  refundable: number;
+  razorpay: boolean;
+};
+export type ReturnInput = {
+  kind: 'return' | 'exchange';
+  reason: ReturnReason;
+  note?: string;
+  photos?: string[];
+  items: { index: number; qty: number; exchangeVariantId?: string; exchangeLabel?: string }[];
+};
+export type AbandonedCheckout = { phone: string; name?: string; items: string; verifiedAt: string; remindedAt?: string };
+
+/** What checkout shows before the order exists: the server's own pricing. */
+export type Totals = { subtotal: number; discount: number; prepaidDiscount: number; shipping: number; codFee: number; total: number };
+export type Quote = {
+  lines: OrderLine[];
+  offerCode?: string;
+  offerError?: string;
+  prepaid: Totals;
+  cod: Totals;
+  codLimit?: number;
+  codAvailable: boolean;
 };
 
 // AI order desk
 export type DraftItem = { productId: string; name: string; variant: string; qty: number; price: number };
+
+/** One turn of the seller trying their own assistant. */
+export type PracticeTurn = {
+  messages: string[];
+  cart: ChatCart;
+  stage: ChatStage;
+  summaryHash: string;
+  action: 'silent' | 'reply' | 'summary' | 'place' | 'handoff';
+  note: string;
+};
 export type DraftData = {
   items: DraftItem[];
   customerName: string;
@@ -426,6 +664,22 @@ export type AdminOverview = {
   openPlanRequests: number;
   openEnquiries: number;
 };
+export type AiUsageTotals = { calls: number; inputTokens: number; outputTokens: number; cost: number };
+export type AiUsage = {
+  days: number;
+  usdInr: number;
+  totals: AiUsageTotals;
+  businesses: (AiUsageTotals & { id: string; name: string; code: string })[];
+  daily: (AiUsageTotals & { day: string })[];
+};
+export type AuditEntry = { action: string; detail: Record<string, unknown>; ip: string; adminEmail: string; createdAt: string };
+export type SupportSession = {
+  accessToken: string;
+  businessId: string;
+  businessCode: string;
+  businessName: string;
+  expiresAt: string;
+};
 export type AdminBusinessRow = {
   id: string;
   code: string;
@@ -434,7 +688,7 @@ export type AdminBusinessRow = {
   email: string;
   phone: string;
   city: string;
-  status: 'active' | 'suspended';
+  status: 'active' | 'suspended' | 'deleted' | 'purged';
   planCode: string;
   subscriptionStatus: string;
   subscriptionEndsAt: string;
@@ -471,6 +725,8 @@ export type AdminBusinessDetail = {
     products: number;
     customers: number;
   };
+  aiUsage?: AiUsage;
+  audit?: AuditEntry[];
 };
 export type PlanRequest = {
   id: string;
@@ -504,6 +760,8 @@ export type AdminPayment = {
   razorpayOrderId: string;
   planCode: string;
   createdAt: string;
+  invoiceNumber: string;
+  autopay: boolean;
 };
 export type SiteStat = { value: number; suffix: string; label: string };
 export type SiteTestimonial = { quote: string; name: string; business: string; metric: string };
@@ -516,6 +774,8 @@ export type SiteSettings = {
   stats: SiteStat[];
   testimonials: SiteTestimonial[];
   faqs: SiteFaq[];
+  /** CartHedge's own identity on the invoices sellers get for their plan (staff-only). */
+  billing?: { legalName: string; gstin: string; address: string; email: string; sac: string; rate: number };
 };
 
 // public storefront
@@ -534,6 +794,9 @@ export type StoreBusiness = {
   codEnabled: boolean;
   shippingFee: number;
   onlinePayment: OnlinePayment;
+  freeShippingAbove: number;
+  codFee: CheckoutRules['codFee'];
+  prepaidDiscount: CheckoutRules['prepaidDiscount'];
 };
 export type PublicVariant = { id: string; name: string; price: number; inStock: boolean };
 export type PublicProduct = {
@@ -547,6 +810,8 @@ export type PublicProduct = {
   inStock: boolean;
   trending: boolean;
   variants: PublicVariant[];
+  details: ProductDetail[];
+  sizeChart?: string;
 };
 export type StoreHome = {
   business: StoreBusiness;
@@ -583,9 +848,21 @@ export type PlacedOrder = {
   paymentMethod: 'cod' | 'prepaid';
   next: 'pay' | 'codPending';
 };
+export type BuyerAfterSale = {
+  canCancel: boolean;
+  canChangeAddress: boolean;
+  canReturn: boolean;
+  returnBy?: string;
+  returnPolicy: ReturnPolicy;
+  returns: ReturnRequest[];
+  refunds: Refund[];
+  options: Record<string, { id: string; name: string; inStock: boolean }[]>;
+  returnable: Record<string, number>;
+};
 export type TrackedOrder = {
   orderCode: string;
   businessName: string;
+  businessCode: string;
   status: OrderStatus;
   paymentMethod: string;
   paymentStatus: string;
@@ -593,10 +870,39 @@ export type TrackedOrder = {
   items: OrderLine[];
   subtotal: number;
   discount: number;
+  prepaidDiscount: number;
   shipping: number;
+  codFee: number;
+  tokenAmount: number;
   total: number;
   courierName?: string;
   courierTrackingId?: string;
+  address: Address;
+  replacementOf?: string;
+  afterSale?: BuyerAfterSale;
   events: OrderEvent[];
   createdAt: string;
+};
+export type StorePolicyPage = {
+  business: {
+    code: string;
+    name: string;
+    logoUrl: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    whatsapp: string;
+    instagram: string;
+    gstin: string;
+    legalName: string;
+  };
+  policies: StorePolicies;
+  hours: string;
+  shippingFee: number;
+  freeShippingAbove: number;
+  codEnabled: boolean;
+  codFee: CheckoutRules['codFee'];
+  prepaidDiscount: CheckoutRules['prepaidDiscount'];
+  onlinePayment: OnlinePayment;
 };

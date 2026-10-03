@@ -1,5 +1,6 @@
 import { useAuth } from '@/store/auth';
 import { useAdminAuth } from '@/store/adminAuth';
+import { activeSupport, useSupport } from '@/store/support';
 import { useUi } from '@/store/ui';
 import type { Tokens } from './types';
 
@@ -66,7 +67,8 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     const headers: Record<string, string> = {};
     if (!formData) headers['Content-Type'] = 'application/json';
     if (auth === 'seller') {
-      const token = useAuth.getState().accessToken;
+      // an admin's read-only support view uses its own short-lived token
+      const token = activeSupport()?.accessToken ?? useAuth.getState().accessToken;
       if (token) headers.Authorization = `Bearer ${token}`;
     } else if (auth === 'admin') {
       const token = useAdminAuth.getState().accessToken;
@@ -77,8 +79,9 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
 
   let res = await doFetch();
 
-  // silent refresh + replay, sellers only
-  if (res.status === 401 && auth === 'seller' && (await refreshSellerToken())) {
+  // silent refresh + replay, sellers only (a support view has nothing to refresh)
+  const support = auth === 'seller' && !!activeSupport();
+  if (res.status === 401 && auth === 'seller' && !support && (await refreshSellerToken())) {
     res = await doFetch();
   }
 
@@ -92,11 +95,16 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     } catch {
       // non-JSON error body
     }
-    if (res.status === 401 && auth === 'seller') useAuth.getState().clear();
+    if (res.status === 401 && auth === 'seller') {
+      if (support) useSupport.getState().end();
+      else useAuth.getState().clear();
+    }
     if (res.status === 401 && auth === 'admin') useAdminAuth.getState().clear();
     if (res.status === 402 && code === 'subscriptionExpired') useUi.getState().setPaywall(true);
     // suspension is not a billing problem: sign out, and login explains it
     if (res.status === 403 && code === 'accountSuspended') useAuth.getState().clear();
+    if (res.status === 403 && code === 'accountDeleted') useUi.getState().setAccountDeleted(true);
+    if (res.status === 403 && code === 'readOnly') message = 'This is a read-only support view.';
     if (res.status === 429) message = 'Too many attempts, take a breath and retry in a minute.';
     throw new ApiError(res.status, message, code);
   }

@@ -4,6 +4,14 @@ What a real Instagram/WhatsApp seller, their buyers and CartHedge staff will loo
 
 **Priority:** P0 = before onboarding real sellers · P1 = core for this segment, soon after · P2 = later / nice to have.
 
+## Status after the 3 Oct 2026 build
+
+Built and verified (API suites + UI pass, see [FEATURE-BUILD.md](FEATURE-BUILD.md)):
+
+- **Done:** 1.1 returns/exchanges · 1.3 refund records + credit notes · 1.4 buyer cancel · 2.1 structured policies · 2.2 buyer policy page · 2.3 FAQ pairs · 2.4 tone/language/emoji/aap-tum · 2.5 business hours + away message · 2.6 seller-chosen handoff rules · 2.7 product details + size chart · 2.8 practice chat · 3.1 seller alerts (WhatsApp/email/web push + live toast) · 3.2 packing slips + pick list · 3.3 bulk status/print · 3.5 COD charge + prepaid discount · 4.1 stock quantity in the form · 4.3 size chart · 5.1 change password + sign out other devices · 5.2 export + delete account + buyer erase · 5.3 subscription GST invoices + history · 5.4 GST-compliant buyer invoices · 5.5 autopay · 6.1 dropped-checkout reminder · 6.2 coupon limits · 7.4 policy page · 8.1 AI cost per seller · 8.2 view as seller (read-only, audited).
+- **Partly done:** 1.2 (stock back on receipt and per-buyer return count; no per-product return rate yet) · 1.5 (address change by buyer and seller; no size or quantity edit) · 1.6 (the assistant quotes the policy and sends buyers to their order page; it does not open the request itself) · 2.1 (COD ceiling done; no blocked-pincode list) · 3.3 (no export) · 7.1 (cancel, address, return/exchange with photos; no invoice download or reorder) · 8.3 (staff actions are logged; one admin login, no roles or 2FA).
+- **Still open:** 2.9, 3.4, 3.6, 3.7, 3.8, 3.9, 4.2, 4.4, 4.5, 5.6, 5.7, 6.3, 6.4, 7.2, 7.3, 7.5, 8.4, 8.5, 8.6 — and OPS-1 (OTP/WhatsApp delivery), which the alerts and reminders depend on.
+
 ---
 
 ## 1. Returns, exchanges, cancellations, refunds (the biggest hole)
@@ -103,7 +111,7 @@ What a real Instagram/WhatsApp seller, their buyers and CartHedge staff will loo
 
 ---
 
-## Suggested order
+## Suggested order (as written before the build — see the status above)
 
 1. **Must before real sellers:** OTP/WhatsApp delivery (OPS-1), new-order alert (3.1), stock quantity in the form (4.1), store policies for AI + buyer page (2.1, 2.2), returns/exchange/refund records (1.1–1.3), packing slip or fix the marketing claim (3.2), change password + delete account (5.1, 5.2).
 2. **Next:** buyer self-service (7.1, 1.4–1.6), AI FAQ/tone/hours/handoff rules (2.3–2.8), COD fee/prepaid discount + pincode rules + COD block for risky buyers (3.5–3.7), courier sync (3.4), bulk actions (3.3), abandoned checkout (6.1), subscription GST invoice + autopay (5.3, 5.5), AI cost per seller (8.1).

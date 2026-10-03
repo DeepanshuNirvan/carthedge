@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { AlertTriangle, Search, Users } from 'lucide-react';
+import { AlertTriangle, Search, UserX, Users } from 'lucide-react';
 import type { Customer } from '@/api/types';
-import { useCustomer, useCustomers, useUpdateCustomer } from '@/api/customers';
+import { useCustomer, useCustomers, useEraseCustomer, useUpdateCustomer } from '@/api/customers';
 import { useOrders } from '@/api/orders';
 import { toast } from '@/store/ui';
 import { formatDate, timeAgo } from '@/lib/date';
@@ -11,7 +11,8 @@ import { Table, Td, Th, Tr } from '@/ui/Table';
 import { MoneyText } from '@/ui/MoneyText';
 import { Badge, StatusChip } from '@/ui/Badge';
 import { Switch } from '@/ui/Switch';
-import { Sheet } from '@/ui/Modal';
+import { Modal, Sheet } from '@/ui/Modal';
+import { Button } from '@/ui/Button';
 import { Avatar } from '@/ui/Avatar';
 import { Skeleton, SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
@@ -20,6 +21,8 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
   const { data: customer } = useCustomer(customerId ?? undefined);
   const { data: orders } = useOrders(customer ? { search: customer.phone, limit: 20 } : { limit: 0 });
   const update = useUpdateCustomer();
+  const erase = useEraseCustomer();
+  const [confirmErase, setConfirmErase] = useState(false);
 
   return (
     <Sheet open={!!customerId} onClose={onClose} title={customer?.name ?? 'Customer'}>
@@ -41,7 +44,7 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
             )}
           </div>
 
-          <div className="grid grid-cols-3 divide-x rounded-xl bg-[rgb(var(--field)/0.04)] text-center hairline">
+          <div className="grid grid-cols-4 divide-x rounded-xl bg-[rgb(var(--field)/0.04)] text-center hairline">
             <div className="p-3.5">
               <p className="text-xl font-semibold tracking-tight tnum text-hi">{customer.ordersCount}</p>
               <p className="text-xs text-low">orders</p>
@@ -55,6 +58,10 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
                 {customer.codRefusals}
               </p>
               <p className="text-xs text-low">COD refusals</p>
+            </div>
+            <div className="p-3.5">
+              <p className="text-xl font-semibold tracking-tight tnum text-hi">{customer.returnsCount}</p>
+              <p className="text-xs text-low">returns</p>
             </div>
           </div>
 
@@ -114,6 +121,41 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
               <p className="text-sm text-low">No orders recorded.</p>
             )}
           </section>
+
+          <section className="border-t pt-4">
+            <Button variant="ghost" size="sm" className="text-danger-ink" icon={<UserX className="size-4" />} onClick={() => setConfirmErase(true)}>
+              Erase this buyer's personal data
+            </Button>
+          </section>
+
+          <Modal open={confirmErase} onClose={() => setConfirmErase(false)} title="Erase personal data">
+            <p className="text-sm leading-relaxed text-mid">
+              Use this when <span className="font-medium text-hi">{customer.name}</span> asks you to delete their data. Their name,
+              phone, email, addresses and chats are removed for good. Orders stay in your records without their details, so your
+              sales and tax figures do not change.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="danger"
+                loading={erase.isPending}
+                onClick={() =>
+                  erase.mutate(customer.id, {
+                    onSuccess: () => {
+                      toast('success', 'Personal data erased');
+                      setConfirmErase(false);
+                      onClose();
+                    },
+                    onError: (e) => toast('error', 'Could not erase', e.message),
+                  })
+                }
+              >
+                Erase for good
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmErase(false)}>
+                Keep
+              </Button>
+            </div>
+          </Modal>
         </div>
       )}
     </Sheet>

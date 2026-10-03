@@ -14,6 +14,7 @@ import (
 	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
 	"carthedge/internal/product"
+	"carthedge/internal/shop"
 )
 
 // Cart is the order a buyer is building in a chat. It lives on the
@@ -47,6 +48,17 @@ type Store struct {
 	CodTokenAmount    int
 	OnlinePay         bool
 	Products          []product.Product // active products, in stock or not
+	// what the seller configured: policies and FAQs the assistant quotes,
+	// how it talks and when it hands off, and the checkout charges
+	Policies shop.Policies
+	Profile  shop.AIProfile
+	Pricing  shop.Pricing
+	Offers   []string // public coupon codes in words, shared only when the seller allows it
+}
+
+// checkout is the store's pricing as order creation sees it.
+func (st Store) checkout() shop.Checkout {
+	return shop.Checkout{ShippingFee: st.ShippingFee, FreeShippingAbove: st.FreeShippingAbove, Pricing: st.Pricing}
 }
 
 func (st Store) storeLink() string { return st.BaseURL + "/s/" + st.Code }
@@ -64,10 +76,12 @@ type QuoteLine struct {
 }
 
 type Quote struct {
-	Lines    []QuoteLine
-	Subtotal int
-	Shipping int
-	Total    int
+	Lines           []QuoteLine
+	Subtotal        int
+	Shipping        int
+	CodFee          int
+	PrepaidDiscount int
+	Total           int
 }
 
 const maxQty = 20
@@ -145,6 +159,9 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 	if len(c.Items) == 0 {
 		missing = append([]string{"what they would like to order"}, missing...)
 	}
+	// the seller's COD ceiling is checked on the COD total, charge included
+	codAllowed := st.Policies.CodMaxOrder == 0 || q.Subtotal == 0 ||
+		st.checkout().Totals(q.Subtotal, 0, "cod").Total <= st.Policies.CodMaxOrder
 
 	if c.Phone != "" {
 		if p, ok := httpx.NormalizePhone(c.Phone); ok {
@@ -161,6 +178,9 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 	switch {
 	case c.Payment == "cod" && !st.CodEnabled:
 		problems = append(problems, "cash on delivery is not available at this shop")
+		c.Payment = ""
+	case c.Payment == "cod" && !codAllowed:
+		problems = append(problems, "cash on delivery is available on orders up to "+inr(st.Policies.CodMaxOrder)+"; this order needs online payment")
 		c.Payment = ""
 	case c.Payment == "prepaid" && !st.OnlinePay:
 		problems = append(problems, "online payment is not available at this shop")
@@ -184,22 +204,20 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 		missing = append(missing, "pincode")
 	}
 	if c.Payment == "" {
-		missing = append(missing, "payment: "+st.payOptions())
+		missing = append(missing, "payment: "+st.payOptions(codAllowed))
 	}
 
 	if q.Subtotal > 0 {
-		q.Shipping = st.ShippingFee
-		if st.FreeShippingAbove > 0 && q.Subtotal >= st.FreeShippingAbove {
-			q.Shipping = 0
-		}
-		q.Total = q.Subtotal + q.Shipping
+		// the same maths order creation runs, so the card matches the bill
+		t := st.checkout().Totals(q.Subtotal, 0, c.Payment)
+		q.Shipping, q.CodFee, q.PrepaidDiscount, q.Total = t.Shipping, t.CodFee, t.PrepaidDiscount, t.Total
 	}
 	return c, q, problems, missing
 }
 
-func (st Store) payOptions() string {
+func (st Store) payOptions(codAllowed bool) string {
 	var opts []string
-	if st.CodEnabled {
+	if st.CodEnabled && codAllowed {
 		opts = append(opts, "cash on delivery")
 	}
 	if st.OnlinePay {
@@ -335,6 +353,12 @@ func (st Store) summary(c Cart, q Quote) string {
 		fmt.Fprintf(&b, "Delivery — %s\n", inr(q.Shipping))
 	} else {
 		b.WriteString("Delivery — free\n")
+	}
+	if q.CodFee > 0 {
+		fmt.Fprintf(&b, "COD charge — %s\n", inr(q.CodFee))
+	}
+	if q.PrepaidDiscount > 0 {
+		fmt.Fprintf(&b, "Online payment discount — -%s\n", inr(q.PrepaidDiscount))
 	}
 	fmt.Fprintf(&b, "Total — %s\n", inr(q.Total))
 	pay := "Cash on delivery"

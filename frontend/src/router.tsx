@@ -13,6 +13,7 @@ const AdminRoot = lazy(() => import('./admin/AdminRoot'));
 const ResetPasswordPage = lazy(() => import('./app/auth/ResetPasswordPage'));
 const StorePage = lazy(() => import('./store-front/storefront/StorePage'));
 const ProductPage = lazy(() => import('./store-front/product/ProductPage'));
+const StorePoliciesPage = lazy(() => import('./store-front/policies/StorePoliciesPage'));
 const LinkCheckoutPage = lazy(() => import('./store-front/checkout/LinkCheckoutPage'));
 const TrackPage = lazy(() => import('./store-front/tracking/TrackPage'));
 const CodConfirmPage = lazy(() => import('./store-front/tracking/CodConfirmPage'));
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
   { path: '/admin/*', element: wrap(<AdminRoot />) },
   { path: '/s/:businessCode', element: wrap(<StorePage />) },
   { path: '/s/:businessCode/p/:productId', element: wrap(<ProductPage />) },
+  { path: '/s/:businessCode/policies', element: wrap(<StorePoliciesPage />) },
   { path: '/l/:businessCode/:token', element: wrap(<LinkCheckoutPage />) },
   { path: '/track', element: wrap(<TrackPage />) },
   { path: '/o/:orderCode', element: wrap(<TrackPage />) },

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { get, patch } from './http';
+import { get, patch, post } from './http';
 import type { Customer } from './types';
 
 type CustomerFilters = { search?: string; segment?: string; risk?: boolean };
@@ -29,5 +29,17 @@ export function useUpdateCustomer() {
     mutationFn: ({ id, segment, riskFlagged }: { id: string; segment?: string; riskFlagged?: boolean }) =>
       patch<{ ok: boolean }>(`/api/v1/customers/${id}`, { segment, riskFlagged }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  });
+}
+
+/** A buyer's DPDP erasure request: their personal data goes, the order money stays. */
+export function useEraseCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => post<{ ok: boolean }>(`/api/v1/customers/${id}/erase`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    },
   });
 }

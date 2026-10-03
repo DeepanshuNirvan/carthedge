@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"carthedge/internal/ai"
+	"carthedge/internal/alert"
 	"carthedge/internal/events"
 	"carthedge/internal/httpx"
-	"carthedge/internal/notify"
 	"carthedge/internal/secure"
 
 	"github.com/jackc/pgx/v5"
@@ -40,7 +40,7 @@ type Service struct {
 	ai     *ai.Service
 	bus    *events.Bus
 	cipher *secure.Cipher
-	notify *notify.Notifier
+	alerts *alert.Service
 	log    *slog.Logger
 	// can answers plan entitlements (plan.Service.HasFeature): drafts need
 	// "ai", automatic replies need "aiReply"
@@ -52,8 +52,8 @@ type Service struct {
 }
 
 func NewService(pool *pgxpool.Pool, client *Client, aiSvc *ai.Service, bus *events.Bus, cipher *secure.Cipher,
-	n *notify.Notifier, can func(ctx context.Context, bizID, feature string) bool, log *slog.Logger) *Service {
-	return &Service{pool: pool, client: client, ai: aiSvc, bus: bus, cipher: cipher, notify: n, can: can, log: log}
+	alerts *alert.Service, can func(ctx context.Context, bizID, feature string) bool, log *slog.Logger) *Service {
+	return &Service{pool: pool, client: client, ai: aiSvc, bus: bus, cipher: cipher, alerts: alerts, can: can, log: log}
 }
 
 // Start runs the debounce loop: quiet conversations with new messages get one

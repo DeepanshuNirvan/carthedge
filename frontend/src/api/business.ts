@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, put } from './http';
-import type { BusinessProfile } from './types';
+import type { AiProfile, AlertPrefs, BusinessProfile, CheckoutRules, GstProfile, StorePolicies } from './types';
 
 export type BusinessUpdate = Partial<
   Pick<
@@ -17,11 +17,21 @@ export type BusinessUpdate = Partial<
     | 'gstin'
     | 'logoUrl'
     | 'shippingFee'
+    | 'freeShippingAbove'
     | 'codEnabled'
     | 'codTokenAmount'
     | 'baselineRtoPercent'
   >
 >;
+
+/** One settings document, saved whole (see internal/shop). */
+export type SettingsSections = {
+  policies: StorePolicies;
+  ai: AiProfile;
+  checkout: CheckoutRules;
+  gst: GstProfile;
+  alerts: AlertPrefs;
+};
 
 export type PaymentSettings = { razorpayKeyId?: string; razorpayKeySecret?: string; upiId?: string };
 
@@ -42,6 +52,14 @@ export function useUpdateAiSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AiSettings) => put<BusinessProfile>('/api/v1/business/ai', input),
+    onSuccess: (profile) => qc.setQueryData(['business'], profile),
+  });
+}
+
+export function useUpdateSettings<K extends keyof SettingsSections>(section: K) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (doc: SettingsSections[K]) => put<BusinessProfile>(`/api/v1/business/settings/${section}`, doc),
     onSuccess: (profile) => qc.setQueryData(['business'], profile),
   });
 }

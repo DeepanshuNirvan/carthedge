@@ -20,11 +20,15 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/store/auth';
-import { useUi } from '@/store/ui';
+import { useSupport } from '@/store/support';
+import { toast, useUi } from '@/store/ui';
 import { useSubscription } from '@/api/plans';
+import { useBusiness } from '@/api/business';
 import type { Capability } from '@/api/types';
-import { logout } from '@/api/auth';
-import { daysLeft } from '@/lib/date';
+import { logout, restoreAccount } from '@/api/auth';
+import { daysLeft, formatDate, formatDateTime } from '@/lib/date';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLiveAlerts } from './useLiveAlerts';
 import { cn } from '@/lib/cn';
 import { LogoMark } from '@/marketing/Wordmark';
 import { ThemeToggle } from '@/ui/ThemeToggle';
@@ -253,6 +257,66 @@ function PaywallGate() {
   );
 }
 
+/** An admin's read-only look at this workspace: say so on every screen. */
+function SupportBanner() {
+  const session = useSupport((s) => s.session);
+  const end = useSupport((s) => s.end);
+  if (!session) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-gold-400/14 px-4 py-2 text-center text-xs font-medium text-gold-ink">
+      Support view of {session.businessName}: read-only, ends {formatDateTime(session.expiresAt)}.
+      <button
+        onClick={() => {
+          end();
+          window.close();
+        }}
+        className="underline underline-offset-2"
+      >
+        End support view
+      </button>
+    </div>
+  );
+}
+
+/** A deleted account inside its 30-day window: one way back, or out. */
+function RestoreGate({ when, onSignOut }: { when?: string; onSignOut: () => void }) {
+  const qc = useQueryClient();
+  const setDeleted = useUi((s) => s.setAccountDeleted);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-start gap-4 py-16">
+      <h1 className="text-d4 font-semibold text-hi">Your account is scheduled for deletion</h1>
+      <p className="text-sm leading-relaxed text-mid">
+        Your store is closed{when ? ` and its data will be erased on ${formatDate(when)}` : ''}. Restore it to reopen your
+        store with everything as you left it. Reconnect Instagram or WhatsApp afterwards.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          loading={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await restoreAccount();
+              setDeleted(false);
+              qc.invalidateQueries();
+              toast('success', 'Account restored', 'Your store is open again.');
+            } catch (e) {
+              toast('error', 'Could not restore', e instanceof Error ? e.message : undefined);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Restore my account
+        </Button>
+        <Button variant="ghost" onClick={onSignOut}>
+          Sign out
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function MoreSheet({ open, onClose, onSignOut }: { open: boolean; onClose: () => void; onSignOut: () => void }) {
   const locked = useLocked();
   return (
@@ -284,13 +348,26 @@ function MoreSheet({ open, onClose, onSignOut }: { open: boolean; onClose: () =>
 }
 
 export function AppShell() {
-  const { businessName, businessCode } = useAuth();
+  const auth = useAuth();
+  const support = useSupport((s) => s.session);
+  // a support view shows the seller it opened, not whoever is saved in this browser
+  const businessName = support?.businessName ?? auth.businessName;
+  const businessCode = support?.businessCode ?? auth.businessCode;
   const [more, setMore] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const reduced = useReducedMotion();
+  const { data: business } = useBusiness();
+  const deletedFlag = useUi((s) => s.accountDeleted);
+  const deleted = deletedFlag || !!business?.deletionScheduledAt;
+  useLiveAlerts();
 
   const signOut = async () => {
+    if (support) {
+      useSupport.getState().end();
+      window.close();
+      return;
+    }
     await logout();
     navigate('/app/login');
   };
@@ -317,6 +394,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <SupportBanner />
         <TrialBanner />
         <header className="glass-bar glass-float sheen scroll-edge sticky top-0 z-30 flex items-center gap-3 px-4 lg:after:hidden pb-2.5 pt-[calc(0.6rem+env(safe-area-inset-top))] sm:px-6 lg:top-3 lg:mx-3 lg:mt-3 lg:rounded-xl lg:pb-2 lg:pt-2">
           <div className="flex min-w-0 items-center gap-2.5 lg:hidden">
@@ -360,7 +438,7 @@ export function AppShell() {
           transition={{ type: 'spring', stiffness: 300, damping: 32 }}
           className="w-full min-w-0 flex-1 px-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:pb-8"
         >
-          <Outlet />
+          {deleted ? <RestoreGate when={business?.deletionScheduledAt} onSignOut={signOut} /> : <Outlet />}
         </motion.main>
       </div>
       <BottomTabs onMore={() => setMore(true)} />

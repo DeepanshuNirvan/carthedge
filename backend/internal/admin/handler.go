@@ -90,6 +90,7 @@ func (h *Handler) SetBusinessStatus(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	h.svc.audit(r.Context(), r, r.PathValue("id"), "setStatus", map[string]any{"status": in.Status})
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
@@ -106,6 +107,8 @@ func (h *Handler) AssignPlan(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	h.svc.audit(r.Context(), r, r.PathValue("id"), "assignPlan",
+		map[string]any{"planCode": in.PlanCode, "customPrice": in.CustomPrice, "extendDays": in.ExtendDays})
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
@@ -244,5 +247,8 @@ func (h *Handler) Site(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusInternalServerError, "could not load site content")
 		return
 	}
+	// staff-only settings stay off the public endpoint
+	delete(out, "billing")
+	delete(out, "aiPricing")
 	httpx.OK(w, out)
 }

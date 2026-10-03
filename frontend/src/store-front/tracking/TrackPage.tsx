@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Copy, Truck } from 'lucide-react';
 import type { CheckoutInfo, TrackedOrder } from '@/api/types';
 import { buyerPay, buyerVerifyPayment, trackOrder } from '@/api/storefront';
 import { UpiPayPanel } from '../checkout/UpiPayPanel';
+import { SelfService } from './SelfService';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCopy } from '@/hooks/useCopy';
 import { Seo } from '@/lib/seo';
@@ -31,7 +32,14 @@ const journeyLabels: Record<string, string> = {
 // orders nobody can pay for any more; the API refuses them too
 const closedStatuses = ['cancelled', 'rto', 'delivered'];
 
+// keyed by the order code, so following a link to another order (an exchange's
+// replacement) starts fresh instead of keeping the previous order on screen
 export default function TrackPage() {
+  const { orderCode } = useParams();
+  return <TrackView key={orderCode ?? ''} />;
+}
+
+function TrackView() {
   const { orderCode: codeFromUrl } = useParams();
   const [code, setCode] = useState(codeFromUrl ?? '');
   // checkout hands the number over in router state, so a buyer who just ordered
@@ -261,6 +269,30 @@ export default function TrackPage() {
                   ))}
                 </ul>
                 <dl className="mt-2 flex flex-col gap-1.5 border-t pt-3 text-sm">
+                  {order.discount > 0 && (
+                    <div className="flex justify-between text-mid">
+                      <dt>Discount</dt>
+                      <dd>
+                        −<MoneyText paise={order.discount} />
+                      </dd>
+                    </div>
+                  )}
+                  {order.prepaidDiscount > 0 && (
+                    <div className="flex justify-between text-mid">
+                      <dt>Online payment discount</dt>
+                      <dd>
+                        −<MoneyText paise={order.prepaidDiscount} />
+                      </dd>
+                    </div>
+                  )}
+                  {order.codFee > 0 && (
+                    <div className="flex justify-between text-mid">
+                      <dt>Cash on delivery charge</dt>
+                      <dd>
+                        <MoneyText paise={order.codFee} />
+                      </dd>
+                    </div>
+                  )}
                   <div className="flex justify-between text-mid">
                     <dt>Shipping</dt>
                     <dd>{order.shipping > 0 ? <MoneyText paise={order.shipping} /> : 'Free'}</dd>
@@ -291,6 +323,12 @@ export default function TrackPage() {
                 )}
               </section>
 
+              <SelfService
+                order={order}
+                phone={phoneSchema.safeParse(phone).data ?? phone}
+                onChanged={() => trackOrder(order.orderCode, phone).then(setOrder, () => undefined)}
+              />
+
               {order.events.length > 0 && (
                 <section className="panel rounded-xl p-5 sm:p-6">
                   <h2 className="text-[15px] font-semibold text-hi">Updates</h2>
@@ -309,9 +347,16 @@ export default function TrackPage() {
                 </section>
               )}
 
-              <Button variant="ghost" onClick={() => setOrder(null)}>
-                Track another order
-              </Button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => setOrder(null)}>
+                  Track another order
+                </Button>
+                {order.businessCode && (
+                  <Link to={`/s/${order.businessCode}/policies`} className="px-3 text-[13px] text-mid underline-offset-2 hover:text-hi hover:underline">
+                    Returns and policies
+                  </Link>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

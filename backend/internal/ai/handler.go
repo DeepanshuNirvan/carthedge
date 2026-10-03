@@ -2,6 +2,7 @@ package ai
 
 import (
 	"net/http"
+	"slices"
 
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
@@ -77,6 +78,71 @@ func (h *Handler) Discard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// Practice is the seller chatting with their own assistant before letting it
+// loose on buyers: a real turn on the live catalog and settings that places
+// nothing. The client carries the cart and stage between turns.
+func (h *Handler) Practice(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Messages []struct {
+			Who  string `json:"who"` // buyer | shop
+			Text string `json:"text"`
+		} `json:"messages"`
+		Cart        Cart   `json:"cart"`
+		Stage       string `json:"stage"`
+		SummaryHash string `json:"summaryHash"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if len(in.Messages) == 0 || len(in.Messages) > 40 {
+		httpx.Err(w, http.StatusBadRequest, "send 1 to 40 messages")
+		return
+	}
+	p := PracticeInput{Cart: in.Cart, Stage: in.Stage, SummaryHash: in.SummaryHash}
+	for _, m := range in.Messages {
+		if m.Who != "buyer" && m.Who != "shop" {
+			httpx.Err(w, http.StatusBadRequest, "who must be buyer or shop")
+			return
+		}
+		if len([]rune(m.Text)) > 1000 {
+			httpx.Err(w, http.StatusBadRequest, "keep each message under 1,000 characters")
+			return
+		}
+		p.Transcript = append(p.Transcript, ChatLine{Who: m.Who, Text: m.Text})
+	}
+	if !slices.Contains([]string{"", "open", "confirming", "awaiting_seller", "handoff"}, p.Stage) {
+		httpx.Err(w, http.StatusBadRequest, "unknown stage")
+		return
+	}
+	res, err := h.svc.Practice(r.Context(), middleware.BusinessID(r.Context()), p)
+	if err != nil {
+		httpx.Err(w, http.StatusBadGateway, "the assistant could not answer just now — try again")
+		return
+	}
+	note := ""
+	switch res.Action {
+	case ActPlace:
+		if len(res.Messages) == 0 {
+			note = "In a real chat the order is placed now (auto-confirm is on) and the buyer gets the order link."
+		} else {
+			note = "In a real chat this order now waits on your AI desk for one tap."
+		}
+	case ActHandoff:
+		note = "In a real chat the assistant pauses here and alerts you: " + res.Handoff
+	case ActSilent:
+		note = "The assistant would stay quiet on this message."
+	}
+	httpx.OK(w, httpx.M{"messages": orEmptyStrings(res.Messages), "cart": res.Cart, "stage": res.Stage,
+		"summaryHash": res.SummaryHash, "action": res.Action, "note": note})
+}
+
+func orEmptyStrings(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // Reply suggests an answer to a buyer's pre-sales question.

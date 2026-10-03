@@ -6,11 +6,13 @@ import type {
   AdminOverview,
   AdminPayment,
   AdminSession,
+  AiUsage,
   Capability,
   ContactMessage,
   Plan,
   PlanRequest,
   SiteSettings,
+  SupportSession,
 } from './types';
 import { useAdminAuth } from '@/store/adminAuth';
 
@@ -150,3 +152,13 @@ export function useUpdateSettings() {
     },
   });
 }
+
+export const useAdminAiUsage = (days = 30) =>
+  useQuery({
+    queryKey: ['admin', 'aiUsage', days],
+    queryFn: () => get<AiUsage>('/api/v1/admin/ai-usage', { days }, 'admin'),
+  });
+
+/** Opens a read-only seller session for support (30 minutes, audited). */
+export const impersonate = (businessId: string) =>
+  post<SupportSession>(`/api/v1/admin/businesses/${businessId}/impersonate`, undefined, 'admin');

@@ -20,7 +20,8 @@ const (
 )
 
 // Runner owns the recurring platform work: subscription lifecycle (expiry +
-// renewal reminders) and the COD confirmation nudge. One ticker, no cron.
+// renewal reminders, autopay overage), the COD confirmation nudge, the
+// abandoned-checkout reminder and purging deleted accounts. One ticker, no cron.
 type Runner struct {
 	pool    *pgxpool.Pool
 	rdb     *redis.Client
@@ -28,10 +29,18 @@ type Runner struct {
 	notify  *notify.Notifier
 	log     *slog.Logger
 	baseURL string
+	extra   Extra
 }
 
-func New(pool *pgxpool.Pool, rdb *redis.Client, orders *order.Service, n *notify.Notifier, log *slog.Logger, baseURL string) *Runner {
-	return &Runner{pool: pool, rdb: rdb, orders: orders, notify: n, log: log, baseURL: baseURL}
+// Extra is the periodic work owned by other packages.
+type Extra struct {
+	PurgeDeleted func(ctx context.Context) (int, error)
+	BillOverage  func(ctx context.Context) (int, error)
+	HasFeature   func(ctx context.Context, bizID, feature string) bool
+}
+
+func New(pool *pgxpool.Pool, rdb *redis.Client, orders *order.Service, n *notify.Notifier, log *slog.Logger, baseURL string, extra Extra) *Runner {
+	return &Runner{pool: pool, rdb: rdb, orders: orders, notify: n, log: log, baseURL: baseURL, extra: extra}
 }
 
 func (r *Runner) Start(ctx context.Context) {
@@ -65,6 +74,25 @@ func (r *Runner) runOnce(ctx context.Context) {
 		r.log.Error("job nudgePendingCod failed", "err", err)
 	} else if n > 0 {
 		r.log.Info("cod confirmation nudges sent", "count", n)
+	}
+	steps := []struct {
+		name string
+		run  func(context.Context) (int, error)
+	}{
+		{"remindAbandoned", func(ctx context.Context) (int, error) { return r.orders.RemindAbandoned(ctx, r.extra.HasFeature) }},
+		{"billOverage", r.extra.BillOverage},
+		{"purgeDeleted", r.extra.PurgeDeleted},
+	}
+	for _, st := range steps {
+		// shutting down: the next tick picks up where this one stopped
+		if st.run == nil || ctx.Err() != nil {
+			continue
+		}
+		if n, err := st.run(ctx); err != nil && ctx.Err() == nil {
+			r.log.Error("job failed", "job", st.name, "err", err)
+		} else if n > 0 {
+			r.log.Info("job done", "job", st.name, "count", n)
+		}
 	}
 }
 

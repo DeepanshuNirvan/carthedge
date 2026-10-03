@@ -110,7 +110,7 @@ func knownRoute(seg []string) bool {
 		return true
 	case seg[0] == "app" || seg[0] == "admin":
 		return true
-	case seg[0] == "s" && (len(seg) == 2 || (len(seg) == 4 && seg[2] == "p")):
+	case seg[0] == "s" && (len(seg) == 2 || (len(seg) == 4 && seg[2] == "p") || (len(seg) == 3 && seg[2] == "policies")):
 		return true
 	case seg[0] == "l" && len(seg) == 3:
 		return true
@@ -145,6 +145,9 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 
 	case seg[0] == "s" && len(seg) == 2:
 		return h.storeMeta(ctx, seg[1])
+
+	case seg[0] == "s" && len(seg) == 3 && seg[2] == "policies":
+		return h.policiesMeta(ctx, seg[1])
 
 	case path == "/contact":
 		return meta{Title: "Contact CartHedge — Talk to a human",
@@ -193,6 +196,17 @@ func (h *Handler) storeMeta(ctx context.Context, code string) meta {
 			"address": map[string]any{"@type": "PostalAddress", "addressLocality": city, "addressRegion": state, "addressCountry": "IN"},
 		},
 	}
+}
+
+// policiesMeta is the store's public policy page — the address a seller gives
+// a payment gateway for its refund, shipping and terms checks.
+func (h *Handler) policiesMeta(ctx context.Context, code string) meta {
+	var name string
+	if err := h.pool.QueryRow(ctx, `select name from businesses where code=$1 and status='active'`, code).Scan(&name); err != nil {
+		return meta{Title: "Store not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
+	}
+	return meta{Title: "Policies — " + name,
+		Description: "Returns and exchanges, cancellation, shipping and delivery, payment terms and contact details for " + name + "."}
 }
 
 func (h *Handler) productMeta(ctx context.Context, code, productID string) meta {

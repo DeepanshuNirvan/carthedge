@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -11,6 +12,7 @@ import (
 	"carthedge/internal/link"
 	"carthedge/internal/order"
 	"carthedge/internal/product"
+	"carthedge/internal/shop"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -30,6 +32,11 @@ type storeBusiness struct {
 	CodEnabled    bool   `json:"codEnabled"`
 	ShippingFee   int    `json:"shippingFee"`
 	OnlinePayment string `json:"onlinePayment"` // gateway | upi | none
+	// checkout levers the store page advertises ("free delivery above ₹999",
+	// "save ₹50 paying online"); the quote endpoint does the actual maths
+	FreeShippingAbove int           `json:"freeShippingAbove"`
+	CodFee            shop.Fee      `json:"codFee"`
+	PrepaidDiscount   shop.Discount `json:"prepaidDiscount"`
 }
 
 // toPublic is product.ToPublic — the one buyer-facing projection, shared with
@@ -39,16 +46,24 @@ var toPublic = product.ToPublic
 func (h *Handler) storeBusiness(ctx context.Context, code string) (*storeBusiness, error) {
 	var b storeBusiness
 	var razorpayKeyID, upiID string
+	var pricing []byte
 	err := h.pool.QueryRow(ctx, `select id, code, name, logo_url, city, state, instagram, whatsapp,
-		cod_enabled, shipping_fee, razorpay_key_id, upi_id
+		cod_enabled, shipping_fee, razorpay_key_id, upi_id, free_shipping_above, checkout_rules
 		from businesses where code=$1 and status='active'`, code).Scan(
 		&b.ID, &b.Code, &b.Name, &b.LogoURL, &b.City, &b.State, &b.Instagram, &b.Whatsapp, &b.CodEnabled,
-		&b.ShippingFee, &razorpayKeyID, &upiID)
+		&b.ShippingFee, &razorpayKeyID, &upiID, &b.FreeShippingAbove, &pricing)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errors.New("store not found")
 	}
+	if err != nil {
+		return nil, err
+	}
 	b.OnlinePayment = link.OnlinePaymentMode(razorpayKeyID, upiID)
-	return &b, err
+	// same reading as shop.Load: a malformed document means no charges
+	var rules shop.Pricing
+	json.Unmarshal(pricing, &rules)
+	b.CodFee, b.PrepaidDiscount = rules.CodFee, rules.PrepaidDiscount
+	return &b, nil
 }
 
 // Store returns the storefront home: business card, categories, trending
@@ -172,6 +187,8 @@ func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
 		PaymentMethod string           `json:"paymentMethod"`
 		OfferCode     string           `json:"offerCode"`
 		Notes         string           `json:"notes"`
+		BuyerGstin    string           `json:"buyerGstin"`
+		BuyerCompany  string           `json:"buyerCompany"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
@@ -215,6 +232,7 @@ func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
 		BusinessID: biz.ID, Source: "store",
 		Name: in.Name, Phone: phone, Email: in.Email, Address: in.Address,
 		Refs: in.Items, PaymentMethod: in.PaymentMethod, OfferCode: in.OfferCode, Notes: in.Notes,
+		BuyerGstin: in.BuyerGstin, BuyerCompany: in.BuyerCompany,
 	})
 	if err != nil {
 		fail(http.StatusBadRequest, err.Error())

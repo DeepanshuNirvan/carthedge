@@ -32,11 +32,16 @@ The DM stays the shop. Competitors move the buyer off to a website; CartHedge wo
 
 ## Capabilities and Constraints
 
-- AI auto-reply, chat parsing into orders, auto-confirm (optional, off by default), handover to the seller, and pause/resume per chat.
-- Order board, products and variants, bulk import, offers, reseller pricing, waitlists, links (with QR codes), customer ledger, broadcasts, GST-lite invoices, insights and analytics, billing.
-- Buyer storefront, link checkout, phone OTP, UPI intent / card / COD with an optional token payment, COD confirmation page, and order tracking.
-- Admin: MRR/GMV overview, businesses, plans (capabilities), plan requests, payments, site content.
-- **Constraint for this revamp:** the work is UI only. API calls, query keys, route paths, form field names, data bindings and backend behaviour stay untouched.
+- AI auto-reply, chat parsing into orders, auto-confirm (optional, off by default), handover to the seller, and pause/resume per chat. Seller-set voice (tone, reply language, emoji, aap/tum), store policies and word-for-word FAQ answers, business hours with an away message, seller-chosen handoff topics and amount, per-product details and size charts, and a practice chat.
+- Order board with list-view bulk actions (status, packing slips, pick list, cancel), returns tab and dropped checkouts; products and variants with stock quantities, details, size chart, HSN and GST rate; bulk import, offers with usage limits, reseller pricing, waitlists, links (with QR codes), customer ledger (with DPDP erase), broadcasts, insights and analytics, billing.
+- After-sales: return and exchange requests (reason, photos), approve → pick up → receive (stock back on receipt) → complete, replacement orders linked to the original, refunds (Razorpay through the seller's keys, or UPI/bank/cash), credit notes.
+- Money: GST invoices (tax invoice / bill of supply / invoice, CGST+SGST or IGST by place of supply, HSN, financial-year numbering, buyer GSTIN, per-invoice overrides); checkout charges (COD charge, online-payment discount, free delivery above, COD ceiling) priced by one server function.
+- Seller alerts for new orders, returns, cancellations and chats needing them — WhatsApp, email and device push, plus a live in-app toast.
+- Account: change password (signs out other devices), data export, deletion with a 30-day restore window.
+- Buyer storefront, link checkout with a coupon box and server-quoted totals, phone OTP, UPI intent / card / COD with an optional token payment, COD confirmation page, store policies page, and an order page with tracking and self-service (cancel, change address, return or exchange, refunds) behind a one-time code.
+- Subscription autopay (Razorpay) and a CartHedge GST invoice for every subscription payment.
+- Admin: MRR/GMV overview, AI spend per seller, businesses (with a read-only, audited "view as seller" support session and account restore), plans (capabilities), plan requests, payments with invoice numbers, site content and CartHedge's invoice identity.
+- The 2 Oct 2026 revamp was UI only. The 3 Oct feature build added the backend and one migration (`0015`); its rules and progress are in `docs/FEATURE-BUILD.md`.
 - All money is in paise and always renders through `MoneyText` / `formatPaise`.
 
 ## Brand Commitments

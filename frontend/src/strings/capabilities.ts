@@ -7,9 +7,10 @@ export const capabilityLabels: Record<Capability, { label: string; blurb: string
   aiReply: { label: 'AI reply assistant', blurb: 'Drafted answers to price, fabric and delivery questions' },
   broadcasts: { label: 'Broadcast drops', blurb: 'Collection blasts to past buyers, segmented' },
   offers: { label: 'Offers & reseller pricing', blurb: 'Discount codes and a second price list for resellers' },
-  invoices: { label: 'GST-lite invoices', blurb: 'Numbered invoices generated from orders' },
+  invoices: { label: 'GST invoices', blurb: 'Tax invoices with HSN, CGST/SGST or IGST, and credit notes on refunds' },
   courier: { label: 'Courier handoff', blurb: 'Push shipments to your courier and track them back' },
   waitlist: { label: 'Back-in-stock waitlist', blurb: 'Buyers leave their number on sold-out items' },
+  recovery: { label: 'Abandoned checkout reminder', blurb: 'One WhatsApp nudge to buyers who verified but did not order' },
 };
 
 export const capabilityLabel = (c: Capability) => capabilityLabels[c]?.label ?? c;

@@ -6,6 +6,7 @@ import (
 
 	"carthedge/internal/customer"
 	"carthedge/internal/product"
+	"carthedge/internal/shop"
 )
 
 func no() *bool { b := false; return &b }
@@ -268,5 +269,33 @@ func TestMergeKeepsAMatchedProduct(t *testing.T) {
 	next := merge(prev, Cart{Items: []CartItem{{Name: "pink kurti", Qty: 1}}}, "confirm")
 	if next.Items[0].ProductID != "kurti" || next.Items[0].Variant != "M" {
 		t.Errorf("matched product lost between turns: %+v", next.Items[0])
+	}
+}
+
+func TestSummaryCarriesSellerCharges(t *testing.T) {
+	st := testStore()
+	st.Pricing.CodFee = shop.Fee{Kind: "flat", Value: 4900}
+	c, q, _, _ := st.check(fullCart())
+	s := st.summary(c, q)
+	for _, want := range []string{"COD charge — ₹49", "Total — ₹1,598"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("summary missing %q:\n%s", want, s)
+		}
+	}
+	st.Policies.CodMaxOrder = 100000 // ₹1,000 ceiling, the kurti is ₹1,499
+	c, _, problems, missing := st.check(fullCart())
+	if c.Payment != "" || len(problems) == 0 || !strings.Contains(strings.Join(missing, " "), "online") {
+		t.Errorf("COD above the ceiling must be refused: payment=%q problems=%v missing=%v", c.Payment, problems, missing)
+	}
+}
+
+func TestHandoffRuleFollowsSeller(t *testing.T) {
+	def := handoffRule(shop.AIProfile{})
+	if !strings.Contains(def, "refund/return/exchange/damage") || !strings.Contains(def, "bargaining") {
+		t.Error("default must hand off returns and bargaining")
+	}
+	let := handoffRule(shop.AIProfile{Handles: shop.Handles{Returns: true, Bargain: true}})
+	if strings.Contains(let, "refund/return/exchange/damage;") || !strings.Contains(let, "Do NOT hand off") {
+		t.Errorf("handled topics must leave the handoff list:\n%s", let)
 	}
 }

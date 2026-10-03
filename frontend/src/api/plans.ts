@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { get, post } from './http';
+import { del, get, post } from './http';
 import type { Capability, CheckoutInfo, Plan, Subscription } from './types';
 
 type SubscriptionResponse = { subscription: Subscription; overageFee: number; overageOrders: number };
@@ -46,6 +46,22 @@ export function useCancelSubscription() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => post<{ ok: boolean }>('/api/v1/subscription/cancel'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscription'] }),
+  });
+}
+
+/** Autopay: a Razorpay subscription (card or UPI AutoPay mandate) renews the plan. */
+export type AutopayStart = CheckoutInfo & { subscriptionId: string; planCode: string; firstChargeAt?: string };
+
+export const startAutopay = (planCode: string) => post<AutopayStart>('/api/v1/subscription/autopay', { planCode });
+
+export const verifyAutopay = (payload: { razorpayPaymentId: string; razorpaySubscriptionId: string; signature: string }) =>
+  post<{ ok: boolean }>('/api/v1/subscription/autopay/verify', payload);
+
+export function useCancelAutopay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => del<{ ok: boolean }>('/api/v1/subscription/autopay'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['subscription'] }),
   });
 }

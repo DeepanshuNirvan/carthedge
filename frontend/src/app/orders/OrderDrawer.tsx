@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { BellRing, IndianRupee, Lock, MapPin, MessageCircle, Phone, Truck } from 'lucide-react';
-import type { OrderStatus } from '@/api/types';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { BellRing, FileText, IndianRupee, Lock, MapPin, MessageCircle, Pencil, Phone, Printer, Truck } from 'lucide-react';
+import type { Address, OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
 import { useOrder, useOrderMutations } from '@/api/orders';
-import { useCreateInvoice } from '@/api/invoices';
 import { useCan } from '@/api/plans';
+import { InvoiceDialog } from '../invoices/InvoiceDialog';
+import { AfterSalePanel } from './AfterSalePanel';
 import { toast } from '@/store/ui';
 import { formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
@@ -16,14 +18,67 @@ import { StatusChip } from '@/ui/Badge';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { whatsappHref } from '@/lib/validators';
 
+/** Where the parcel goes, editable until it ships. */
+function AddressEditor({ orderId, address, onDone }: { orderId: string; address: Address; onDone: () => void }) {
+  const { changeAddress } = useOrderMutations();
+  const [a, setA] = useState(address);
+  return (
+    <div className="mt-3 grid gap-2 border-t pt-3">
+      <Field label="Address">
+        <Input value={a.line} maxLength={300} onChange={(e) => setA({ ...a, line: e.target.value })} />
+      </Field>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="City">
+          <Input value={a.city} onChange={(e) => setA({ ...a, city: e.target.value })} />
+        </Field>
+        <Field label="State">
+          <Input value={a.state} onChange={(e) => setA({ ...a, state: e.target.value })} />
+        </Field>
+        <Field label="Pincode">
+          <Input inputMode="numeric" maxLength={6} value={a.pincode} onChange={(e) => setA({ ...a, pincode: e.target.value.replace(/\D/g, '') })} />
+        </Field>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          loading={changeAddress.isPending}
+          onClick={() =>
+            changeAddress.mutate(
+              { id: orderId, address: a },
+              {
+                onSuccess: () => {
+                  toast('success', 'Address updated', 'The buyer has been told.');
+                  onDone();
+                },
+                onError: (e) => toast('error', 'Address not changed', e.message),
+              },
+            )
+          }
+        >
+          Save address
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId ?? undefined);
   const { setStatus, ship, resendCodConfirmation, confirmPayment } = useOrderMutations();
-  const createInvoice = useCreateInvoice();
   const canInvoice = useCan('invoices').allowed;
   const [courierName, setCourierName] = useState('Shiprocket');
   const [trackingId, setTrackingId] = useState('');
   const [nextStatus, setNextStatus] = useState<OrderStatus | ''>('');
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [invoicing, setInvoicing] = useState(false);
+  // a half-done edit belongs to the order it was started on
+  useEffect(() => {
+    setEditingAddress(false);
+    setInvoicing(false);
+  }, [orderId]);
 
   const doShip = () => {
     if (!order) return;
@@ -63,6 +118,11 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
             <StatusChip status={order.status} />
             <StatusChip status={order.paymentStatus || (order.paymentMethod === 'cod' ? 'pending' : 'paid')} />
             {order.riskFlagged && <StatusChip status="rto" />}
+            {order.replacementOf && (
+              <span className="rounded-full bg-jade-500/12 px-2.5 py-0.5 text-[11.5px] font-semibold text-jade-ink">
+                Exchange for #{order.replacementOf}
+              </span>
+            )}
             <span className="ml-auto text-xs text-low">{formatDateTime(order.createdAt)}</span>
           </div>
 
@@ -95,10 +155,28 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                 </a>
               </div>
             </div>
-            <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-mid">
+            <div className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-mid">
               <MapPin className="mt-0.5 size-3.5 shrink-0" />
-              {order.address.line}, {order.address.city}, {order.address.state}, {order.address.pincode}
-            </p>
+              <span className="flex-1">
+                {[order.address.line, order.address.city, order.address.state, order.address.pincode].filter(Boolean).join(', ')}
+              </span>
+              {['new', 'confirmed', 'packed'].includes(order.status) && !editingAddress && (
+                <button
+                  type="button"
+                  onClick={() => setEditingAddress(true)}
+                  className="-my-2 inline-flex items-center gap-1 py-2 font-medium text-jade-ink hover:underline"
+                >
+                  <Pencil className="size-3" /> Edit
+                </button>
+              )}
+            </div>
+            {(order.buyerGstin || order.buyerCompany) && (
+              <p className="mt-1.5 text-xs text-mid">
+                {order.buyerCompany}
+                {order.buyerGstin && <span className="font-mono"> GSTIN {order.buyerGstin}</span>}
+              </p>
+            )}
+            {editingAddress && <AddressEditor orderId={order.id} address={order.address} onDone={() => setEditingAddress(false)} />}
           </section>
 
           {/* items & money */}
@@ -125,10 +203,22 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                   <dd>-<MoneyText paise={order.discount} /></dd>
                 </div>
               )}
+              {order.prepaidDiscount > 0 && (
+                <div className="flex justify-between text-jade-ink">
+                  <dt>Online payment discount</dt>
+                  <dd>-<MoneyText paise={order.prepaidDiscount} /></dd>
+                </div>
+              )}
               <div className="flex justify-between text-mid">
                 <dt>Shipping</dt>
-                <dd><MoneyText paise={order.shipping} /></dd>
+                <dd>{order.shipping > 0 ? <MoneyText paise={order.shipping} /> : 'Free'}</dd>
               </div>
+              {order.codFee > 0 && (
+                <div className="flex justify-between text-mid">
+                  <dt>COD charge</dt>
+                  <dd><MoneyText paise={order.codFee} /></dd>
+                </div>
+              )}
               <div className="flex justify-between font-semibold text-hi">
                 <dt>Total</dt>
                 <dd><MoneyText paise={order.total} /></dd>
@@ -248,29 +338,38 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               </Button>
             )}
 
-            {order.status === 'delivered' &&
-              (canInvoice ? (
-                <Button
-                  variant="secondary"
-                  loading={createInvoice.isPending}
-                  onClick={() =>
-                    createInvoice.mutate(
-                      { orderId: order.id, gstRate: 0 },
-                      {
-                        onSuccess: () => toast('success', 'Invoice created', 'Find it under Invoices.'),
-                        onError: (e) => toast('error', 'Invoice failed', e.message),
-                      },
-                    )
-                  }
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/app/print/slips?ids=${order.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-hi neu"
+              >
+                <Printer className="size-4" /> Packing slip
+              </a>
+              {order.invoiceId ? (
+                <Link
+                  to={`/app/invoices?open=${order.invoiceId}`}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-hi neu"
                 >
-                  Generate invoice
-                </Button>
+                  <FileText className="size-4" /> Open invoice
+                </Link>
               ) : (
-                <p className="flex items-center gap-2 text-xs text-low">
-                  <Lock className="size-3.5" /> Invoices need a higher plan.
-                </p>
-              ))}
+                order.status !== 'cancelled' &&
+                (canInvoice ? (
+                  <Button size="sm" variant="secondary" icon={<FileText className="size-4" />} onClick={() => setInvoicing(true)}>
+                    Create invoice
+                  </Button>
+                ) : (
+                  <p className="flex items-center gap-2 text-xs text-low">
+                    <Lock className="size-3.5" /> Invoices need a higher plan.
+                  </p>
+                ))
+              )}
+            </div>
           </section>
+
+          <AfterSalePanel order={order} />
 
           {/* timeline */}
           {order.events && order.events.length > 0 && (
@@ -283,7 +382,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                       aria-hidden
                       className="absolute -left-[26px] top-1 size-2.5 rounded-full bg-jade-500 ring-4 ring-surface"
                     />
-                    <p className="text-sm font-medium capitalize text-hi">{ev.status}</p>
+                    <p className="text-sm font-medium first-letter:uppercase text-hi">{ev.status.replace(/_/g, ' ')}</p>
                     {ev.note && <p className="text-xs text-mid">{ev.note}</p>}
                     <p className="mt-0.5 text-xs text-low">{formatDateTime(ev.createdAt)}</p>
                   </li>
@@ -291,6 +390,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               </ol>
             </section>
           )}
+          {invoicing && <InvoiceDialog order={order} open onClose={() => setInvoicing(false)} />}
         </div>
       )}
     </Sheet>

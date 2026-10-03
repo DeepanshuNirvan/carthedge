@@ -38,7 +38,7 @@ Visitor	Prospect on the marketing site	None
 Public site that sells CartHedge: problem, core loop, feature tour, interactive RTO savings calculator, pricing, guides/FAQ, testimonials, contact. Drives free-trial signups. SEO-heavy.
 
 6.2 Seller app (post-login workspace)
-The daily driver. Dashboard, order board, products, links, customers, AI desk (the live DM inbox the assistant works from), insights, broadcasts, invoices, analytics, settings, billing.
+The daily driver. Dashboard, order board (with returns and dropped checkouts), products, links, customers, AI desk (the live DM inbox the assistant works from), insights, broadcasts, invoices, analytics, settings (store, policies, assistant, payments and checkout charges, GST, account), billing.
 
 6.3 Buyer storefront + link checkout
 Mobile-first pages that open cleanly inside the Instagram/WhatsApp in-app browser. Two entry points:
@@ -46,9 +46,11 @@ Mobile-first pages that open cleanly inside the Instagram/WhatsApp in-app browse
 Storefront — the business's full public catalog, browsable.
 Share link — a single product, a cart of items, or a custom made-to-order line item.
 Both end in the same checkout. No login ever.
+Store policies page — returns, cancellation, shipping, payments, terms, FAQs and contact, built from the seller's settings (payment gateways ask sellers for exactly these pages).
+Order page — tracking plus self-service: cancel, change the address, ask for a return or exchange, see refunds.
 
 6.4 Admin console
-CartHedge's own control room: MRR/GMV, business management, plan CRUD, custom-pricing deals, subscription payments, editable website content.
+CartHedge's own control room: MRR/GMV, AI spend per seller, business management with a read-only "view as seller" support mode, plan CRUD, custom-pricing deals, subscription payments with GST invoices, editable website content and CartHedge's invoice identity.
 
 7. Core loop (the product in seven steps)
 Buyer DMs the seller — "pink wali kurti hai? price?" — in Hinglish, Hindi or English, at any hour.
@@ -67,8 +69,12 @@ Alternative entry: the seller skips the AI and just shares a link (product / car
 Self-serve registration → business created → 15-day free trial starts immediately, no card.
 Multi-step onboarding: business details → contact & socials → done.
 Unique business code per business (used in every buyer URL, e.g. /s/demo-store) so links carry the seller's identity — trust for the buyer, branding for the seller.
-Business profile: name, owner, email, phone, WhatsApp, Instagram, address, city, state, pincode, GSTIN, logo.
+Business profile: name, owner, email, phone, WhatsApp, Instagram, address, city, state, pincode, logo. (GSTIN and tax details live under Settings → GST.)
 Login, logout, forgot password, reset password.
+Change password while logged in (every other device is signed out), and "sign out other devices" on its own.
+Download all store data as one file (products, buyers, orders, returns, invoices, chats).
+Delete account (India's DPDP Act): the store closes and the assistant stops at once; the data is erased after 30 days, and logging in before then restores everything. Tax invoices CartHedge issued are kept as the law requires. A deleted account's number cannot start a second free trial.
+Seller alerts: a new order, a return request, a buyer cancellation, a reported UPI payment and chats that need the seller arrive on WhatsApp, email and device notifications (web push, also with the app closed) — each channel switchable. While the app is open, new orders also show a live toast with a chime.
 8.2 Seller — dashboard & insights
 Today's sales, month revenue, pending orders, COD-at-risk count, repeat-customer rate.
 RTO savings meter — rupees prevented this month vs baseline.
@@ -80,7 +86,10 @@ Products: name, description, category, price / reseller price / compare-at price
 Variants (size, colour) per product.
 Add one-by-one or bulk import (CSV/JSON) with per-row validation.
 In-stock toggle, trending toggle (drives the storefront's trending row).
-Offers: percent or flat discount, minimum order amount, product scope, expiry, active/inactive.
+Stock quantity per product and per variant: orders draw it down, the item shows sold out at 0, cancellations and received returns put it back. Leave it empty to manage stock with the switch only.
+Product details as label/value pairs (fabric, fit, length, care, what is in the box) and a size-chart image — shown on the product page and used by the AI assistant in its answers.
+HSN code and GST rate per product (falls back to the store default) for GST invoices.
+Offers (coupon codes): percent or flat discount with an optional cap for percent, minimum order amount, product scope, expiry, active/inactive; usage limits — total uses, uses per buyer, first order only; live "used" count; edit and delete. A cancelled order hands its use back.
 Reseller pricing tier — a second price shown to buyers tagged as resellers (social selling is heavily reseller-driven).
 Back-in-stock waitlist — buyers leave their number on an out-of-stock item.
 8.4 Seller — order links
@@ -97,13 +106,26 @@ Kanban across every source: new / confirmed / packed / shipped / delivered / rto
 Drag to advance status; confirmation prompt on risky transitions.
 Card shows buyer, items, ₹ total, payment method + status, COD confirmation state, risk flag, courier status.
 Filters: status, source (AI / link / storefront / manual), risk, date range. Search. Table view toggle.
-Order detail: full breakdown, event timeline, status change, ship (courier handoff), resend COD confirmation.
+Order detail: full breakdown (discount, online-payment discount, COD charge), event timeline, status change, ship (courier handoff), resend COD confirmation, edit the delivery address before dispatch, buyer GSTIN and company, create or open the GST invoice, packing slip.
+Bulk actions in the list view: select up to 100 orders → move them to a status (each order checked on its own, with a per-order result), print packing slips, print a pick list, or cancel.
+Packing slip: one page per order with from/to address, items, the COD amount to collect and a QR code to the order page. Pick list: every item and size to pull from the shelf for the selected orders.
+Dropped checkouts: buyers who verified their number but did not order this week, with what was in their cart.
 Manual order creation for phone/walk-in orders.
+8.5a Seller — returns, exchanges and refunds
+Return and exchange requests arrive from the buyer's order page (reason, photos, which pieces) or are logged by the seller.
+Flow: requested → approved (or declined with a note to the buyer) → picked up (courier and tracking) → received → completed; the buyer can withdraw before pickup.
+Stock goes back only when the item is received, piece by piece (a damaged piece can be kept off the shelf).
+Exchange: one tap creates the replacement order linked to the original, with the returned value credited — the buyer pays only any difference; it does not count against the plan's order quota.
+Refunds are recorded per order (pending / processed / failed / cancelled), never above what the buyer paid. Online payments refund through the seller's own Razorpay account; COD and UPI orders are refunded by UPI, bank or cash with a reference. A cancelled prepaid order (or a prepaid order returned to origin) creates the pending refund automatically.
+An invoiced order gets a GST credit note for every refund, proportional to the amount.
+Returns tab on the order board: open requests first, everything at a glance.
+The store's return rules (window in days, exchange and/or refund, accepted reasons, photos required, pickup or self-ship, conditions) and cancellation rule (until confirmed / packed / shipped, or never) are set in Settings → Policies.
 8.6 Seller — customers (ledger)
 Auto-built from orders. Name, phone, email, last address.
 Segment: retail vs reseller (drives which price the buyer sees).
-Orders count, lifetime value, COD refusals count, risk flag, last order date.
+Orders count, lifetime value, COD refusals count, returns count, risk flag, last order date.
 Detail view with full order history, editable segment and notes.
+Erase a buyer's personal data on request (name, phone, email, addresses, chats); orders stay without the details so sales and tax figures do not change.
 Address autofill on repeat purchase, keyed to the phone number.
 8.7 Seller — AI sales assistant (automated DMs)
 One-tap connect: the seller logs in with Instagram (official Instagram API — no password sharing, disconnect anytime). WhatsApp connect runs on the same pipeline next.
@@ -114,7 +136,11 @@ Collects the order the way a person would: item → size → name, number and ad
 Exact order summary card in the chat (computed by CartHedge, not the model); only a "yes" to that exact summary counts.
 Auto-confirm setting: off by default — the buyer's yes becomes a ready draft the seller approves in one tap; on — the order is placed instantly. Auto-reply can be switched off anytime (chats then only become drafts).
 After the order: order code + tracking/payment link in the same chat; answers "order kahan hai?" with live status, courier and tracking id; a repeat order starts fresh without re-adding old items.
-Knows when to step back: complaints, refunds/returns, cancelling a placed order, bargaining, bulk deals or a buyer asking for a person → hands the chat to the seller with a WhatsApp/email alert and stays out until the seller resumes it.
+Knows when to step back: complaints, abuse or a buyer asking for a person always go to the seller. The seller chooses which of returns, cancellations, bargaining, bulk deals and live offers the assistant handles itself (it points buyers to their order page for returns and cancellations, inside the store's rules) and can send every order above an amount to themselves. A handed-over chat raises an alert and the assistant stays out until the seller resumes it.
+Customisable voice: tone (polite and professional / warm / fun), reply language (same as the buyer, English, Hinglish, Hindi), emoji use, and "aap" or "tum" in Hindi.
+Store policies and FAQ answers: the assistant quotes the store's return, cancellation, delivery and payment rules, and gives the seller's FAQ answers word for word.
+Business hours with an away message, sent once per chat while the store is closed; the seller can let the assistant answer all day or only outside business hours.
+Practice chat in Settings: write as a buyer and see exactly how the assistant replies with the live catalog and settings — nothing is ordered or sent.
 The seller stays in control: replying themselves — from CartHedge or straight from the Instagram app — pauses the assistant on that chat; pause/resume per chat.
 One gentle follow-up if a buyer goes quiet mid-order; ignores "ok", emojis and spam; caps automatic replies per chat to stop loops.
 Honest by design: never claims to be human — asked "bot ho?", it says it is the shop's assistant and the owner also sees the chat.
@@ -124,20 +150,24 @@ Works inside Meta's rules: replies only within the 24-hour window after the buye
 Broadcast drops: new-collection blasts to past buyers, segmented (all / retail / reseller / repeat). Schedule or send now, with sent counts.
 Auto status updates pushed to the buyer on confirmed / shipped / delivered — on the same Instagram/WhatsApp chat the order came from (inside Meta's 24-hour window, WhatsApp after it) — kills the "order kahan hai" spam.
 COD confirmation sequence — the automated flow that re-confirms intent before dispatch.
+Dropped-checkout reminder — one WhatsApp message 1–24 hours after a buyer verified their number but did not order, at most once a week per buyer (Growth and Pro; the seller can switch it off).
 AI reply assistant — drafts answers to pre-sales questions (price, fabric, delivery time), which are ~80% of DM volume. In connected chats the sales assistant (8.7) answers them automatically; for any other chat, paste the question and get a ready reply.
 8.9 Seller — money
-GST-lite invoices: numbered, generated from orders, printable/downloadable.
+GST invoices from orders: the seller saves their GST details once (registration type, GSTIN with checksum validation, legal name, default rate and HSN, invoice prefix, a note), then every invoice is built from them — a tax invoice for a regular taxpayer, a bill of supply for composition, a plain invoice when unregistered. Numbering restarts each financial year (PREFIX/2627/0001). Prices are GST-inclusive; the tax is split line by line at each product's rate, CGST + SGST inside the seller's state and IGST across states (place of supply from the delivery address), with HSN, taxable value, shipping and COD charges as their own lines and the amount in words. Business buyers can add their GSTIN and company at checkout; the seller can set or correct the buyer's GSTIN, name, place of supply and a custom GST rate when creating the invoice. Printable, with credit notes for refunds.
+Checkout charges, all optional and editable: free delivery above an amount; a COD charge (flat or percent, with a cap and a "free above" amount); a discount for paying online (flat or percent, with a cap and a minimum order); a COD ceiling (bigger orders must be paid online). The server prices every order with them — checkout, the AI's summary and the order all show the same total.
 Payment settings: the seller connects their own Razorpay account — buyer money settles directly to the seller, never through CartHedge. Keys stored encrypted. Plus UPI ID, COD on/off, COD token amount, shipping fee.
-Subscription & billing: current plan, trial countdown, renew, cancel, request a custom plan.
+Subscription & billing: current plan, trial countdown, renew, cancel, request a custom plan. Autopay: renew automatically with card or UPI AutoPay through Razorpay (orders above the quota are added to the next charge), cancel anytime. Every subscription payment comes with CartHedge's GST invoice, listed in billing history and printable.
 8.10 Buyer — storefront (no login)
 Business header: logo, name, city, socials.
 Trust strip: "Payments secured by Razorpay · Seller verified".
 Category chips, trending row, live offers, product grid.
 Real filtering: category, price range, in-stock, search, sort.
-Product detail: image gallery, variant picker, price + compare-at, stock state, waitlist if out of stock.
+Product detail: image gallery, variant picker, price + compare-at, product details and size chart, stock state, waitlist if out of stock, delivery charge and free-delivery threshold.
+Store policies page at /s/<store>/policies, linked from the storefront footer, checkout and order pages.
 8.11 Buyer — checkout (no login)
 Cart → address form with pincode validation + serviceability check (bad addresses are a top RTO cause) → autofill on repeat via phone.
 Phone OTP verification — the only identity step. No account, no password.
+After verification the server quotes the exact totals: coupon box (with a clear reason when a code cannot be used), online-payment discount shown as "Save ₹X", COD charge as "+₹X", free delivery above the threshold, and COD hidden above the store's COD ceiling. Optional business GST details (GSTIN, company) for a B2B invoice.
 Payment choice:
 UPI intent (opens GPay/PhonePe directly),
 card,
@@ -145,31 +175,36 @@ COD → triggers the confirmation flow, with an optional ₹50–100 token payme
 Order confirmation with an order code.
 8.12 Buyer — after the order
 Order tracking at the same link: enter phone → live status timeline (confirmed → shipped → out for delivery → delivered), courier info, support contact.
+Self-service on the order page, each step confirmed with a one-time code to the order's phone: cancel the order (within the store's cancellation rule), change the delivery address before it ships, ask for a return or exchange after delivery (pieces, reason, photos, the size to exchange into, inside the return window), withdraw a request, and follow returns and refunds.
 COD confirmation page: clean summary → confirm intent → optional token payment.
 Order confirmation, payment link and status updates on the same Instagram/WhatsApp chat they ordered from — the buyer never has to ask.
 8.13 Platform admin
 Overview: total businesses, trials, paying, MRR, GMV, revenue this month/total, orders last 30 days, open plan requests, growth chart, recent signups.
-Businesses: searchable table (name, code, owner, plan, subscription status, ends-at, order count, status). Detail view with profile, subscription and usage. Actions: suspend / activate (instantly pauses their storefront and API), assign plan with a negotiated custom price and extended days.
+Businesses: searchable table (name, code, owner, plan, subscription status, ends-at, order count, status). Detail view with profile, subscription, usage, AI use for the last 30 days and the staff actions taken on the account. Actions: suspend / activate (instantly pauses their storefront and API), restore an account deleted less than 30 days ago, assign plan with a negotiated custom price and extended days, and "view as seller" — a read-only, 30-minute support session of the seller's app (every attempt to change something is refused; each session is recorded).
+AI spend: model calls, tokens and estimated cost per seller and per day, at the model providers' list prices.
 Plans: full CRUD — code, name, monthly price, order quota, per-order fee, feature list, custom flag, active flag — with live active-subscription counts.
 Plan requests: pipeline of custom-plan enquiries (open → contacted → closed) with notes, linking straight to the business.
-Payments: subscription revenue ledger.
-Site content: editable contact, socials, tagline, announcement — read live by the marketing website.
+Payments: subscription revenue ledger with the GST invoice number and whether it was an autopay charge.
+Site content: editable contact, socials, tagline, announcement — read live by the marketing website — plus CartHedge's invoice identity (legal name, GSTIN, address, SAC, GST rate) printed on sellers' subscription invoices.
 Account: change admin password.
 8.14 Platform-wide
 Per-business data isolation — one seller can never see another's data.
 Subscription gating: expired/suspended → seller APIs and the public storefront both stop, with a clear renew path (billing stays reachable so they can pay).
 Rate limiting on login, OTP, order creation, payments.
 Buyer identity is a short-lived token from OTP, consumed once at order creation.
-All money handled in paise (integers) — no floating-point rupee bugs.
+All money handled in paise (integers) — no floating-point rupee bugs. One pricing function prices checkout quotes, orders and the assistant's summaries.
+Changing the password revokes every other session; admin support sessions are read-only by construction.
+Built for many buyers at once: stock, coupon limits, refunds, returns and invoice numbers stay correct when orders and actions arrive at the same moment (race and stress suites cover each).
+Database changes ship only as new numbered migrations, applied in one transaction under a lock at boot.
 Channel tokens encrypted at rest and renewed automatically; every Meta webhook is signature-verified.
 9. Plans & pricing
 Plan	Price/month	Order quota	Per-order fee above quota	Includes
 Starter	₹499	100	₹3	Order links, order board, COD confirmation flow, customer ledger, WhatsApp status updates
-Growth	₹999	500	₹2.50	Everything in Starter + AI order capture from DMs (connected chats become ready order drafts), broadcast drops, offers & reseller pricing, invoices & reports
+Growth	₹999	500	₹2.50	Everything in Starter + AI order capture from DMs (connected chats become ready order drafts), broadcast drops, offers & reseller pricing, GST invoices & reports, dropped-checkout reminders
 Pro	₹1,999	2,000	₹2	Everything in Growth + AI sales assistant (automatic DM replies, in-chat order summary & confirmation, optional auto-confirm), courier handoff, back-in-stock waitlists, priority support
 Custom	Negotiated	Negotiated	Negotiated	Requested in-app, priced by CartHedge staff, assigned from the admin console
 15-day free trial, no card required.
-Subscription billed via Razorpay on CartHedge's own account.
+Subscription billed via Razorpay on CartHedge's own account — by hand each month or with autopay — with a GST invoice for every payment.
 Buyer payments go through the seller's own Razorpay account — CartHedge never holds seller money.
 10. Business model
 Stream	Detail

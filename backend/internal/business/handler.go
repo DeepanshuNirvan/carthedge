@@ -1,14 +1,17 @@
 package business
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 
+	"carthedge/internal/gst"
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
 	"carthedge/internal/payment"
 	"carthedge/internal/secure"
+	"carthedge/internal/shop"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -48,6 +51,14 @@ type Profile struct {
 	AiAutoReply        bool   `json:"aiAutoReply"`
 	AiAutoOrder        bool   `json:"aiAutoOrder"`
 	AiNotes            string `json:"aiNotes"`
+	// settings documents (see internal/shop)
+	Policies  shop.Policies  `json:"policies"`
+	AIProfile shop.AIProfile `json:"aiProfile"`
+	Checkout  shop.Pricing   `json:"checkout"`
+	GST       shop.GST       `json:"gst"`
+	Alerts    shop.Alerts    `json:"alerts"`
+	// DeletionScheduledAt is set while an account deletion waits out its grace period
+	DeletionScheduledAt string `json:"deletionScheduledAt,omitempty"`
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +79,11 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.RazorpayConfigured = p.RazorpayKeyID != "" && secretEnc != ""
+	if s, err := shop.Load(r.Context(), h.pool, bizID); err == nil {
+		p.Policies, p.AIProfile, p.Checkout, p.GST, p.Alerts = s.Policies, s.AI, s.Checkout.Pricing, s.GST, s.Alerts
+	}
+	h.pool.QueryRow(r.Context(), `select coalesce(to_char(deleted_at + interval '30 days', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
+		from businesses where id=$1`, bizID).Scan(&p.DeletionScheduledAt)
 	httpx.OK(w, p)
 }
 
@@ -120,6 +136,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if in.Pincode != nil && *in.Pincode != "" && !httpx.ValidPincode(*in.Pincode) {
 		httpx.Err(w, http.StatusBadRequest, "invalid pincode")
 		return
+	}
+	if in.Gstin != nil {
+		g := strings.ToUpper(strings.TrimSpace(*in.Gstin))
+		if g != "" && !gst.ValidGSTIN(g) {
+			httpx.Err(w, http.StatusBadRequest, "that GSTIN does not look right — 15 characters, as on your GST certificate")
+			return
+		}
+		in.Gstin = &g
 	}
 	if in.WhatsApp != nil && *in.WhatsApp != "" {
 		whatsapp, ok := httpx.NormalizePhone(*in.WhatsApp)
@@ -195,6 +219,68 @@ func (h *Handler) UpdateAI(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Get(w, r)
 }
+
+// sections are the settings documents a seller can save, one at a time.
+var sections = map[string]string{
+	"policies": "policies", "ai": "ai_profile", "checkout": "checkout_rules", "gst": "gst_profile", "alerts": "alert_prefs",
+}
+
+// UpdateSettings saves one validated settings document whole (the form sends
+// the full section). The GST section is checked against the stored GSTIN.
+func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	bizID := middleware.BusinessID(ctx)
+	section := r.PathValue("section")
+	column, ok := sections[section]
+	if !ok {
+		httpx.Err(w, http.StatusNotFound, "unknown settings section")
+		return
+	}
+	var doc interface{ Validate() error }
+	switch section {
+	case "policies":
+		doc = &shop.Policies{}
+	case "ai":
+		doc = &shop.AIProfile{}
+	case "checkout":
+		doc = &shop.Pricing{}
+	case "alerts":
+		doc = &alertsDoc{}
+	case "gst":
+		var gstin string
+		h.pool.QueryRow(ctx, `select gstin from businesses where id=$1`, bizID).Scan(&gstin)
+		doc = &gstDoc{gstin: gstin}
+	}
+	if !httpx.Bind(w, r, doc) {
+		return
+	}
+	if err := doc.Validate(); err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	raw, _ := json.Marshal(doc)
+	// column comes from the fixed map above, never from the request
+	if _, err := h.pool.Exec(ctx, `update businesses set `+column+`=$2::jsonb, updated_at=now() where id=$1`, bizID, string(raw)); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not save settings")
+		return
+	}
+	h.Get(w, r)
+}
+
+// alertsDoc has nothing to validate beyond its shape.
+type alertsDoc struct{ shop.Alerts }
+
+func (alertsDoc) Validate() error { return nil }
+
+// gstDoc validates the GST profile against the GSTIN on file.
+type gstDoc struct {
+	shop.GST
+	gstin string
+}
+
+func (g *gstDoc) Validate() error { return g.GST.Validate(g.gstin) }
+
+func (g gstDoc) MarshalJSON() ([]byte, error) { return json.Marshal(g.GST) }
 
 // UpdatePayments stores the seller's own Razorpay keys (buyer money goes to
 // the seller's account, never the platform's) and UPI ID. Omitted fields keep

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Bot, Check, Instagram, Landmark, Lock, MessageCircle, ShieldCheck, Store } from 'lucide-react';
-import { useBusiness, useUpdateAiSettings, useUpdateBusiness, useUpdatePayments } from '@/api/business';
-import { useCan } from '@/api/plans';
+import { Check, Instagram, Landmark, MessageCircle, ShieldCheck, Store } from 'lucide-react';
+import { useBusiness, useUpdateBusiness, useUpdatePayments } from '@/api/business';
 import { getChannelConnectUrl, useChannelsInfo, useChannelMutations } from '@/api/messaging';
 import { uploadFile } from '@/api/uploads';
 import { toast } from '@/store/ui';
@@ -21,6 +20,12 @@ import { Badge } from '@/ui/Badge';
 import { Switch } from '@/ui/Switch';
 import { Avatar } from '@/ui/Avatar';
 import { SkeletonRows } from '@/ui/Skeleton';
+import { Tabs } from '@/ui/Tabs';
+import { PoliciesTab } from './PoliciesTab';
+import { AssistantTab } from './AssistantTab';
+import { CheckoutCharges } from './CheckoutCharges';
+import { GstTab } from './GstTab';
+import { AccountTab } from './AccountTab';
 
 const channelMeta = {
   whatsapp: { label: 'WhatsApp', Icon: MessageCircle, idLabel: 'Phone number ID', hint: 'WhatsApp → API Setup in your Meta app' },
@@ -178,7 +183,6 @@ const profileSchema = z.object({
   city: z.string(),
   state: z.string(),
   pincode: pincodeSchema.or(z.literal('')),
-  gstin: z.string(),
 });
 type ProfileForm = z.infer<typeof profileSchema>;
 
@@ -201,7 +205,6 @@ function ProfileSection() {
       city: business.city,
       state: business.state,
       pincode: business.pincode,
-      gstin: business.gstin,
     },
   });
 
@@ -258,9 +261,6 @@ function ProfileSection() {
         <Field label="Instagram">
           <Input placeholder="@handle" {...register('instagram')} />
         </Field>
-        <Field label="GSTIN" optional>
-          <Input {...register('gstin')} />
-        </Field>
         <div className="sm:col-span-2">
           <Field label="Address">
             <Textarea rows={2} {...register('address')} />
@@ -283,108 +283,6 @@ function ProfileSection() {
           Save profile
         </Button>
       </form>
-    </Card>
-  );
-}
-
-// How the DM assistant behaves. Replies need the aiReply capability; without it
-// chats still become drafts (the "ai" capability), which is today's behaviour.
-function AiAssistantSection() {
-  const { data: business } = useBusiness();
-  const update = useUpdateAiSettings();
-  const canReply = useCan('aiReply');
-  const [notes, setNotes] = useState<string | null>(null);
-
-  if (!business) return null;
-  const save = (input: Parameters<typeof update.mutate>[0], done: string) =>
-    update.mutate(input, {
-      onSuccess: () => toast('success', done),
-      onError: (e) => toast('error', 'Could not save', e.message),
-    });
-  const notesValue = notes ?? business.aiNotes;
-
-  return (
-    <Card>
-      <CardHeader
-        title="AI assistant"
-        subtitle="Answers buyers in your DMs, in their language, from your catalog only"
-        action={
-          <span className="grid size-9 place-items-center rounded-full bg-jade-500/15 text-jade-ink">
-            <Bot className="size-4.5" />
-          </span>
-        }
-      />
-      <div className="flex flex-col gap-5 p-5 pt-4">
-        {!canReply.allowed && !canReply.isLoading && (
-          <p className="flex flex-wrap items-center gap-2 rounded-lg bg-gold-400/10 p-3 text-xs text-mid shadow-[inset_0_0_0_1px_rgb(var(--gold-400)/0.22)]">
-            <Lock className="size-3.5" /> Automatic replies need a higher plan, chats still become order drafts.
-            <Link to="/app/billing" className="font-medium text-jade-ink hover:underline">
-              See plans
-            </Link>
-          </p>
-        )}
-        <div className="flex items-start gap-3">
-          <span className="pt-0.5">
-            <Switch
-              checked={business.aiAutoReply}
-              label="Reply to buyers automatically"
-              disabled={!canReply.allowed || update.isPending}
-              onChange={(autoReply) => save({ autoReply }, autoReply ? 'Auto-reply on' : 'Auto-reply off')}
-            />
-          </span>
-          <div>
-            <p className="text-sm font-medium text-hi">Reply to buyers automatically</p>
-            <p className="text-xs text-low">
-              Answers price, size, stock and delivery questions, collects the order and shows the buyer a summary to
-              confirm. Off: chats only become drafts for you.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <span className="pt-0.5">
-            <Switch
-              checked={business.aiAutoOrder}
-              label="Place orders without my confirmation"
-              disabled={!canReply.allowed || !business.aiAutoReply || update.isPending}
-              onChange={(autoOrder) =>
-                save({ autoOrder }, autoOrder ? 'Orders place automatically' : 'You confirm each order')
-              }
-            />
-          </span>
-          <div>
-            <p className="text-sm font-medium text-hi">Place orders without my confirmation</p>
-            <p className="text-xs text-low">
-              When the buyer says yes to the summary, the order is created and they get the order link right away. Off:
-              you get a ready draft to confirm in one tap, then the buyer gets the link.
-            </p>
-          </div>
-        </div>
-        <Field
-          label="What the assistant should know"
-          hint="Delivery time, exchange or return policy, sizing, fabric care. It never makes these up; anything not here, it checks with you."
-        >
-          <Textarea
-            rows={4}
-            maxLength={2000}
-            placeholder={'Delivery in 4–6 days across India.\nExchange within 7 days for size issues, no cash refunds.\nKurtis are true to size.'}
-            value={notesValue}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Field>
-        <Button
-          variant="secondary"
-          className="self-start"
-          loading={update.isPending}
-          disabled={notes === null || notes === business.aiNotes}
-          onClick={() => save({ notes: notesValue }, 'Assistant notes saved')}
-        >
-          Save notes
-        </Button>
-        <p className="text-xs text-low">
-          The assistant never claims to be a person. When a buyer complains, asks for a discount or wants to talk to
-          you, it steps back and alerts you. Replying yourself pauses it on that chat for 12 hours.
-        </p>
-      </div>
     </Card>
   );
 }
@@ -519,25 +417,58 @@ function PaymentsSection() {
   );
 }
 
+const tabs = [
+  { value: 'store', label: 'Store' },
+  { value: 'policies', label: 'Policies' },
+  { value: 'assistant', label: 'Assistant' },
+  { value: 'payments', label: 'Payments' },
+  { value: 'gst', label: 'GST' },
+  { value: 'account', label: 'Account' },
+] as const;
+type Tab = (typeof tabs)[number]['value'];
+
 export default function SettingsPage() {
+  // the tab lives in the URL: alerts and other pages can link straight to it
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('tab');
+  const tab: Tab = tabs.some((t) => t.value === asked) ? (asked as Tab) : 'store';
+  const show = (t: Tab) => {
+    params.set('tab', t);
+    setParams(params, { replace: true });
+  };
+
   return (
     <>
-      <PageHeader title="Settings" />
-      {/* two columns from xl: who you are and where buyers reach you, then how the assistant and payments behave */}
-      <div className="grid items-start gap-5 xl:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-5">
+      <PageHeader title="Settings" actions={<Tabs tabs={[...tabs]} value={tab} onChange={show} className="max-w-full overflow-x-auto" />} />
+      {/* every tab stays mounted, so unsaved edits survive a look at another tab */}
+      <div hidden={tab !== 'store'}>
+        <div className="grid items-start gap-5 xl:grid-cols-2">
           <ProfileSection />
           <ChannelsSection />
         </div>
-        <div className="flex min-w-0 flex-col gap-5">
-          <AiAssistantSection />
-          <PaymentsSection />
-        </div>
       </div>
-      <p className="mt-5 flex items-center gap-2 px-1 text-xs text-low">
-        <Landmark className="size-3.5" /> CartHedge never holds your money, Razorpay and UPI settle straight to you.
-        <Store className="ml-3 size-3.5" /> Store pauses automatically if your subscription lapses.
-      </p>
+      <div hidden={tab !== 'policies'}>
+        <PoliciesTab />
+      </div>
+      <div hidden={tab !== 'assistant'}>
+        <AssistantTab />
+      </div>
+      <div hidden={tab !== 'payments'}>
+        <div className="grid items-start gap-5 xl:grid-cols-2">
+          <PaymentsSection />
+          <CheckoutCharges />
+        </div>
+        <p className="mt-5 flex flex-wrap items-center gap-2 px-1 text-xs text-low">
+          <Landmark className="size-3.5" /> CartHedge never holds your money, Razorpay and UPI settle straight to you.
+          <Store className="ml-3 size-3.5" /> Store pauses automatically if your subscription lapses.
+        </p>
+      </div>
+      <div hidden={tab !== 'gst'}>
+        <GstTab />
+      </div>
+      <div hidden={tab !== 'account'}>
+        <AccountTab />
+      </div>
     </>
   );
 }

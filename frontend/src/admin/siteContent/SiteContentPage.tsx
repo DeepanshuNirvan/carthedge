@@ -6,7 +6,7 @@ import type { SiteFaq, SiteSettings, SiteStat, SiteTestimonial } from '@/api/typ
 import { toast } from '@/store/ui';
 import { PageHeader } from '@/app/shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
-import { Field, Input, Textarea } from '@/ui/Input';
+import { Field, Input, Select, Textarea } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 import { SkeletonRows } from '@/ui/Skeleton';
 
@@ -82,6 +82,7 @@ export default function SiteContentPage() {
       next.stats ??= siteFallback.stats;
       next.testimonials ??= siteFallback.testimonials;
       next.faqs ??= siteFallback.faqs;
+      next.billing ??= { legalName: '', gstin: '', address: '', email: '', sac: '998314', rate: 18 };
       setForm(next);
     }
   }, [data, form]);
@@ -161,6 +162,41 @@ export default function SiteContentPage() {
             </Field>
           </div>
         </Card>
+
+        {form.billing && (
+          <Card className="lg:col-span-2">
+            <CardHeader title="Invoice identity" subtitle="Printed on the GST invoice every seller gets for their plan payment" />
+            <div className="grid gap-4 p-5 pt-4 sm:grid-cols-2">
+              {(
+                [
+                  ['legalName', 'Legal name', 'As on the GST certificate'],
+                  ['gstin', 'GSTIN', 'Without it, invoices carry no GST'],
+                  ['address', 'Registered address', ''],
+                  ['email', 'Billing email', ''],
+                  ['sac', 'SAC code', '998314 covers software services'],
+                ] as const
+              ).map(([key, label, hint]) => (
+                <Field key={key} label={label} hint={hint || undefined}>
+                  <Input
+                    value={form.billing![key]}
+                    onChange={(e) =>
+                      setForm({ ...form, billing: { ...form.billing!, [key]: key === 'gstin' ? e.target.value.toUpperCase() : e.target.value } })
+                    }
+                  />
+                </Field>
+              ))}
+              <Field label="GST rate on plans" hint="Plan prices include it">
+                <Select value={String(form.billing.rate)} onChange={(e) => setForm({ ...form, billing: { ...form.billing!, rate: Number(e.target.value) } })}>
+                  {[0, 5, 12, 18, 28].map((r) => (
+                    <option key={r} value={r}>
+                      {r}%
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          </Card>
+        )}
 
         <Card className="lg:col-span-2">
           <CardHeader title="Social links" subtitle="Shown in the site footer" />

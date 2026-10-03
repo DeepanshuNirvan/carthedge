@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Inbox, Mail } from 'lucide-react';
-import { useAdminOverview, useAdminBusinesses } from '@/api/admin';
+import { useAdminAiUsage, useAdminOverview, useAdminBusinesses } from '@/api/admin';
 import { PageHeader } from '@/app/shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
 import { MoneyText } from '@/ui/MoneyText';
@@ -9,13 +9,17 @@ import { Skeleton, SkeletonRows } from '@/ui/Skeleton';
 import { timeAgo } from '@/lib/date';
 import { cn } from '@/lib/cn';
 
+const tokenCount = new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 });
+
 export default function OverviewPage() {
   const { data: o, isLoading } = useAdminOverview();
   const { data: recent } = useAdminBusinesses({ page: 1 });
+  const { data: ai } = useAdminAiUsage(30);
 
   const money = [
     { label: 'Revenue this month', paise: o?.revenueThisMonth ?? 0, hint: o ? <>total <MoneyText paise={o.revenueTotal ?? 0} /></> : null },
     { label: 'GMV, last 30 days', paise: o?.gmvLast30Days ?? 0, hint: o ? `${o.ordersLast30Days} ${o.ordersLast30Days === 1 ? 'order' : 'orders'}` : null },
+    { label: 'AI cost, last 30 days', paise: ai?.totals.cost ?? 0, hint: ai ? `${ai.totals.calls} model calls` : null },
   ];
   const attention = [
     { to: '/admin/requests', icon: Inbox, label: 'Open plan requests', value: o?.openPlanRequests ?? 0 },
@@ -42,7 +46,7 @@ export default function OverviewPage() {
               <MoneyText paise={o?.mrr ?? 0} />
             </p>
           )}
-          <div className="mt-6 grid gap-5 border-t pt-5 sm:grid-cols-2">
+          <div className="mt-6 grid gap-5 border-t pt-5 sm:grid-cols-3">
             {money.map((m) => (
               <div key={m.label}>
                 <p className="text-xs text-low">{m.label}</p>
@@ -91,6 +95,43 @@ export default function OverviewPage() {
           </div>
         ))}
       </Card>
+
+      {ai && ai.businesses.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader title="AI spend by seller" subtitle={`Last ${ai.days} days, estimated at ₹${ai.usdInr} per US dollar`} />
+          <div className="px-2 pb-2 pt-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-low">
+                  <th className="px-3 py-2 font-medium">Seller</th>
+                  <th className="px-3 py-2 text-right font-medium">Calls</th>
+                  <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Tokens in / out</th>
+                  <th className="px-3 py-2 text-right font-medium">Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {ai.businesses.slice(0, 10).map((b) => (
+                  <tr key={b.id}>
+                    <td className="px-3 py-2.5">
+                      <Link to={`/admin/businesses/${b.id}`} className="font-medium text-hi hover:underline">
+                        {b.name}
+                      </Link>{' '}
+                      <span className="font-mono text-xs text-low">/{b.code}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right tnum text-mid">{b.calls}</td>
+                    <td className="hidden px-3 py-2.5 text-right tnum text-mid sm:table-cell">
+                      {tokenCount.format(b.inputTokens)} / {tokenCount.format(b.outputTokens)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-medium text-hi">
+                      <MoneyText paise={b.cost} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Card className="mt-4">
         <CardHeader
