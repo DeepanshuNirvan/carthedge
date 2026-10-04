@@ -112,6 +112,10 @@ type CreateParams struct {
 	ReplacementOf string
 	Credit        int
 	Shipping      int
+	// MarketingOptIn is the buyer ticking "send me offers on WhatsApp" at
+	// checkout; it is recorded with Proof in the order's transaction.
+	MarketingOptIn bool
+	Proof          customer.Proof
 }
 
 type Service struct {
@@ -434,6 +438,12 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, p *CreateParams) (*Place
 	}
 	if _, err := tx.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,$2,$3)`, orderID, status, note); err != nil {
 		return nil, err
+	}
+	if p.MarketingOptIn && !replacement {
+		if err := customer.RecordConsent(ctx, tx, customer.Consent{BusinessID: p.BusinessID, Phone: p.Phone, OptIn: true,
+			Source: customer.SourceCheckout, Wording: customer.OptInWording(bizName), OrderID: orderID, Proof: p.Proof}); err != nil {
+			return nil, err
+		}
 	}
 	if chatCodConfirmed {
 		if _, err := tx.Exec(ctx, `update orders set status='confirmed', cod_confirmed_at=now() where id=$1`, orderID); err != nil {

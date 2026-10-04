@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { CheckCheck, Podcast, Send, Trash2 } from 'lucide-react';
-import { useBroadcastMutations, useBroadcasts } from '@/api/broadcasts';
+import { Link } from 'react-router-dom';
+import { CheckCheck, Podcast, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import type { Broadcast } from '@/api/types';
+import { useBroadcastAudience, useBroadcastMutations, useBroadcasts } from '@/api/broadcasts';
+import { useBusiness } from '@/api/business';
 import { toast } from '@/store/ui';
-import { formatDateTime, timeAgo } from '@/lib/date';
+import { formatDate, formatDateTime, timeAgo } from '@/lib/date';
 import { PageHeader } from '../shell/PageHeader';
 import { Card, CardHeader } from '@/ui/Card';
 import { Button, IconButton } from '@/ui/Button';
@@ -19,40 +22,68 @@ const nowLocal = () => {
   return d.toISOString().slice(0, 16);
 };
 
-const segments = [
+const segments: { value: Broadcast['segment']; label: string }[] = [
   { value: 'all', label: 'All customers' },
   { value: 'retail', label: 'Retail buyers' },
   { value: 'reseller', label: 'Resellers' },
   { value: 'repeat', label: 'Repeat buyers' },
 ];
 
+const STORE_LINK = '{{store link}}';
+
 export default function BroadcastsPage() {
   const { data: broadcasts, isLoading } = useBroadcasts();
-  const { create, send, remove } = useBroadcastMutations();
+  const { data: audience } = useBroadcastAudience();
+  const { data: business } = useBusiness();
+  const { create, send, remove, acceptTerms } = useBroadcastMutations();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
-  const [segment, setSegment] = useState('all');
+  const [segment, setSegment] = useState<Broadcast['segment']>('all');
   const [scheduledAt, setScheduledAt] = useState('');
   // the time picker only appears once the seller chooses to schedule
   const [when, setWhen] = useState<'now' | 'later'>('now');
+  const [agreed, setAgreed] = useState(false);
 
-  const submit = (thenSend: boolean) => {
+  const accepted = !!audience?.termsAcceptedAt;
+  const reach = audience?.optedIn[segment] ?? 0;
+  const storeUrl = business ? `${window.location.origin}/s/${business.code}` : '';
+
+  /** The broadcast rules are accepted once, the first time a drop goes out. */
+  const ensureTerms = async () => {
+    if (accepted) return true;
+    if (!agreed) {
+      toast('error', 'Accept the broadcast rules first', 'Tick the box above the send button.');
+      return false;
+    }
+    try {
+      await acceptTerms.mutateAsync();
+      return true;
+    } catch (e) {
+      toast('error', 'Could not save that', e instanceof Error ? e.message : undefined);
+      return false;
+    }
+  };
+
+  const sendNow = async (id: string, done?: string) => {
+    if (!(await ensureTerms())) return;
+    send.mutate(id, {
+      onSuccess: () => toast('success', done ?? 'Broadcast sending', 'Messages are going out now.'),
+      onError: (e) => toast('error', 'Send failed', e.message),
+    });
+  };
+
+  const submit = async (thenSend: boolean) => {
     if (!name || message.length < 5) {
       toast('error', 'Give the drop a name and a message');
       return;
     }
+    if ((thenSend || scheduledAt) && !(await ensureTerms())) return;
     create.mutate(
       { name, message, segment, scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined },
       {
         onSuccess: (b) => {
-          if (thenSend) {
-            send.mutate(b.id, {
-              onSuccess: () => toast('success', 'Broadcast sending', 'Messages are going out now.'),
-              onError: (e) => toast('error', 'Send failed', e.message),
-            });
-          } else {
-            toast('success', scheduledAt ? 'Broadcast scheduled' : 'Draft saved');
-          }
+          if (thenSend) sendNow(b.id);
+          else toast('success', scheduledAt ? 'Broadcast scheduled' : 'Draft saved');
           setName('');
           setMessage('');
           setScheduledAt('');
@@ -65,29 +96,44 @@ export default function BroadcastsPage() {
 
   return (
     <>
-      <PageHeader title="Broadcasts" subtitle="Collection drops and announcements over WhatsApp" />
+      <PageHeader title="Broadcasts" subtitle="Collection drops and announcements over WhatsApp, to buyers who asked for them" />
       <div className="grid items-start gap-4 lg:grid-cols-5 lg:items-stretch">
         <Card className="lg:col-span-3">
           <CardHeader title="Compose a drop" />
           <div className="flex flex-col gap-4 p-5 pt-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Name">
-                <Input placeholder="Diwali collection drop" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input placeholder="Diwali collection drop" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
               <Field label="Audience">
-                <Select value={segment} onChange={(e) => setSegment(e.target.value)}>
+                <Select value={segment} onChange={(e) => setSegment(e.target.value as Broadcast['segment'])}>
                   {segments.map((s) => (
                     <option key={s.value} value={s.value}>
                       {s.label}
+                      {audience ? ` (${audience.optedIn[s.value]})` : ''}
                     </option>
                   ))}
                 </Select>
               </Field>
             </div>
-            <Field label="Message" hint="Keep it personal, broadcasts that read like DMs convert best">
+            <p className="-mt-1 flex items-start gap-2 text-xs leading-relaxed text-low">
+              <ShieldCheck className="mt-px size-3.5 shrink-0 text-jade-ink" aria-hidden />
+              <span>
+                Only buyers who said yes to offers get broadcasts
+                {audience && (
+                  <>
+                    : <span className="font-medium text-mid tnum">{audience.optedIn.all}</span> of{' '}
+                    <span className="tnum">{audience.customers}</span> customers
+                  </>
+                )}
+                . They tick a box at checkout or reply START, and every message ends with their own stop link.
+              </span>
+            </p>
+            <Field label="Message" hint={`Keep it personal, broadcasts that read like DMs convert best. ${STORE_LINK} becomes your store link.`}>
               <Textarea
                 rows={5}
-                placeholder={'Naya collection aa gaya! ✨\nPehle 20 orders pe free shipping.\n{{store link}}'}
+                maxLength={1000}
+                placeholder={'Naya collection aa gaya! ✨\nPehle 20 orders pe free shipping.\n' + STORE_LINK}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
               />
@@ -107,20 +153,29 @@ export default function BroadcastsPage() {
               />
               {when === 'later' && (
                 <Field label="Send at">
-                  <Input
-                    type="datetime-local"
-                    min={nowLocal()}
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                  />
+                  <Input type="datetime-local" min={nowLocal()} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
                 </Field>
               )}
             </div>
-            <div className="flex flex-wrap gap-3">
+
+            {audience && !accepted && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg p-3.5 neu">
+                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-jade-500" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                <span className="text-sm leading-snug text-mid">
+                  I will only send offers buyers asked for, honour every stop request, and follow WhatsApp&apos;s Business and Commerce
+                  policies.{' '}
+                  <Link to="/terms#broadcasts-and-marketing-messages" target="_blank" className="font-medium text-jade-ink hover:underline">
+                    Broadcast rules
+                  </Link>
+                </span>
+              </label>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 icon={<Send className="size-4" />}
-                loading={create.isPending || send.isPending}
-                disabled={when === 'later' && !scheduledAt}
+                loading={create.isPending || send.isPending || acceptTerms.isPending}
+                disabled={(when === 'later' && !scheduledAt) || (!accepted && !agreed) || reach === 0}
                 onClick={() => submit(!scheduledAt)}
               >
                 {when === 'later' ? 'Schedule' : 'Send now'}
@@ -130,7 +185,13 @@ export default function BroadcastsPage() {
                   Save as draft
                 </Button>
               )}
+              {audience && reach === 0 && (
+                <span className="text-xs text-low">No one in this audience has said yes to offers yet.</span>
+              )}
             </div>
+            {accepted && audience?.termsAcceptedAt && (
+              <p className="text-xs text-low">Broadcast rules accepted on {formatDate(audience.termsAcceptedAt)}.</p>
+            )}
           </div>
         </Card>
 
@@ -143,7 +204,11 @@ export default function BroadcastsPage() {
                 <p className="mb-4 text-center text-[11px] text-low">Today</p>
                 <div className="ml-auto w-fit max-w-[88%] rounded-[18px] rounded-br-md bg-jade-700 px-3.5 py-2 shadow-raised">
                   <p className="whitespace-pre-wrap break-words text-sm text-white">
-                    {message || 'Your message shows here'}
+                    {message ? message.split(STORE_LINK).join(storeUrl || STORE_LINK) : 'Your message shows here'}
+                  </p>
+                  {/* every buyer gets their own stop link at the foot */}
+                  <p className="mt-2 break-words text-xs text-white/80">
+                    No more offers from {business?.name ?? 'your store'}? Tap {window.location.host}/unsubscribe/…
                   </p>
                   <p className="mt-1 flex items-center justify-end gap-1 text-[10.5px] text-white/90">
                     {new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}
@@ -176,16 +241,7 @@ export default function BroadcastsPage() {
                     {b.scheduledAt ? formatDateTime(b.scheduledAt) : timeAgo(b.createdAt)}
                   </span>
                   {b.status === 'draft' && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        send.mutate(b.id, {
-                          onSuccess: () => toast('success', 'Broadcast sending'),
-                          onError: (e) => toast('error', 'Send failed', e.message),
-                        })
-                      }
-                    >
+                    <Button size="sm" variant="secondary" disabled={!accepted && !agreed} onClick={() => sendNow(b.id)}>
                       Send
                     </Button>
                   )}
@@ -211,7 +267,7 @@ export default function BroadcastsPage() {
             <EmptyState
               icon={<Podcast className="size-5" />}
               title="No broadcasts yet"
-              message="Your past buyers are your warmest audience, announce the next drop to them first."
+              message="Your past buyers are your warmest audience. Announce the next drop to the ones who asked for offers."
             />
           )}
         </div>

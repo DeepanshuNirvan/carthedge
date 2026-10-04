@@ -107,11 +107,16 @@ func (h *Handler) VerifyOtp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := httpx.M{"orderToken": token}
-	var bizID string
-	if h.pool.QueryRow(r.Context(), `select id from businesses where code=$1`, bizCode).Scan(&bizID) == nil {
+	var bizID, bizName string
+	if h.pool.QueryRow(r.Context(), `select id, name from businesses where code=$1`, bizCode).Scan(&bizID, &bizName) == nil {
+		// checkout shows the offers box with this exact wording, or says the
+		// buyer already gets them
+		marketing := httpx.M{"wording": customer.OptInWording(bizName), "optedIn": false}
 		if c, err := h.customers.Lookup(r.Context(), bizID, phone); err == nil {
 			out["prefill"] = httpx.M{"name": c.Name, "email": c.Email, "address": c.LastAddress}
+			marketing["optedIn"] = c.MarketingOptIn
 		}
+		out["marketing"] = marketing
 		if len(in.Items) > 0 || in.LinkToken != "" {
 			if len(in.Items) > 50 || len(in.LinkToken) > 64 {
 				in.Items, in.LinkToken = in.Items[:min(len(in.Items), 50)], ""
@@ -127,36 +132,67 @@ func (h *Handler) VerifyOtp(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, out)
 }
 
+// orderInput is what checkout sends to place an order, from a link or the
+// storefront.
+type orderInput struct {
+	OrderToken    string           `json:"orderToken"`
+	Name          string           `json:"name"`
+	Phone         string           `json:"phone"`
+	Email         string           `json:"email"`
+	Address       customer.Address `json:"address"`
+	Items         []order.Ref      `json:"items"`
+	PaymentMethod string           `json:"paymentMethod"`
+	OfferCode     string           `json:"offerCode"`
+	Notes         string           `json:"notes"`
+	BuyerGstin    string           `json:"buyerGstin"`
+	BuyerCompany  string           `json:"buyerCompany"`
+	// the unticked "send me offers on WhatsApp" box; true only if the buyer ticked it
+	MarketingOptIn bool `json:"marketingOptIn"`
+}
+
+// phone checks the contact details and returns the normalised mobile.
+func (in orderInput) phone() (string, error) {
+	phone, ok := httpx.NormalizePhone(in.Phone)
+	if !ok {
+		return "", errors.New("invalid phone number")
+	}
+	if !httpx.ValidPincode(in.Address.Pincode) {
+		return "", errors.New("invalid pincode — please recheck, wrong pincodes cause failed deliveries")
+	}
+	if in.Email != "" && !httpx.ValidEmail(in.Email) {
+		return "", errors.New("invalid email")
+	}
+	return phone, nil
+}
+
+func (in orderInput) params(r *http.Request, bizID, phone, source string) order.CreateParams {
+	return order.CreateParams{BusinessID: bizID, Source: source,
+		Name: in.Name, Phone: phone, Email: in.Email, Address: in.Address,
+		PaymentMethod: in.PaymentMethod, OfferCode: in.OfferCode, Notes: in.Notes,
+		BuyerGstin: in.BuyerGstin, BuyerCompany: in.BuyerCompany,
+		MarketingOptIn: in.MarketingOptIn, Proof: customer.ProofFrom(r)}
+}
+
+// placed answers a new order with what checkout does next.
+func placed(w http.ResponseWriter, o *order.Order) {
+	next := "pay"
+	if o.PaymentMethod == "cod" {
+		next = "codPending"
+	}
+	httpx.Created(w, httpx.M{"orderCode": o.Code, "total": o.Total, "tokenAmount": o.TokenAmount,
+		"paymentMethod": o.PaymentMethod, "next": next})
+}
+
 // CreateOrder places the order behind a link after OTP verification.
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		OrderToken    string           `json:"orderToken"`
-		Name          string           `json:"name"`
-		Phone         string           `json:"phone"`
-		Email         string           `json:"email"`
-		Address       customer.Address `json:"address"`
-		Items         []order.Ref      `json:"items"`
-		PaymentMethod string           `json:"paymentMethod"`
-		OfferCode     string           `json:"offerCode"`
-		Notes         string           `json:"notes"`
-		BuyerGstin    string           `json:"buyerGstin"`
-		BuyerCompany  string           `json:"buyerCompany"`
-	}
+	var in orderInput
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
 	bizCode := r.PathValue("businessCode")
-	phone, ok := httpx.NormalizePhone(in.Phone)
-	if !ok {
-		httpx.Err(w, http.StatusBadRequest, "invalid phone number")
-		return
-	}
-	if !httpx.ValidPincode(in.Address.Pincode) {
-		httpx.Err(w, http.StatusBadRequest, "invalid pincode — please recheck, wrong pincodes cause failed deliveries")
-		return
-	}
-	if in.Email != "" && !httpx.ValidEmail(in.Email) {
-		httpx.Err(w, http.StatusBadRequest, "invalid email")
+	phone, err := in.phone()
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !h.otp.Consume(r.Context(), bizCode, phone, in.OrderToken) {
@@ -178,12 +214,8 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := order.CreateParams{
-		BusinessID: res.Business.ID, LinkID: res.LinkID, Source: "link",
-		Name: in.Name, Phone: phone, Email: in.Email, Address: in.Address,
-		PaymentMethod: in.PaymentMethod, OfferCode: in.OfferCode, Notes: in.Notes,
-		BuyerGstin: in.BuyerGstin, BuyerCompany: in.BuyerCompany,
-	}
+	params := in.params(r, res.Business.ID, phone, "link")
+	params.LinkID = res.LinkID
 	if res.Kind == "custom" {
 		params.CustomLines = []product.Line{{Name: res.Title, Qty: 1, Price: res.Amount}}
 	} else {
@@ -199,12 +231,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusBadRequest, err.Error())
 		return
 	}
-	next := "pay"
-	if o.PaymentMethod == "cod" {
-		next = "codPending"
-	}
-	httpx.Created(w, httpx.M{"orderCode": o.Code, "total": o.Total, "tokenAmount": o.TokenAmount,
-		"paymentMethod": o.PaymentMethod, "next": next})
+	placed(w, o)
 }
 
 // pickItems keeps buyers inside the link's catalog scope while letting them
@@ -253,7 +280,46 @@ func (h *Handler) Track(w http.ResponseWriter, r *http.Request) {
 	if v, err := h.aftersale.BuyerView(r.Context(), store.ID, o); err == nil {
 		out["afterSale"] = v
 	}
+	if c, err := h.customers.Lookup(r.Context(), store.ID, phone); err == nil {
+		out["marketing"] = httpx.M{"optedIn": c.MarketingOptIn, "wording": customer.OptInWording(store.Name)}
+	}
 	httpx.OK(w, out)
+}
+
+// MarketingLink says whose a broadcast's stop link is, for the page it opens.
+func (h *Handler) MarketingLink(w http.ResponseWriter, r *http.Request) {
+	sub, err := h.customers.ByUnsubscribeToken(r.Context(), r.PathValue("token"))
+	if err != nil {
+		httpx.Err(w, http.StatusNotFound, err.Error())
+		return
+	}
+	httpx.OK(w, sub)
+}
+
+// SetMarketingLink stops offers from a broadcast's link, or starts them again.
+// Stopping needs no code: withdrawing must be as easy as agreeing was.
+func (h *Handler) SetMarketingLink(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		OptIn bool `json:"optIn"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	sub, err := h.customers.ByUnsubscribeToken(r.Context(), r.PathValue("token"))
+	if err != nil {
+		httpx.Err(w, http.StatusNotFound, err.Error())
+		return
+	}
+	wording := "Unsubscribed with the link in a broadcast"
+	if in.OptIn {
+		wording = customer.OptInWording(sub.Store)
+	}
+	if err := customer.RecordConsent(r.Context(), h.pool, customer.Consent{BusinessID: sub.BusinessID, Phone: sub.Phone,
+		OptIn: in.OptIn, Source: customer.SourceLink, Wording: wording, Proof: customer.ProofFrom(r)}); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not save your choice, try again")
+		return
+	}
+	httpx.OK(w, httpx.M{"store": sub.Store, "optedIn": in.OptIn})
 }
 
 // Pay starts a Razorpay checkout for the full amount or the COD token.

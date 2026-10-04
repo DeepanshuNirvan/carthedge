@@ -7,6 +7,7 @@ import { toast } from '@/store/ui';
 import { PageHeader } from '../shell/PageHeader';
 import { ShareActions, productUrl } from '../shell/ShareActions';
 import { ProductForm } from './ProductForm';
+import { isPlainList } from '@/lib/options';
 import { BulkImportModal } from './BulkImportModal';
 import { OffersPanel } from './OffersPanel';
 import { Button, IconButton } from '@/ui/Button';
@@ -70,7 +71,9 @@ function ProductCard({
         <p className="truncate text-[14px] font-semibold tracking-snug text-hi">{product.name}</p>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-sm">
           <MoneyText paise={product.price} className="font-semibold text-hi" />
-          {product.comparePrice > product.price && <MoneyText paise={product.comparePrice} strike className="text-xs" />}
+          {Math.max(product.mrp, product.comparePrice) > product.price && (
+            <MoneyText paise={product.mrp > 0 ? product.mrp : product.comparePrice} strike className="text-xs" />
+          )}
           {product.resellerPrice > 0 && (
             <span className="ml-auto text-xs text-low">
               reseller <MoneyText paise={product.resellerPrice} className="text-xs" />
@@ -78,8 +81,15 @@ function ProductCard({
           )}
         </p>
         <p className="mt-0.5 truncate text-xs text-low">
-          {product.category}
-          {product.variants.length > 0 && `, ${product.variants.length} variants`}
+          {[
+            product.category,
+            product.variants.length > 0 &&
+              (isPlainList(product.options)
+                ? `${product.variants.length} options`
+                : `${product.options.map((o) => o.name).join(' × ')}, ${product.variants.length} combinations`),
+          ]
+            .filter(Boolean)
+            .join(', ')}
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
           <span className="flex items-center gap-2 text-xs text-mid">

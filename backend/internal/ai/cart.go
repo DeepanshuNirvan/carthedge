@@ -119,18 +119,24 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 		}
 		line := QuoteLine{ProductID: p.ID, Name: p.Name, Qty: it.Qty, Price: p.Price}
 		if len(p.Variants) > 0 {
-			v, found := variantByName(p, it.Variant)
+			ch := p.Choose(it.Variant)
+			v := ch.Variant
+			ask := fmt.Sprintf("which option of %s (%s)", p.Name, p.ChoiceText(nil))
 			switch {
 			case it.Variant == "":
-				missing = append(missing, fmt.Sprintf("which option of %s (%s)", p.Name, optionList(p)))
-			case !found:
-				problems = append(problems, fmt.Sprintf("%s has no option %q (available: %s)", p.Name, it.Variant, optionList(p)))
+				missing = append(missing, ask)
+			case len(ch.Open) > 0 && len(ch.Open) < len(p.Options):
+				// part of it is settled ("pink"): ask only for what is still open
+				// and keep their words, so the next message completes the choice
+				missing = append(missing, fmt.Sprintf("which option of %s (%s)", p.Name, p.ChoiceText(ch.Open)))
+			case !ch.Found:
+				problems = append(problems, fmt.Sprintf("%s has no option %q (available: %s)", p.Name, it.Variant, p.ChoiceText(nil)))
 				it.Variant = ""
-				missing = append(missing, fmt.Sprintf("which option of %s (%s)", p.Name, optionList(p)))
-			case v.InStock != nil && !*v.InStock:
-				problems = append(problems, fmt.Sprintf("%s in %s is out of stock (available: %s)", p.Name, v.Name, optionList(p)))
+				missing = append(missing, ask)
+			case !v.Stocked():
+				problems = append(problems, fmt.Sprintf("%s in %s is out of stock (available: %s)", p.Name, v.Name, p.ChoiceText(nil)))
 				it.Variant = ""
-				missing = append(missing, fmt.Sprintf("which option of %s (%s)", p.Name, optionList(p)))
+				missing = append(missing, ask)
 			default:
 				it.Variant, line.VariantID, line.Variant = v.Name, v.ID, v.Name
 				if v.Price > 0 {
@@ -306,28 +312,6 @@ func sameThing(a, b string) bool {
 		}
 	}
 	return false
-}
-
-func variantByName(p product.Product, name string) (product.Variant, bool) {
-	for _, v := range p.Variants {
-		if name != "" && strings.EqualFold(strings.TrimSpace(v.Name), strings.TrimSpace(name)) {
-			return v, true
-		}
-	}
-	return product.Variant{}, false
-}
-
-func optionList(p product.Product) string {
-	var names []string
-	for _, v := range p.Variants {
-		if v.InStock == nil || *v.InStock {
-			names = append(names, v.Name)
-		}
-	}
-	if len(names) == 0 {
-		return "none in stock"
-	}
-	return strings.Join(names, ", ")
 }
 
 // hash pins the exact cart a summary showed, so "yes" confirms only that.

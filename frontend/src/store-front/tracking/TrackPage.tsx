@@ -5,7 +5,7 @@ import { Check, Copy, Truck } from 'lucide-react';
 import type { CheckoutInfo, TrackedOrder } from '@/api/types';
 import { buyerPay, buyerVerifyPayment, trackOrder } from '@/api/storefront';
 import { UpiPayPanel } from '../checkout/UpiPayPanel';
-import { SelfService } from './SelfService';
+import { OffersPreference, SelfService } from './SelfService';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCopy } from '@/hooks/useCopy';
 import { Seo } from '@/lib/seo';
@@ -324,6 +324,12 @@ function TrackView() {
               </section>
 
               <SelfService
+                order={order}
+                phone={phoneSchema.safeParse(phone).data ?? phone}
+                onChanged={() => trackOrder(order.orderCode, phone).then(setOrder, () => undefined)}
+              />
+
+              <OffersPreference
                 order={order}
                 phone={phoneSchema.safeParse(phone).data ?? phone}
                 onChanged={() => trackOrder(order.orderCode, phone).then(setOrder, () => undefined)}

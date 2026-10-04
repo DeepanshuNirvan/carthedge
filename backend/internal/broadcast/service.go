@@ -4,14 +4,24 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
+	"carthedge/internal/customer"
 	"carthedge/internal/notify"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var validSegments = map[string]bool{"all": true, "retail": true, "reseller": true, "repeat": true}
+
+// TermsVersion is the broadcast rules a seller accepts before the first send
+// (/terms, "Broadcasts"). Changing the rules means a new version, and every
+// seller accepts again.
+const TermsVersion = "2026-10-04"
+
+var ErrTermsNeeded = errors.New("accept the broadcast rules before sending")
 
 type Broadcast struct {
 	ID          string `json:"id"`
@@ -24,21 +34,27 @@ type Broadcast struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
-// Service sends drops (new collection, festive sales) to buyer segments over
-// WhatsApp, immediately or on schedule.
+// Service sends drops (new collection, festive sales) over WhatsApp to the
+// buyers who said yes to offers, immediately or on schedule.
 type Service struct {
-	pool   *pgxpool.Pool
-	notify *notify.Notifier
-	log    *slog.Logger
+	pool      *pgxpool.Pool
+	notify    *notify.Notifier
+	customers *customer.Service
+	log       *slog.Logger
+	baseURL   string
 }
 
-func NewService(pool *pgxpool.Pool, n *notify.Notifier, log *slog.Logger) *Service {
-	return &Service{pool: pool, notify: n, log: log}
+func NewService(pool *pgxpool.Pool, n *notify.Notifier, customers *customer.Service, log *slog.Logger, baseURL string) *Service {
+	return &Service{pool: pool, notify: n, customers: customers, log: log, baseURL: baseURL}
 }
 
 func (s *Service) Create(ctx context.Context, bizID, name, message, segment, scheduledAt string) (*Broadcast, error) {
+	name, message = strings.TrimSpace(name), strings.TrimSpace(message)
 	if name == "" || message == "" {
 		return nil, errors.New("name and message are required")
+	}
+	if len([]rune(name)) > 80 || len([]rune(message)) > 1000 {
+		return nil, errors.New("keep the name under 80 characters and the message under 1,000")
 	}
 	if segment == "" {
 		segment = "all"
@@ -52,6 +68,10 @@ func (s *Service) Create(ctx context.Context, bizID, name, message, segment, sch
 		t, err := time.Parse(time.RFC3339, scheduledAt)
 		if err != nil {
 			return nil, errors.New("scheduledAt must be RFC3339")
+		}
+		// a scheduled drop goes out on its own, so the rules are accepted now
+		if err := s.requireTerms(ctx, bizID); err != nil {
+			return nil, err
 		}
 		schedAt = t
 		status = "scheduled"
@@ -89,6 +109,9 @@ func (s *Service) List(ctx context.Context, bizID string, limit, offset int) ([]
 
 // Send dispatches a draft/scheduled broadcast now.
 func (s *Service) Send(ctx context.Context, bizID, id string) error {
+	if err := s.requireTerms(ctx, bizID); err != nil {
+		return err
+	}
 	ct, err := s.pool.Exec(ctx, `update broadcasts set status='sending', updated_at=now()
 		where id=$1 and business_id=$2 and status in ('draft','scheduled')`, id, bizID)
 	if err != nil {
@@ -108,6 +131,60 @@ func (s *Service) Delete(ctx context.Context, bizID, id string) error {
 	}
 	if ct.RowsAffected() == 0 {
 		return errors.New("broadcast not found or already sent")
+	}
+	return nil
+}
+
+// Audience is who a broadcast can reach: buyers who said yes to offers, per
+// segment, beside everyone in the ledger, and whether the rules are accepted.
+type Audience struct {
+	Customers       int            `json:"customers"`
+	OptedIn         map[string]int `json:"optedIn"`
+	TermsVersion    string         `json:"termsVersion"`
+	TermsAcceptedAt string         `json:"termsAcceptedAt,omitempty"`
+}
+
+func (s *Service) Audience(ctx context.Context, bizID string) (*Audience, error) {
+	var all, yes, retail, reseller, repeat int
+	err := s.pool.QueryRow(ctx, `select count(*),
+		count(*) filter (where marketing_opt_in),
+		count(*) filter (where marketing_opt_in and segment = 'retail'),
+		count(*) filter (where marketing_opt_in and segment = 'reseller'),
+		count(*) filter (where marketing_opt_in and orders_count > 1)
+		from customers where business_id=$1 and phone not like 'erased-%'`, bizID).Scan(&all, &yes, &retail, &reseller, &repeat)
+	if err != nil {
+		return nil, err
+	}
+	a := &Audience{Customers: all, TermsVersion: TermsVersion,
+		OptedIn: map[string]int{"all": yes, "retail": retail, "reseller": reseller, "repeat": repeat}}
+	a.TermsAcceptedAt, err = s.termsAcceptedAt(ctx, bizID)
+	return a, err
+}
+
+// AcceptTerms records the seller accepting the current broadcast rules.
+func (s *Service) AcceptTerms(ctx context.Context, bizID string, proof customer.Proof) error {
+	_, err := s.pool.Exec(ctx, `insert into terms_acceptances (business_id, document, version, ip, user_agent)
+		values ($1,'broadcasts',$2,$3,$4)`, bizID, TermsVersion, proof.IP, proof.UserAgent)
+	return err
+}
+
+func (s *Service) termsAcceptedAt(ctx context.Context, bizID string) (string, error) {
+	var at string
+	err := s.pool.QueryRow(ctx, `select to_char(max(accepted_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from terms_acceptances
+		where business_id=$1 and document='broadcasts' and version=$2 having count(*) > 0`, bizID, TermsVersion).Scan(&at)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return at, err
+}
+
+func (s *Service) requireTerms(ctx context.Context, bizID string) error {
+	at, err := s.termsAcceptedAt(ctx, bizID)
+	if err != nil {
+		return err
+	}
+	if at == "" {
+		return ErrTermsNeeded
 	}
 	return nil
 }
@@ -144,6 +221,29 @@ func (s *Service) StartScheduler(ctx context.Context) {
 	}()
 }
 
+// segmentFilter narrows the ledger to a broadcast's audience. Only buyers who
+// said yes are ever in it.
+func segmentFilter(segment string) string {
+	where := "business_id = $1 and marketing_opt_in"
+	switch segment {
+	case "retail":
+		where += " and segment = 'retail'"
+	case "reseller":
+		where += " and segment = 'reseller'"
+	case "repeat":
+		where += " and orders_count > 1"
+	}
+	return where
+}
+
+// compose is the WhatsApp text one buyer gets: the seller's message with the
+// store link filled in, and their own stop link at the foot. Every marketing
+// message carries a way out.
+func compose(message, store, storeURL, stopURL string) string {
+	body := strings.ReplaceAll(message, "{{store link}}", storeURL)
+	return body + "\n\nNo more offers from " + store + "? Tap " + stopURL
+}
+
 func (s *Service) dispatch(id, bizID string) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -151,36 +251,33 @@ func (s *Service) dispatch(id, bizID string) {
 		}
 	}()
 	ctx := context.Background()
-	var message, segment string
-	if err := s.pool.QueryRow(ctx, `select message, segment from broadcasts where id=$1`, id).Scan(&message, &segment); err != nil {
+	var message, segment, store, code string
+	if err := s.pool.QueryRow(ctx, `select b.message, b.segment, z.name, z.code from broadcasts b
+		join businesses z on z.id = b.business_id where b.id=$1`, id).Scan(&message, &segment, &store, &code); err != nil {
 		return
 	}
-	where := "business_id = $1"
-	switch segment {
-	case "retail", "reseller":
-		where += " and segment = '" + segment + "'"
-	case "repeat":
-		where += " and orders_count > 1"
-	}
-	rows, err := s.pool.Query(ctx, `select phone from customers where `+where, bizID)
+	rows, err := s.pool.Query(ctx, `select id, phone from customers where `+segmentFilter(segment), bizID)
 	if err != nil {
 		return
 	}
-	var phones []string
+	type recipient struct{ id, phone string }
+	var recipients []recipient
 	for rows.Next() {
-		var p string
-		if rows.Scan(&p) == nil {
-			phones = append(phones, p)
+		var r recipient
+		if rows.Scan(&r.id, &r.phone) == nil {
+			recipients = append(recipients, r)
 		}
 	}
 	rows.Close()
 
 	sent := 0
-	for _, phone := range phones {
-		if err := s.notify.WhatsApp(phone, message); err == nil {
+	storeURL := s.baseURL + "/s/" + code
+	for _, r := range recipients {
+		stopURL := s.baseURL + "/unsubscribe/" + s.customers.UnsubscribeToken(r.id)
+		if err := s.notify.WhatsApp(r.phone, compose(message, store, storeURL, stopURL)); err == nil {
 			sent++
 		}
 	}
 	s.pool.Exec(ctx, `update broadcasts set status='sent', sent_count=$2, updated_at=now() where id=$1`, id, sent)
-	s.log.Info("broadcast sent", "id", id, "recipients", sent)
+	s.log.Info("broadcast sent", "id", id, "recipients", len(recipients), "sent", sent)
 }

@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, BellRing, Check, Minus, PackageX, Plus, Ruler, ShieldCheck, Store, Truck } from 'lucide-react';
-import type { ProductDetail, PublicVariant } from '@/api/types';
+import type { ProductDetail, ProductLegal } from '@/api/types';
 import { joinWaitlist, useStore, useStoreProduct } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
 import { cn } from '@/lib/cn';
 import { useCart } from '@/store/cart';
 import { toast } from '@/store/ui';
 import { phoneSchema } from '@/lib/validators';
+import { galleryFor, isPlainList, missingGroup, settledPicks, variantFor, type Picks } from '@/lib/options';
+import { OptionPicker } from './OptionPicker';
 import { StoreHeader, trustLine } from '../storefront/StoreHeader';
 import { CartSheet } from '../cart/CartSheet';
 import { BuyerNotice } from '../BuyerNotice';
@@ -94,34 +96,60 @@ function Gallery({
   );
 }
 
-function ProductFacts({ details, sizeChart, name }: { details: ProductDetail[]; sizeChart?: string; name: string }) {
+function SizeChart({ src, name, className }: { src: string; name: string; className?: string }) {
   const [open, setOpen] = useState(false);
-  if (details.length === 0 && !sizeChart) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn('inline-flex items-center gap-1.5 text-sm font-medium text-jade-ink hover:underline', className)}
+      >
+        <Ruler className="size-4" aria-hidden /> Size chart
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Size chart" wide>
+        <img src={src} alt={`Size chart for ${name}`} className="w-full rounded-lg" />
+      </Modal>
+    </>
+  );
+}
+
+/** Details the seller wrote, then what the law asks a listing to state (origin, maker). */
+function ProductFacts({
+  details,
+  legal,
+  sizeChart,
+  name,
+}: {
+  details: ProductDetail[];
+  legal: ProductLegal;
+  sizeChart?: string;
+  name: string;
+}) {
+  const facts = [
+    ...details,
+    ...(legal.originCountry ? [{ label: 'Country of origin', value: legal.originCountry }] : []),
+    ...(legal.manufacturer ? [{ label: 'Made or packed by', value: legal.manufacturer }] : []),
+  ];
+  if (facts.length === 0 && !sizeChart) return null;
   return (
     <div className="mt-5">
-      {details.length > 0 && (
+      {facts.length > 0 && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-sm">
-          {details.map((d, i) => (
+          {facts.map((d, i) => (
             <div key={i} className="contents">
               <dt className="text-low">{d.label}</dt>
-              <dd className="text-hi">{d.value}</dd>
+              <dd className="whitespace-pre-line text-hi">{d.value}</dd>
             </div>
           ))}
         </dl>
       )}
-      {sizeChart && (
-        <>
-          <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-jade-ink hover:underline">
-            <Ruler className="size-4" aria-hidden /> Size chart
-          </button>
-          <Modal open={open} onClose={() => setOpen(false)} title="Size chart" wide>
-            <img src={sizeChart} alt={`Size chart for ${name}`} className="w-full rounded-lg" />
-          </Modal>
-        </>
-      )}
+      {sizeChart && <SizeChart src={sizeChart} name={name} className="mt-3" />}
     </div>
   );
 }
+
+const isSizeGroup = (name: string) => /size|fit|length|waist/i.test(name);
 
 export default function ProductPage() {
   const { businessCode = '', productId = '' } = useParams();
@@ -130,7 +158,7 @@ export default function ProductPage() {
   const add = useCart((s) => s.add);
 
   const [imageIndex, setImageIndex] = useState(0);
-  const [variant, setVariant] = useState<PublicVariant | null>(null);
+  const [chosen, setChosen] = useState<Picks>([]);
   const [qty, setQty] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
@@ -177,19 +205,30 @@ export default function ProductPage() {
   }
 
   const needsVariant = product.variants.length > 0;
+  const picks = settledPicks(product.options, chosen);
+  const variant = variantFor(product.options, product.variants, picks);
+  const photos = galleryFor(product.images, product.options, picks);
   const activePrice = variant && variant.price > 0 ? variant.price : product.price;
   const available = needsVariant ? (variant ? variant.inStock : product.inStock) : product.inStock;
-  const discount =
-    product.comparePrice > activePrice
-      ? Math.round(((product.comparePrice - activePrice) / product.comparePrice) * 100)
-      : 0;
+  // the MRP is the legal reference price; a compare-at price shows only without one
+  const listPrice = product.mrp > 0 ? product.mrp : product.comparePrice;
+  const discount = listPrice > activePrice ? Math.round(((listPrice - activePrice) / listPrice) * 100) : 0;
+  // the size chart sits beside the size choices when there are some
+  const sizeGroup = product.sizeChart ? product.options.find((o) => isSizeGroup(o.name)) : undefined;
+
+  const choose = (next: Picks) => {
+    setChosen(next);
+    setImageIndex(0);
+  };
 
   const addToCart = () => {
     if (needsVariant && !variant) {
-      toast('info', 'Pick an option first', 'Choose a size or colour to continue.');
+      const missing = missingGroup(product.options, picks);
+      const title = missing && !isPlainList(product.options) ? `Choose a ${missing.name.toLowerCase()} first` : 'Pick an option first';
+      toast('info', title, 'Then add it to your cart.');
       return;
     }
-    add(businessCode, product, variant ?? undefined, qty);
+    add(businessCode, product, variant, qty, photos[0]);
     setCartOpen(true);
   };
 
@@ -222,6 +261,7 @@ export default function ProductPage() {
           name: product.name,
           image: product.images,
           description: product.description,
+          ...(product.originCountry ? { countryOfOrigin: product.originCountry } : {}),
           offers: {
             '@type': 'Offer',
             priceCurrency: 'INR',
@@ -243,7 +283,8 @@ export default function ProductPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 sm:gap-10">
           {/* gallery: swipe on phones, thumbnails where there is room */}
-          <Gallery images={product.images} name={product.name} index={imageIndex} onIndex={setImageIndex} />
+          {/* keyed by the photo set, so picking a colour starts its photos from the first */}
+          <Gallery key={photos.join('|')} images={photos} name={product.name} index={imageIndex} onIndex={setImageIndex} />
 
           {/* details */}
           <div>
@@ -253,41 +294,48 @@ export default function ProductPage() {
               <MoneyText paise={activePrice} className="text-2xl font-semibold text-hi" />
               {discount > 0 && (
                 <>
-                  <MoneyText paise={product.comparePrice} strike className="text-sm" />
+                  <span className="text-sm text-low">
+                    {product.mrp > 0 && 'MRP '}
+                    <MoneyText paise={listPrice} strike className="text-sm" />
+                  </span>
                   <span className="text-sm font-semibold text-jade-ink">{discount}% off</span>
                 </>
               )}
             </p>
+            {product.mrp > 0 && (
+              <p className="mt-1 text-xs text-low">
+                {discount > 0 ? (
+                  'Inclusive of all taxes'
+                ) : (
+                  <>
+                    MRP <MoneyText paise={product.mrp} className="text-xs" />, inclusive of all taxes
+                  </>
+                )}
+              </p>
+            )}
 
             {product.description && (
               <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-mid">{product.description}</p>
             )}
 
-            <ProductFacts details={product.details ?? []} sizeChart={product.sizeChart} name={product.name} />
-
             {needsVariant && (
-              <fieldset className="mt-5">
-                <legend className="mb-2 text-sm font-medium text-hi">Choose an option</legend>
-                <div className="flex flex-wrap gap-2">
-                  {product.variants.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      aria-pressed={variant?.id === v.id}
-                      disabled={!v.inStock}
-                      onClick={() => setVariant(v)}
-                      className={cn(
-                        'min-h-11 min-w-12 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-micro ease-spring active:scale-95',
-                        variant?.id === v.id ? 'bg-hi text-bg shadow-raised' : 'neu text-hi hover:bg-surface-3',
-                        !v.inStock && 'cursor-not-allowed text-low line-through opacity-50',
-                      )}
-                    >
-                      {v.name}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
+              <div className="mt-5">
+                <OptionPicker
+                  options={product.options}
+                  variants={product.variants}
+                  picks={picks}
+                  onPicks={choose}
+                  aside={(o) => o === sizeGroup && product.sizeChart && <SizeChart src={product.sizeChart} name={product.name} />}
+                />
+              </div>
             )}
+
+            <ProductFacts
+              details={product.details ?? []}
+              legal={product}
+              sizeChart={sizeGroup ? undefined : product.sizeChart}
+              name={product.name}
+            />
 
             {available && (
               <div className="mt-5 flex items-center gap-3">

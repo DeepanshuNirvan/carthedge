@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"carthedge/internal/cache"
 	"carthedge/internal/httpx"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -256,11 +257,8 @@ func RateLimit(rdb *redis.Client, name string, limit int, window time.Duration, 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			k := "rl:" + name + ":" + key(r)
-			n, err := rdb.Incr(r.Context(), k).Result()
+			n, err := cache.Count(r.Context(), rdb, k, window)
 			if err == nil {
-				if n == 1 {
-					rdb.Expire(r.Context(), k, window)
-				}
 				if n > int64(limit) {
 					httpx.Err(w, http.StatusTooManyRequests, "too many requests, try again later")
 					return

@@ -14,7 +14,7 @@ export type LegalDoc = {
 };
 
 const CONTACT = 'privacy@carthedge.in';
-const UPDATED = '3 October 2026';
+const UPDATED = '4 October 2026';
 
 export const legalDocs = {
   privacy: {
@@ -54,6 +54,7 @@ export const legalDocs = {
           'If you return or exchange an item, the request details, any photos you upload and the record of any refund.',
           'If you buy for a business, the GSTIN and company name you add for a tax invoice.',
           'If you verify your number but do not finish checking out, the store may send you one reminder about the order. That record is deleted after 30 days.',
+          'If you choose to get offers from a store on WhatsApp, a record of that choice: the words you agreed to, when, where you said yes (checkout, your order page, WhatsApp or a link) and the network address and browser it came from. Stopping offers is recorded the same way.',
           'Card and UPI details are handled entirely by Razorpay. CartHedge never sees or stores them; we keep only Razorpay’s payment and refund references, amounts and status, for refunds and tax records.',
         ],
       },
@@ -65,6 +66,15 @@ export const legalDocs = {
           'Message content is used for one purpose: drafting an order card that you review and confirm. We also use it to send replies and order updates that you or your configured automations trigger.',
           'Message text is sent to our AI provider (OpenAI or Google Gemini) to understand the buyer, draft the assistant’s replies and extract order details such as item, size, address and payment preference. It is not used to train third-party models.',
           'You can disconnect an account at any time from Settings. Disconnecting immediately stops all message access and deletes the stored access token.',
+        ],
+      },
+      {
+        heading: 'Offers on WhatsApp',
+        body: [
+          'A store sends you offers and new arrivals on WhatsApp only if you said yes: by ticking the box at checkout (it is never ticked for you), on your order page, or by replying START to the store. Buying something does not sign you up.',
+          'Updates about your own orders, such as confirmation, dispatch and delivery, are not offers. They come whether or not you subscribe.',
+          'You can stop offers at any time and it takes effect at once: reply STOP to the store on WhatsApp, tap the link at the end of any offer, or use your order page.',
+          'The record of each yes and no is kept while the store uses CartHedge, so the store can show what you agreed to. If the store erases your details at your request, or closes its account, the record is deleted too.',
         ],
       },
       {
@@ -131,15 +141,26 @@ export const legalDocs = {
         body: [
           'CartHedge is software that helps you capture, confirm and track orders. We are not a party to any sale between you and your buyer.',
           'You are the merchant of record. You are responsible for your products, your pricing, your delivery commitments, your tax obligations and your dealings with buyers.',
+          'You are responsible for the product information you publish, including the MRP, country of origin and maker or importer details where India’s consumer protection and legal metrology rules require them. Never sell above the MRP you state.',
           'Buyer payments settle directly into your own Razorpay account. CartHedge does not hold, route or refund customer money.',
         ],
       },
       {
         heading: 'Acceptable use',
         body: [
-          'Do not use CartHedge to sell anything illegal, to send messages that violate Meta’s platform policies, or to message people who have not contacted you first.',
+          'Do not use CartHedge to sell anything illegal, to send messages that violate Meta’s platform policies, to message people who have not contacted you first, or to send marketing to anyone who has not opted in to it (see Broadcasts and marketing messages below).',
           'Do not attempt to access another seller’s data, probe the platform for vulnerabilities without permission, or resell access to the platform.',
           'Accounts that put connected Instagram or WhatsApp numbers at risk of a platform ban may be suspended.',
+        ],
+      },
+      {
+        heading: 'Broadcasts and marketing messages',
+        body: [
+          'Send offers, new arrivals and other marketing only to buyers who opted in through CartHedge (the unticked box at checkout, their order page or a START reply) or for whom you hold equal proof of consent. A purchase is not consent.',
+          'Every marketing message CartHedge sends ends with the buyer’s own stop link, and buyers can also reply STOP. Honour every stop request at once and never add back someone who stopped.',
+          'Follow WhatsApp’s Business Messaging Policy and Commerce Policy: no prohibited goods, no misleading claims, and no more messages than your buyers expect.',
+          'For your buyers’ personal data you are the data fiduciary under India’s Digital Personal Data Protection Act, 2023, and CartHedge processes it on your behalf and on your instructions.',
+          'You accept these rules in the app before your first broadcast, and that acceptance is recorded with its date. We may pause broadcasts on an account that draws complaints, spam reports or a low WhatsApp quality rating, to protect your number and the platform.',
         ],
       },
       {

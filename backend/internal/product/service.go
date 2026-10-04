@@ -26,12 +26,14 @@ import (
 var ErrNotFound = errors.New("product not found")
 
 type Variant struct {
-	ID       string `json:"id,omitempty"`
-	Name     string `json:"name"`
-	Price    int    `json:"price"` // 0 = inherit product price
-	Sku      string `json:"sku"`
-	InStock  *bool  `json:"inStock"`  // omitted = in stock
-	StockQty *int   `json:"stockQty"` // omitted = untracked
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name"` // the option values joined: "M / Pink"
+	// one value per product option group, in group order
+	Options  []string `json:"options"`
+	Price    int      `json:"price"` // 0 = inherit product price
+	Sku      string   `json:"sku"`
+	InStock  *bool    `json:"inStock"`  // omitted = in stock
+	StockQty *int     `json:"stockQty"` // omitted = untracked
 }
 
 func (v Variant) Qty() int {
@@ -64,12 +66,31 @@ type Product struct {
 	StockQty      int       `json:"stockQty"` // -1 = untracked
 	Trending      bool      `json:"trending"`
 	Active        bool      `json:"active"`
+	Options       []Option  `json:"options"`
 	Variants      []Variant `json:"variants"`
 	Details       []Detail  `json:"details"`   // fabric, fit, care: shown to buyers and the assistant
 	SizeChart     string    `json:"sizeChart"` // image URL
 	HSN           string    `json:"hsn"`
 	GstRate       int       `json:"gstRate"` // percent; -1 = the store default
-	CreatedAt     string    `json:"createdAt"`
+	Legal
+	CreatedAt string `json:"createdAt"`
+}
+
+// Legal is what India's e-commerce and packaged-goods rules ask a listing to
+// state. Every field is optional: what applies depends on the product.
+type Legal struct {
+	MRP           int    `json:"mrp"` // paise, inclusive of all taxes; 0 = not stated
+	OriginCountry string `json:"originCountry"`
+	Manufacturer  string `json:"manufacturer"` // name and address of the maker, packer or importer
+}
+
+// ListPrice is the price a discount is measured from: the MRP when the seller
+// states one, otherwise their compare-at price.
+func (p Product) ListPrice() int {
+	if p.MRP > 0 {
+		return p.MRP
+	}
+	return p.ComparePrice
 }
 
 // Detail is one labelled fact about a product ("Fabric": "Pure cotton").
@@ -95,16 +116,19 @@ type Public struct {
 	Images       []string        `json:"images"`
 	InStock      bool            `json:"inStock"`
 	Trending     bool            `json:"trending"`
+	Options      []Option        `json:"options"`
 	Variants     []PublicVariant `json:"variants"`
 	Details      []Detail        `json:"details"`
 	SizeChart    string          `json:"sizeChart,omitempty"`
+	Legal
 }
 
 type PublicVariant struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Price   int    `json:"price"`
-	InStock bool   `json:"inStock"`
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Options []string `json:"options"`
+	Price   int      `json:"price"`
+	InStock bool     `json:"inStock"`
 }
 
 func ToPublic(products []Product) []Public {
@@ -112,7 +136,7 @@ func ToPublic(products []Product) []Public {
 	for i, p := range products {
 		variants := make([]PublicVariant, len(p.Variants))
 		for j, v := range p.Variants {
-			variants[j] = PublicVariant{ID: v.ID, Name: v.Name, Price: v.Price, InStock: v.Stocked()}
+			variants[j] = PublicVariant{ID: v.ID, Name: v.Name, Options: v.Options, Price: v.Price, InStock: v.Stocked()}
 		}
 		details := p.Details
 		if details == nil {
@@ -120,7 +144,8 @@ func ToPublic(products []Product) []Public {
 		}
 		out[i] = Public{ID: p.ID, Name: p.Name, Description: p.Description, Category: p.Category,
 			Price: p.Price, ComparePrice: p.ComparePrice, Images: orEmpty(p.Images), InStock: p.InStock,
-			Trending: p.Trending, Variants: variants, Details: details, SizeChart: p.SizeChart}
+			Trending: p.Trending, Options: p.Options, Variants: variants, Details: details, SizeChart: p.SizeChart,
+			Legal: p.Legal}
 	}
 	return out
 }
@@ -147,23 +172,27 @@ func NewService(pool *pgxpool.Pool, n *notify.Notifier, log *slog.Logger) *Servi
 }
 
 type Input struct {
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	Category      string    `json:"category"`
-	Price         int       `json:"price"`
-	ResellerPrice int       `json:"resellerPrice"`
-	ComparePrice  int       `json:"comparePrice"`
-	Sku           string    `json:"sku"`
-	Images        []string  `json:"images"`
-	InStock       *bool     `json:"inStock"`
-	StockQty      *int      `json:"stockQty"` // omitted = untracked
-	Trending      bool      `json:"trending"`
-	Variants      []Variant `json:"variants"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	Category      string `json:"category"`
+	Price         int    `json:"price"`
+	ResellerPrice int    `json:"resellerPrice"`
+	ComparePrice  int    `json:"comparePrice"`
+	Sku           string `json:"sku"`
+	InStock       *bool  `json:"inStock"`
+	StockQty      *int   `json:"stockQty"` // omitted = untracked
+	Trending      bool   `json:"trending"`
 	// omitted (nil) keeps what is stored: a CSV re-import must not wipe them
-	Details   []Detail `json:"details"`
-	SizeChart *string  `json:"sizeChart"`
-	HSN       *string  `json:"hsn"`
-	GstRate   *int     `json:"gstRate"`
+	Images        []string  `json:"images"`
+	Options       []Option  `json:"options"` // omitted with variants = one group of the variant names
+	Variants      []Variant `json:"variants"`
+	Details       []Detail  `json:"details"`
+	SizeChart     *string   `json:"sizeChart"`
+	HSN           *string   `json:"hsn"`
+	GstRate       *int      `json:"gstRate"`
+	MRP           *int      `json:"mrp"`
+	OriginCountry *string   `json:"originCountry"`
+	Manufacturer  *string   `json:"manufacturer"`
 }
 
 // qty resolves the tracked quantity; an omitted or negative value (the API
@@ -239,20 +268,57 @@ func (in *Input) validate() error {
 	if in.GstRate != nil && *in.GstRate != -1 && !slices.Contains(shop.Rates, *in.GstRate) {
 		return errors.New("GST rate must be one of 0, 3, 5, 12, 18, 28, 40")
 	}
+	if in.MRP != nil && *in.MRP < 0 {
+		return errors.New("MRP must be zero (not stated) or an amount in paise")
+	}
+	if in.OriginCountry != nil {
+		v := strings.Join(strings.Fields(*in.OriginCountry), " ")
+		if len([]rune(v)) > 60 {
+			return errors.New("keep the country of origin under 60 characters")
+		}
+		in.OriginCountry = &v
+	}
+	if in.Manufacturer != nil {
+		v := strings.TrimSpace(*in.Manufacturer)
+		if len([]rune(v)) > 300 {
+			return errors.New("keep the maker's name and address under 300 characters")
+		}
+		in.Manufacturer = &v
+	}
+	return in.shapeOptions()
+}
+
+// checkMRP refuses a price above the MRP: selling above the printed maximum
+// retail price is not allowed. mrp is the value that will be stored.
+func (in *Input) checkMRP(mrp int) error {
+	if mrp <= 0 {
+		return nil
+	}
+	if in.Price > mrp {
+		return fmt.Errorf("the price can't be more than the MRP (%s)", notify.Rupees(mrp))
+	}
+	for _, v := range in.Variants {
+		if v.Price > mrp {
+			return fmt.Errorf("%s costs more than the MRP (%s)", v.Name, notify.Rupees(mrp))
+		}
+	}
 	return nil
 }
 
-// detailsParam is the details to write: nil keeps the stored ones.
-func detailsParam(d []Detail) any {
-	if d == nil {
+// jsonParam is a JSON column to write: nil keeps the stored value.
+func jsonParam[T any](v []T) any {
+	if v == nil {
 		return nil
 	}
-	b, _ := json.Marshal(d)
+	b, _ := json.Marshal(v)
 	return string(b)
 }
 
 func (s *Service) Create(ctx context.Context, bizID string, in Input) (*Product, error) {
 	if err := in.validate(); err != nil {
+		return nil, err
+	}
+	if err := in.checkMRP(deref(in.MRP)); err != nil {
 		return nil, err
 	}
 	images, _ := json.Marshal(orEmpty(in.Images))
@@ -266,15 +332,17 @@ func (s *Service) Create(ctx context.Context, bizID string, in Input) (*Product,
 	var id string
 	err = tx.QueryRow(ctx, `insert into products
 		(business_id, name, description, category, price, reseller_price, compare_price, sku, images, in_stock, stock_qty, trending,
-		 details, size_chart, hsn, gst_rate)
-		values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,coalesce($13::jsonb,'[]'),coalesce($14,''),coalesce($15,''),coalesce($16,-1))
+		 details, size_chart, hsn, gst_rate, options, mrp, origin_country, manufacturer)
+		values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,coalesce($13::jsonb,'[]'),coalesce($14,''),coalesce($15,''),coalesce($16,-1),
+		 coalesce($17::jsonb,'[]'),coalesce($18,0),coalesce($19,''),coalesce($20,''))
 		returning id`,
 		bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
-		string(images), in.stocked(), in.qty(), in.Trending, detailsParam(in.Details), in.SizeChart, in.HSN, in.GstRate).Scan(&id)
+		string(images), in.stocked(), in.qty(), in.Trending, jsonParam(in.Details), in.SizeChart, in.HSN, in.GstRate,
+		jsonParam(in.Options), in.MRP, in.OriginCountry, in.Manufacturer).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
-	if err := insertVariants(ctx, tx, id, in.Variants); err != nil {
+	if err := writeVariants(ctx, tx, id, in.Variants, false); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -287,11 +355,19 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 	if err := in.validate(); err != nil {
 		return nil, err
 	}
-	images, _ := json.Marshal(orEmpty(in.Images))
 
 	var wasInStock bool
-	if err := s.pool.QueryRow(ctx, `select in_stock from products where id=$1 and business_id=$2 and active`, id, bizID).Scan(&wasInStock); err != nil {
+	var storedMRP int
+	if err := s.pool.QueryRow(ctx, `select in_stock, mrp from products where id=$1 and business_id=$2 and active`,
+		id, bizID).Scan(&wasInStock, &storedMRP); err != nil {
 		return nil, ErrNotFound
+	}
+	mrp := storedMRP
+	if in.MRP != nil {
+		mrp = *in.MRP
+	}
+	if err := in.checkMRP(mrp); err != nil {
+		return nil, err
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -303,49 +379,25 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 	// an explicit toggle wins; a given count decides (0 = out); neither keeps it
 	var inStock bool
 	err = tx.QueryRow(ctx, `update products set name=$3, description=$4, category=$5, price=$6, reseller_price=$7,
-		compare_price=$8, sku=$9, images=$10::jsonb,
+		compare_price=$8, sku=$9, images=coalesce($10::jsonb, images),
 		in_stock = coalesce($11, case when $12::int is null then in_stock else $12::int <> 0 end),
 		stock_qty = coalesce($12::int, stock_qty),
 		trending=$13, details=coalesce($14::jsonb, details), size_chart=coalesce($15, size_chart),
-		hsn=coalesce($16, hsn), gst_rate=coalesce($17, gst_rate), updated_at=now()
+		hsn=coalesce($16, hsn), gst_rate=coalesce($17, gst_rate), options=coalesce($18::jsonb, options),
+		mrp=coalesce($19, mrp), origin_country=coalesce($20, origin_country), manufacturer=coalesce($21, manufacturer),
+		updated_at=now()
 		where id=$1 and business_id=$2 returning in_stock`,
 		id, bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
-		string(images), in.InStock, qtyParam(in.StockQty), in.Trending,
-		detailsParam(in.Details), in.SizeChart, in.HSN, in.GstRate).Scan(&inStock)
+		jsonParam(in.Images), in.InStock, qtyParam(in.StockQty), in.Trending,
+		jsonParam(in.Details), in.SizeChart, in.HSN, in.GstRate, jsonParam(in.Options),
+		in.MRP, in.OriginCountry, in.Manufacturer).Scan(&inStock)
 	if err != nil {
 		return nil, err
 	}
-	// Variant ids have to survive an edit: share links and order lines already
-	// point at them, so a delete-and-reinsert would dangle every one. Ids the
-	// payload claims but this product does not own are treated as new rows.
-	owned := map[string]bool{}
-	rows, err := tx.Query(ctx, `select id from product_variants where product_id=$1`, id)
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var vid string
-		if rows.Scan(&vid) == nil {
-			owned[vid] = true
+	if in.Variants != nil {
+		if err := writeVariants(ctx, tx, id, in.Variants, true); err != nil {
+			return nil, err
 		}
-	}
-	rows.Close()
-
-	variants := make([]Variant, len(in.Variants))
-	copy(variants, in.Variants)
-	keep := []string{}
-	for i := range variants {
-		if owned[variants[i].ID] {
-			keep = append(keep, variants[i].ID)
-		} else {
-			variants[i].ID = ""
-		}
-	}
-	if _, err := tx.Exec(ctx, `delete from product_variants where product_id=$1 and id <> all($2::uuid[])`, id, keep); err != nil {
-		return nil, err
-	}
-	if err := insertVariants(ctx, tx, id, variants); err != nil {
-		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -517,9 +569,10 @@ func (s *Service) Count(ctx context.Context, bizID string, f Filter) (int, error
 func (s *Service) query(ctx context.Context, where, order string, args ...any) ([]Product, error) {
 	rows, err := s.pool.Query(ctx, `select p.id, p.name, p.description, p.category, p.price, p.reseller_price,
 		p.compare_price, p.sku, p.images, p.in_stock, p.stock_qty, p.trending, p.active, p.created_at,
-		p.details, p.size_chart, p.hsn, p.gst_rate,
-		coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'name', v.name, 'price', v.price, 'sku', v.sku,
-			'inStock', v.in_stock, 'stockQty', v.stock_qty)) filter (where v.id is not null), '[]')
+		p.details, p.size_chart, p.hsn, p.gst_rate, p.options, p.mrp, p.origin_country, p.manufacturer,
+		coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'name', v.name, 'options', v.options, 'price', v.price,
+			'sku', v.sku, 'inStock', v.in_stock, 'stockQty', v.stock_qty) order by v.position, v.name)
+			filter (where v.id is not null), '[]')
 		from products p left join product_variants v on v.product_id = p.id
 		where `+where+` group by p.id order by `+order, args...)
 	if err != nil {
@@ -529,16 +582,19 @@ func (s *Service) query(ctx context.Context, where, order string, args ...any) (
 	var out []Product
 	for rows.Next() {
 		var p Product
-		var images, variants, details []byte
+		var images, variants, details, options []byte
 		var createdAt time.Time
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.ResellerPrice,
 			&p.ComparePrice, &p.Sku, &images, &p.InStock, &p.StockQty, &p.Trending, &p.Active, &createdAt,
-			&details, &p.SizeChart, &p.HSN, &p.GstRate, &variants); err != nil {
+			&details, &p.SizeChart, &p.HSN, &p.GstRate, &options, &p.MRP, &p.OriginCountry, &p.Manufacturer,
+			&variants); err != nil {
 			return nil, err
 		}
 		json.Unmarshal(images, &p.Images)
 		json.Unmarshal(details, &p.Details)
+		json.Unmarshal(options, &p.Options)
 		json.Unmarshal(variants, &p.Variants)
+		p.settleOptions()
 		p.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		out = append(out, p)
 	}
@@ -562,11 +618,6 @@ func (s *Service) Bulk(ctx context.Context, bizID string, inputs []Input) (BulkR
 	for i, in := range inputs {
 		if err := in.validate(); err != nil {
 			return res, fmt.Errorf("row %d: %w", i+1, err)
-		}
-		for _, v := range in.Variants {
-			if strings.TrimSpace(v.Name) == "" {
-				return res, fmt.Errorf("row %d: variant name is required", i+1)
-			}
 		}
 	}
 	for i, in := range inputs {
@@ -854,24 +905,67 @@ func (s *Service) notifyWaitlist(bizID, productID string) {
 	})
 }
 
-func insertVariants(ctx context.Context, tx pgx.Tx, productID string, variants []Variant) error {
-	for _, v := range variants {
+// variantRow is one variant as the write statement reads it.
+type variantRow struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Options  []string `json:"options"`
+	Position int      `json:"position"`
+	Price    int      `json:"price"`
+	Sku      string   `json:"sku"`
+	InStock  *bool    `json:"in_stock"`
+	Qty      any      `json:"qty"` // nil keeps the counted stock
+}
+
+// writeVariants stores a product's variants in two statements, however many
+// there are. A row whose id this product already owns is updated in place, so
+// ids survive an edit (share links and order lines point at them); any other
+// row is inserted with a fresh id, so a client can never reach another
+// product's variant by sending its id. prune drops the owned rows the edit
+// left out.
+func writeVariants(ctx context.Context, tx pgx.Tx, productID string, variants []Variant, prune bool) error {
+	rows := make([]variantRow, len(variants))
+	for i, v := range variants {
 		if strings.TrimSpace(v.Name) == "" {
 			return errors.New("variant name is required")
 		}
-		// a new row defaults to untracked; an existing one keeps its count
-		// unless the payload names one (the edit form does not)
-		if _, err := tx.Exec(ctx, `insert into product_variants (id, product_id, name, price, sku, in_stock, stock_qty)
-			values (coalesce(nullif($1,'')::uuid, gen_random_uuid()),$2,$3,$4,$5,
-				coalesce($6, coalesce($7::int, -1) <> 0), coalesce($7::int, -1))
-			on conflict (id) do update set name=excluded.name, price=excluded.price, sku=excluded.sku,
-				in_stock = coalesce($6, case when $7::int is null then product_variants.in_stock else $7::int <> 0 end),
-				stock_qty = coalesce($7::int, product_variants.stock_qty)`,
-			v.ID, productID, v.Name, v.Price, v.Sku, v.InStock, qtyParam(v.StockQty)); err != nil {
+		rows[i] = variantRow{ID: v.ID, Name: v.Name, Options: orEmpty(v.Options), Position: i, Price: v.Price,
+			Sku: v.Sku, InStock: v.InStock, Qty: qtyParam(v.StockQty)}
+	}
+	payload, _ := json.Marshal(rows)
+	if prune {
+		if _, err := tx.Exec(ctx, `delete from product_variants v where v.product_id = $1 and not exists (
+			select 1 from jsonb_to_recordset($2::jsonb) as x(id text) where x.id = v.id::text)`, productID, string(payload)); err != nil {
 			return err
 		}
 	}
-	return nil
+	if len(rows) == 0 {
+		return nil
+	}
+	// a new row starts untracked unless a count is given; an existing one keeps
+	// its count unless the payload names one (the edit form sends only changes)
+	_, err := tx.Exec(ctx, `with x as (
+			select * from jsonb_to_recordset($2::jsonb) as x(id text, name text, options jsonb, position int, price int,
+				sku text, in_stock boolean, qty int)
+		), upd as (
+			update product_variants v set name = x.name, options = x.options, position = x.position, price = x.price, sku = x.sku,
+				in_stock = coalesce(x.in_stock, case when x.qty is null then v.in_stock else x.qty <> 0 end),
+				stock_qty = coalesce(x.qty, v.stock_qty)
+			from x where v.product_id = $1 and v.id::text = x.id
+			returning v.id::text as id
+		)
+		insert into product_variants (product_id, name, options, position, price, sku, in_stock, stock_qty)
+		select $1, x.name, x.options, x.position, x.price, x.sku, coalesce(x.in_stock, coalesce(x.qty, -1) <> 0), coalesce(x.qty, -1)
+		from x where x.id = '' or x.id not in (select id from upd)`, productID, string(payload))
+	return err
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }
 
 func parseRupees(s string) (int, error) {

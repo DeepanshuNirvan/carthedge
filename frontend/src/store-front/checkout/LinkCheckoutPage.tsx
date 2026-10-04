@@ -13,12 +13,13 @@ import {
   Truck,
   Wallet,
 } from 'lucide-react';
-import type { OrderRef, Product, ResolvedLink, Variant } from '@/api/types';
+import type { OrderRef, Product, ResolvedLink } from '@/api/types';
 import { useResolvedLink, useStore } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
-import { cn } from '@/lib/cn';
 import { formatPaise } from '@/lib/money';
 import { whatsappHref } from '@/lib/validators';
+import { galleryFor, settledPicks, variantFor, type Picks } from '@/lib/options';
+import { OptionPicker } from '../product/OptionPicker';
 import { CheckoutFlow } from './CheckoutFlow';
 import { BuyerNotice } from '../BuyerNotice';
 import { LogoMark } from '@/marketing/Wordmark';
@@ -32,7 +33,7 @@ import { LaneGround } from '@/ui/LaneGround';
 import { NoPhoto } from '@/ui/NoPhoto';
 import { buttonLink } from '@/ui/buttonLink';
 
-type Selection = { qty: number; variantId?: string };
+type Selection = { qty: number; picks: Picks };
 
 const paymentLine = (b: ResolvedLink['business']) =>
   b.onlinePayment === 'gateway'
@@ -116,11 +117,16 @@ export default function LinkCheckoutPage() {
 
   const products: Product[] = useMemo(() => link?.items ?? [], [link]);
 
-  const selectionFor = (p: Product): Selection =>
-    selections[p.id] ?? { qty: 1, variantId: p.variants[0]?.id };
-
-  const priceOf = (p: Product, variantId?: string) => {
-    const v = p.variants.find((x) => x.id === variantId);
+  // opens on what the seller put in the link, else the first combination in stock
+  const selectionFor = (p: Product): Selection => {
+    if (selections[p.id]) return selections[p.id];
+    const ref = link?.refs?.find((r) => r.productId === p.id);
+    const start = p.variants.find((v) => v.id === ref?.variantId && v.inStock) ?? p.variants.find((v) => v.inStock);
+    return { qty: Math.max(ref?.qty ?? 1, 1), picks: start?.options ?? [] };
+  };
+  const variantOf = (p: Product, sel: Selection) => variantFor(p.options, p.variants, settledPicks(p.options, sel.picks));
+  const priceOf = (p: Product, sel: Selection) => {
+    const v = variantOf(p, sel);
     return v && v.price > 0 ? v.price : p.price;
   };
 
@@ -129,13 +135,15 @@ export default function LinkCheckoutPage() {
       ? (link.amount ?? 0)
       : products.reduce((sum, p) => {
           const sel = selectionFor(p);
-          return sum + priceOf(p, sel.variantId) * sel.qty;
+          return sum + priceOf(p, sel) * sel.qty;
         }, 0);
 
   const orderRefs: OrderRef[] = products.map((p) => {
     const sel = selectionFor(p);
-    return { productId: p.id, variantId: sel.variantId, qty: sel.qty };
+    return { productId: p.id, variantId: variantOf(p, sel)?.id, qty: sel.qty };
   });
+  // every item with options needs a complete, in-stock choice before checkout
+  const unchosen = products.find((p) => p.variants.length > 0 && !variantOf(p, selectionFor(p))?.inStock);
 
   if (isLoading) {
     return (
@@ -249,12 +257,13 @@ export default function LinkCheckoutPage() {
                   <ul className="mt-4 flex flex-col divide-y">
                     {products.map((p) => {
                       const sel = selectionFor(p);
+                      const photo = galleryFor(p.images, p.options, settledPicks(p.options, sel.picks))[0];
                       return (
                         <li key={p.id} className="flex gap-3 py-3.5">
                           <div className="size-20 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-soft">
-                            {p.images[0] ? (
+                            {photo ? (
                               <img
-                                src={p.images[0]}
+                                src={photo}
                                 alt={p.name}
                                 className="size-full object-cover"
                                 loading="lazy"
@@ -265,26 +274,17 @@ export default function LinkCheckoutPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium leading-snug text-hi">{p.name}</p>
-                            <MoneyText paise={priceOf(p, sel.variantId)} className="text-sm text-mid" />
+                            <MoneyText paise={priceOf(p, sel)} className="text-sm text-mid" />
 
                             {p.variants.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {p.variants.map((v: Variant) => (
-                                  <button
-                                    key={v.id}
-                                    disabled={!v.inStock}
-                                    onClick={() =>
-                                      setSelections({ ...selections, [p.id]: { ...sel, variantId: v.id } })
-                                    }
-                                    className={cn(
-                                      'min-h-9 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors active:scale-95',
-                                      sel.variantId === v.id ? 'bg-hi text-bg' : 'neu text-mid',
-                                      !v.inStock && 'cursor-not-allowed line-through opacity-50',
-                                    )}
-                                  >
-                                    {v.name}
-                                  </button>
-                                ))}
+                              <div className="mt-2">
+                                <OptionPicker
+                                  compact
+                                  options={p.options}
+                                  variants={p.variants}
+                                  picks={settledPicks(p.options, sel.picks)}
+                                  onPicks={(picks) => setSelections({ ...selections, [p.id]: { ...sel, picks } })}
+                                />
                               </div>
                             )}
 
@@ -344,9 +344,14 @@ export default function LinkCheckoutPage() {
                   </div>
                 </dl>
 
-                <Button size="lg" className="mt-5 w-full" onClick={() => setCheckingOut(true)}>
+                <Button size="lg" className="mt-5 w-full" disabled={!!unchosen} onClick={() => setCheckingOut(true)}>
                   Continue to checkout
                 </Button>
+                {unchosen && (
+                  <p role="status" className="mt-2 text-center text-xs text-low">
+                    Choose the options for {unchosen.name} to continue.
+                  </p>
+                )}
               </>
             ) : (
               <CheckoutFlow

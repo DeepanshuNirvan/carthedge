@@ -116,6 +116,8 @@ func knownRoute(seg []string) bool {
 		return true
 	case seg[0] == "o" && (len(seg) == 2 || (len(seg) == 3 && seg[2] == "confirm")):
 		return true
+	case seg[0] == "unsubscribe" && len(seg) == 2:
+		return true
 	}
 	return false
 }
@@ -135,6 +137,10 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 	switch {
 	case seg[0] == "app", seg[0] == "admin", seg[0] == "o", seg[0] == "track", seg[0] == "reset-password":
 		return meta{Title: siteName, Description: defaultDesc, NoIndex: true}
+
+	// a buyer's own stop link: one person's page, never indexed
+	case seg[0] == "unsubscribe" && len(seg) == 2:
+		return meta{Title: "Stop offers on WhatsApp — " + siteName, Description: defaultDesc, NoIndex: true}
 
 	// private checkout link: rich preview for the buyer, never indexed
 	case seg[0] == "l" && len(seg) == 3:
@@ -319,7 +325,7 @@ func (h *Handler) robots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write([]byte("User-agent: *\n" +
 		"Disallow: /app\nDisallow: /admin\nDisallow: /l/\nDisallow: /o/\nDisallow: /track\n" +
-		"Disallow: /reset-password\nDisallow: /api/\nDisallow: /p/\n\n" +
+		"Disallow: /reset-password\nDisallow: /unsubscribe/\nDisallow: /api/\nDisallow: /p/\n\n" +
 		"Sitemap: " + h.baseURL + "/sitemap.xml\n"))
 }
 

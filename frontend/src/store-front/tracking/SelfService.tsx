@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, Camera, MapPin, RotateCcw, Smartphone, X } from 'lucide-react';
+import { Ban, Camera, MapPin, MessageCircle, RotateCcw, Smartphone, X } from 'lucide-react';
 import type { Address, ReturnReason, TrackedOrder } from '@/api/types';
 import { returnReasons } from '@/api/types';
 import { returnReasonLabels } from '@/api/aftersale';
@@ -9,6 +9,7 @@ import {
   buyerCancel,
   buyerChangeAddress,
   buyerRequestReturn,
+  buyerSetMarketing,
   buyerUploadPhoto,
   buyerWithdrawReturn,
   sendOtp,
@@ -439,6 +440,75 @@ export function SelfService({ order, phone, onChanged }: { order: TrackedOrder; 
             </Button>
           </div>
         ) : null}
+      </Modal>
+    </section>
+  );
+}
+
+/**
+ * WhatsApp offers from this store, on or off. Behind the same one-time code as
+ * the other order actions; the stop link in every offer works without one.
+ */
+export function OffersPreference({ order, phone, onChanged }: { order: TrackedOrder; phone: string; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const m = order.marketing;
+  if (!m) return null;
+
+  const change = async (optIn: boolean) => {
+    setBusy(true);
+    try {
+      await buyerSetMarketing(order.orderCode, { phone, orderToken: token }, optIn);
+      toast('success', optIn ? 'You will get offers on WhatsApp' : 'Offers stopped', optIn ? undefined : 'Order updates still come through.');
+      setOpen(false);
+      onChanged();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) setToken('');
+      toast('error', 'That did not go through', e instanceof Error ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel rounded-xl p-5 sm:p-6">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink">
+          <MessageCircle className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1 basis-52">
+          <h2 className="text-[15px] font-semibold text-hi">Offers on WhatsApp</h2>
+          <p className="mt-0.5 text-sm text-mid">
+            {m.optedIn
+              ? `You get offers and new arrivals from ${order.businessName}.`
+              : `You don't get offers from ${order.businessName}. Order updates come either way.`}
+          </p>
+        </div>
+        <Button size="sm" variant={m.optedIn ? 'ghost' : 'secondary'} onClick={() => setOpen(true)}>
+          {m.optedIn ? 'Stop offers' : 'Get offers'}
+        </Button>
+      </div>
+      <Modal open={open} onClose={() => setOpen(false)} title={m.optedIn ? 'Stop offers' : 'Offers on WhatsApp'}>
+        {!token ? (
+          <Verify order={order} phone={phone} onToken={setToken} />
+        ) : m.optedIn ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm leading-relaxed text-mid">
+              {order.businessName} will stop sending you offers on WhatsApp. Updates about your orders still come through.
+            </p>
+            <Button loading={busy} onClick={() => change(false)}>
+              Stop offers
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm leading-relaxed text-mid">{m.wording}</p>
+            <Button loading={busy} onClick={() => change(true)}>
+              Yes, send me offers
+            </Button>
+          </div>
+        )}
       </Modal>
     </section>
   );

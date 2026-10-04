@@ -208,6 +208,39 @@ func (h *Handler) BuyerWithdrawReturn(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"ok": true})
 }
 
+// BuyerMarketing turns WhatsApp offers on or off from the order page.
+func (h *Handler) BuyerMarketing(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		buyerAuth
+		OptIn bool `json:"optIn"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	ctx := r.Context()
+	bizID, _, o, status, err := h.buyerOrder(ctx, r.PathValue("code"), in.Phone, in.OrderToken)
+	if err != nil {
+		httpx.Err(w, status, err.Error())
+		return
+	}
+	phone, _ := httpx.NormalizePhone(in.Phone)
+	wording := "Stopped offers on the order page"
+	if in.OptIn {
+		var store string
+		if err := h.pool.QueryRow(ctx, `select name from businesses where id=$1`, bizID).Scan(&store); err != nil {
+			httpx.Err(w, http.StatusInternalServerError, "could not save your choice, try again")
+			return
+		}
+		wording = customer.OptInWording(store)
+	}
+	if err := customer.RecordConsent(ctx, h.pool, customer.Consent{BusinessID: bizID, Phone: phone, OptIn: in.OptIn,
+		Source: customer.SourceOrderPage, Wording: wording, OrderID: o.ID, Proof: customer.ProofFrom(r)}); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not save your choice, try again")
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true, "optedIn": in.OptIn})
+}
+
 // BuyerUpload takes a photo for a return request (damaged item, wrong piece).
 // Phone and order token come as form fields next to the file.
 func (h *Handler) BuyerUpload(w http.ResponseWriter, r *http.Request) {

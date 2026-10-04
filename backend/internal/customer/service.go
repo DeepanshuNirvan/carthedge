@@ -2,6 +2,7 @@ package customer
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,9 @@ type Customer struct {
 	RiskFlagged bool    `json:"riskFlagged"`
 	LastOrderAt string  `json:"lastOrderAt,omitempty"`
 	CreatedAt   string  `json:"createdAt"`
+	// WhatsApp offers: only a buyer's own yes turns this on (see consent.go)
+	MarketingOptIn     bool   `json:"marketingOptIn"`
+	MarketingUpdatedAt string `json:"marketingUpdatedAt,omitempty"`
 }
 
 // Ref is the slice of customer state order creation needs.
@@ -45,9 +49,14 @@ type Ref struct {
 
 type Service struct {
 	pool *pgxpool.Pool
+	// signs the stop link in broadcasts; derived, so it is not the JWT key itself
+	linkKey []byte
 }
 
-func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func NewService(pool *pgxpool.Pool, secret string) *Service {
+	key := sha256.Sum256([]byte("marketing-link|" + secret))
+	return &Service{pool: pool, linkKey: key[:]}
+}
 
 // Upsert creates or refreshes the ledger entry for a buyer and bumps order
 // counters. It runs in the order's transaction, so an order that is refused
@@ -106,11 +115,13 @@ func (s *Service) Erase(ctx context.Context, bizID, id string) error {
 		sql  string
 		args []any
 	}{
+		{`delete from marketing_consents where business_id=$1 and phone=$2`, []any{bizID, phone}},
 		{`update customers set name='Erased customer', phone='erased-'||id::text, email='', last_address='{}'::jsonb,
-			updated_at=now() where id=$1`, []any{id}},
+			marketing_opt_in=false, marketing_updated_at=now(), updated_at=now() where id=$1`, []any{id}},
 		{`update orders set address='{"line":"","city":"","state":"","pincode":""}'::jsonb, notes='', payment_ref=''
 			where customer_id=$1`, []any{id}},
-		{`delete from conversations where business_id=$1 and channel='whatsapp' and contact_id=$2`, []any{bizID, phone}},
+		// WhatsApp names a chat by the number with its country code
+		{`delete from conversations where business_id=$1 and channel='whatsapp' and contact_id in ($2, '91'||$2)`, []any{bizID, phone}},
 		{`delete from checkout_sessions where business_id=$1 and phone=$2`, []any{bizID, phone}},
 		{`delete from waitlist where business_id=$1 and phone=$2`, []any{bizID, phone}},
 	}
@@ -212,7 +223,8 @@ func (s *Service) RecordRto(ctx context.Context, customerID string) error {
 
 const baseSelect = `select id, name, phone, email, segment, last_address, orders_count, total_spent,
 	cod_refusals, returns_count, risk_flagged, coalesce(to_char(last_order_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
-	to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from customers`
+	to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), marketing_opt_in,
+	coalesce(to_char(marketing_updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') from customers`
 
 type scannable interface {
 	Scan(dest ...any) error
@@ -222,7 +234,8 @@ func (s *Service) scanOne(row scannable) (*Customer, error) {
 	var c Customer
 	var addr []byte
 	if err := row.Scan(&c.ID, &c.Name, &c.Phone, &c.Email, &c.Segment, &addr, &c.OrdersCount,
-		&c.TotalSpent, &c.CodRefusals, &c.Returns, &c.RiskFlagged, &c.LastOrderAt, &c.CreatedAt); err != nil {
+		&c.TotalSpent, &c.CodRefusals, &c.Returns, &c.RiskFlagged, &c.LastOrderAt, &c.CreatedAt,
+		&c.MarketingOptIn, &c.MarketingUpdatedAt); err != nil {
 		return nil, err
 	}
 	json.Unmarshal(addr, &c.LastAddress)

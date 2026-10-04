@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"carthedge/internal/cache"
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
@@ -339,10 +340,7 @@ func (s *Service) recordTrial(ctx context.Context, clientIP string) {
 	if clientIP == "" {
 		return
 	}
-	key := trialIPKey(clientIP)
-	if n, err := s.rdb.Incr(ctx, key).Result(); err == nil && n == 1 {
-		s.rdb.Expire(ctx, key, 24*time.Hour)
-	}
+	cache.Count(ctx, s.rdb, trialIPKey(clientIP), 24*time.Hour)
 }
 
 func trialIPKey(clientIP string) string { return "trial:ip:" + clientIP }

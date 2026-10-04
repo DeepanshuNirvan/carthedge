@@ -25,10 +25,9 @@ export function ProductCard({
 }) {
   const add = useCart((s) => s.add);
   const reduced = useReducedMotion();
-  const discount =
-    product.comparePrice > product.price
-      ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
-      : 0;
+  // the MRP is the legal reference price; a compare-at price shows only without one
+  const listPrice = product.mrp > 0 ? product.mrp : product.comparePrice;
+  const discount = listPrice > product.price ? Math.round(((listPrice - product.price) / listPrice) * 100) : 0;
   const hasVariants = product.variants.length > 0;
   const href = `/s/${businessCode}/p/${product.id}`;
 
@@ -87,7 +86,7 @@ export function ProductCard({
           <MoneyText paise={product.price} className="text-[14px] font-semibold text-hi" />
           {discount > 0 && (
             <>
-              <MoneyText paise={product.comparePrice} strike className="text-xs" />
+              <MoneyText paise={listPrice} strike className="text-xs" />
               <span className="text-xs font-semibold text-jade-ink">{discount}% off</span>
             </>
           )}

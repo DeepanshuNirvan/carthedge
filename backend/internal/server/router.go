@@ -188,6 +188,9 @@ func New(d Deps) http.Handler {
 	handle("PATCH /api/v1/customers/{id}", d.Customers.Patch, authed, active)
 	// a buyer's DPDP erasure request
 	handle("POST /api/v1/customers/{id}/erase", d.Customers.Erase, authed, active)
+	// WhatsApp offers: the buyer's yes/no record, and stopping them on request
+	handle("GET /api/v1/customers/{id}/consents", d.Customers.Consents, authed, active)
+	handle("POST /api/v1/customers/{id}/marketing/stop", d.Customers.StopMarketing, authed, active)
 
 	// analytics & reports
 	handle("GET /api/v1/dashboard", d.Analytics.Dashboard, authed, active)
@@ -199,6 +202,8 @@ func New(d Deps) http.Handler {
 	// broadcasts
 	broadcasts := middleware.RequireFeature("broadcasts")
 	handle("GET /api/v1/broadcasts", d.Broadcasts.List, authed, active, broadcasts)
+	handle("GET /api/v1/broadcasts/audience", d.Broadcasts.Audience, authed, active, broadcasts)
+	handle("POST /api/v1/broadcasts/terms", d.Broadcasts.AcceptTerms, authed, active, broadcasts)
 	handle("POST /api/v1/broadcasts", d.Broadcasts.Create, authed, active, broadcasts)
 	handle("POST /api/v1/broadcasts/{id}/send", d.Broadcasts.Send, authed, active, broadcasts)
 	handle("DELETE /api/v1/broadcasts/{id}", d.Broadcasts.Delete, authed, active, broadcasts)
@@ -296,6 +301,10 @@ func New(d Deps) http.Handler {
 	handle("POST /p/orders/{code}/returns", d.Public.BuyerReturn, buyerAction)
 	handle("POST /p/orders/{code}/returns/{id}/withdraw", d.Public.BuyerWithdrawReturn, buyerAction)
 	handle("POST /p/orders/{code}/uploads", d.Public.BuyerUpload, byIP("buyerUpload", 20, 10*time.Minute))
+	handle("POST /p/orders/{code}/marketing", d.Public.BuyerMarketing, buyerAction)
+	// the stop link at the foot of every broadcast (signed token, no login)
+	handle("GET /api/v1/marketing/{token}", d.Public.MarketingLink, byIP("marketingLink", 60, 10*time.Minute))
+	handle("POST /api/v1/marketing/{token}", d.Public.SetMarketingLink, byIP("marketingLinkSet", 20, 10*time.Minute))
 	handle("POST /p/payments/verify", d.Public.VerifyPayment, byIP("payVerify", 30, time.Minute))
 
 	// razorpay webhook (platform account)

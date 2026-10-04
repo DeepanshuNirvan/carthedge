@@ -94,7 +94,7 @@ func main() {
 	platformRzp := payment.NewClient(cfg.RazorpayKeyID, cfg.RazorpayKeySecret)
 
 	bus := events.New(rdb, log)
-	customerSvc := customer.NewService(pool)
+	customerSvc := customer.NewService(pool, cfg.JWTSecret)
 	productSvc := product.NewService(pool, notifier, log)
 	orderSvc := order.NewService(pool, rdb, customerSvc, productSvc, notifier, alerts, shiprocket, bus, log, cfg.PublicBaseURL)
 	linkSvc := link.NewService(pool, productSvc, cfg.PublicBaseURL)
@@ -107,7 +107,7 @@ func main() {
 	afterSvc.SetCreditNoteIssuer(invoice.IssueCreditNote)
 	// money already paid on a cancelled or RTO order becomes a refund due
 	orderSvc.SetCloseHook(afterSvc.OnOrderClosed)
-	broadcastSvc := broadcast.NewService(pool, notifier, log)
+	broadcastSvc := broadcast.NewService(pool, notifier, customerSvc, log, cfg.PublicBaseURL)
 	broadcastSvc.StartScheduler(ctx)
 	aiClient := ai.NewClient(cfg, log)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log, cfg.PublicBaseURL)

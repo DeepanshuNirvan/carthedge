@@ -182,8 +182,30 @@ export type CheckoutInfo = {
 };
 
 // catalog
-export type Variant = { id?: string; name: string; price: number; sku: string; inStock: boolean; stockQty?: number };
+/** One choice inside an option group; images are product photos of this choice. */
+export type OptionValue = { name: string; images?: string[] };
+/** How a product varies: Size, Colour, Storage, Finish… (up to 3 groups). */
+export type ProductOption = { name: string; values: OptionValue[] };
+export type Variant = {
+  id?: string;
+  /** the option values joined, "M / Pink" */
+  name: string;
+  /** one value per option group, in group order */
+  options: string[];
+  price: number;
+  sku: string;
+  inStock: boolean;
+  stockQty?: number;
+};
 export type ProductDetail = { label: string; value: string };
+/** What India's e-commerce and packaged-goods rules ask a listing to state. */
+export type ProductLegal = {
+  /** paise, inclusive of all taxes; 0 = not stated */
+  mrp: number;
+  originCountry: string;
+  /** name and address of the maker, packer or importer */
+  manufacturer: string;
+};
 export type Product = {
   id: string;
   name: string;
@@ -199,6 +221,7 @@ export type Product = {
   stockQty: number;
   trending: boolean;
   active: boolean;
+  options: ProductOption[];
   variants: Variant[];
   details: ProductDetail[] | null;
   sizeChart: string;
@@ -206,7 +229,8 @@ export type Product = {
   /** percent; -1 = the store default */
   gstRate: number;
   createdAt: string;
-};
+} & ProductLegal;
+/** Omitted optional fields keep what is stored, so a stock-sheet re-import never wipes photos or options. */
 export type ProductInput = {
   name: string;
   description: string;
@@ -215,17 +239,18 @@ export type ProductInput = {
   resellerPrice: number;
   comparePrice: number;
   sku: string;
-  images: string[];
+  images?: string[];
   inStock: boolean;
   trending: boolean;
-  variants: Variant[];
+  options?: ProductOption[];
+  variants?: Variant[];
   /** omitted keeps the counted stock on an edit; -1 = untracked */
   stockQty?: number;
   details?: ProductDetail[];
   sizeChart?: string;
   hsn?: string;
   gstRate?: number;
-};
+} & Partial<ProductLegal>;
 export type Offer = {
   id: string;
   code: string;
@@ -344,7 +369,13 @@ export type Customer = {
   riskFlagged: boolean;
   lastOrderAt?: string;
   createdAt: string;
+  /** WhatsApp offers: only the buyer's own yes turns this on */
+  marketingOptIn: boolean;
+  marketingUpdatedAt?: string;
 };
+export type ConsentSource = 'checkout' | 'order_page' | 'whatsapp' | 'unsubscribe_link' | 'seller';
+/** One yes or no to WhatsApp offers, with what the buyer agreed to or sent. */
+export type ConsentEvent = { optIn: boolean; source: ConsentSource; wording: string; orderCode?: string; at: string };
 
 // analytics
 export type RtoMeter = {
@@ -403,6 +434,13 @@ export type Broadcast = {
   scheduledAt?: string;
   sentCount: number;
   createdAt: string;
+};
+/** Who a broadcast reaches: buyers who said yes to offers, per segment. */
+export type BroadcastAudience = {
+  customers: number;
+  optedIn: Record<Broadcast['segment'], number>;
+  termsVersion: string;
+  termsAcceptedAt?: string;
 };
 
 // invoices
@@ -798,7 +836,7 @@ export type StoreBusiness = {
   codFee: CheckoutRules['codFee'];
   prepaidDiscount: CheckoutRules['prepaidDiscount'];
 };
-export type PublicVariant = { id: string; name: string; price: number; inStock: boolean };
+export type PublicVariant = { id: string; name: string; options: string[]; price: number; inStock: boolean };
 export type PublicProduct = {
   id: string;
   name: string;
@@ -809,10 +847,11 @@ export type PublicProduct = {
   images: string[];
   inStock: boolean;
   trending: boolean;
+  options: ProductOption[];
   variants: PublicVariant[];
   details: ProductDetail[];
   sizeChart?: string;
-};
+} & ProductLegal;
 export type StoreHome = {
   business: StoreBusiness;
   categories: string[];
@@ -835,11 +874,16 @@ export type ResolvedLink = {
   title: string;
   amount?: number;
   items?: Product[];
+  /** what the seller put in the link: checkout opens on these options and quantities */
+  refs?: OrderRef[];
   paused: boolean;
 };
+/** The WhatsApp-offers box: the exact sentence shown, and the buyer's current answer. */
+export type MarketingConsent = { wording: string; optedIn: boolean };
 export type OtpVerifyResult = {
   orderToken: string;
   prefill?: { name: string; email: string; address: Address };
+  marketing?: MarketingConsent;
 };
 export type PlacedOrder = {
   orderCode: string;
@@ -880,6 +924,7 @@ export type TrackedOrder = {
   address: Address;
   replacementOf?: string;
   afterSale?: BuyerAfterSale;
+  marketing?: MarketingConsent;
   events: OrderEvent[];
   createdAt: string;
 };

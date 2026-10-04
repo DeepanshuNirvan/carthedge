@@ -172,6 +172,8 @@ func (s *Service) purge(ctx context.Context, bizID, phone string) error {
 		`delete from ai_drafts where business_id=$1`,
 		`delete from invoices where business_id=$1`,
 		`delete from payments where business_id=$1 and kind in ('order','token')`,
+		`delete from marketing_consents where business_id=$1`,
+		`delete from terms_acceptances where business_id=$1`,
 		`delete from orders where business_id=$1`,
 		`delete from customers where business_id=$1`,
 		`delete from products where business_id=$1`,
@@ -222,6 +224,9 @@ var exportTables = []struct {
 	{"offers", `select * from offers where business_id=$1 order by created_at`, false},
 	{"links", `select * from order_links where business_id=$1 order by created_at`, false},
 	{"broadcasts", `select * from broadcasts where business_id=$1 order by created_at`, false},
+	// the proof behind every buyer who gets offers, and the rules the seller accepted
+	{"marketingConsents", `select * from marketing_consents where business_id=$1 order by created_at`, false},
+	{"termsAccepted", `select document, version, accepted_at from terms_acceptances where business_id=$1 order by accepted_at`, false},
 	{"conversations", `select c.id, c.channel, c.contact_name, c.contact_handle, c.created_at,
 		(select coalesce(json_agg(json_build_object('direction', m.direction, 'author', m.author, 'body', m.body, 'at', m.created_at)
 			order by m.created_at), '[]') from conversation_messages m where m.conversation_id = c.id) as messages

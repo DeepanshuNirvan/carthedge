@@ -39,10 +39,19 @@ How CartHedge handles money and personal data, what the code guarantees, and wha
 - **Security:** AES-GCM for secrets and channel tokens; HTTPS; signed Meta and Razorpay webhooks; password change ends other sessions; staff support views are read-only and recorded; rate limits on login, OTP, orders, refunds and order tracking.
 - **Logs:** while no WhatsApp/SMS/email provider is configured (OPS-1), outgoing messages — including OTPs — are written to the server log so they can be read during testing. Once a provider is set, message text is no longer logged. Configure providers and limit log access before real buyers use it.
 
+## Marketing consent (WhatsApp offers)
+
+- **Opt-in is the buyer's own act:** an unticked box at checkout that names the store and the channel ("Send me offers and new arrivals from <store> on WhatsApp. I can stop them any time."), shown only after the number is verified by OTP; or "Yes, send me offers" on the order page behind a fresh OTP; or replying START to the store's WhatsApp. A purchase alone never subscribes anyone, and a seller can never turn offers on.
+- **Withdrawal is as easy:** reply STOP (or tap "Stop promotions"), one tap on the stop link at the end of every offer (no code needed), the order page, or ask the seller (Customers → Stop offers).
+- **Proof:** every yes and no is appended to `marketing_consents` with the exact sentence agreed to (or the message sent), source, order, IP address and browser, and time. The seller sees the history in the customer drawer and in their data export. Erasing a buyer deletes it.
+- **Sending:** broadcasts reach only buyers whose current answer is yes; the seller accepts the broadcast rules (version + time + IP recorded in `terms_acceptances`) before the first send or schedule.
+- **Roles:** the seller is the data fiduciary for their buyers under the DPDP Act; CartHedge processes on the seller's behalf (terms, "Broadcasts and marketing messages").
+
 ## Owner actions (not code)
 
 - [ ] Have a lawyer review the privacy policy and terms against the DPDP Rules (notice contents, grievance contact, consent wording for reminders and broadcasts).
 - [ ] Configure the WhatsApp/SMS and email providers (OPS-1).
 - [ ] Confirm the AI provider account does not use API data for training (the privacy policy says it is not). OpenAI's API does not by default; Gemini's free tier may.
 - [ ] Save CartHedge's GSTIN in admin, and subscribe the Razorpay webhook to `subscription.*` and `payment.captured`.
-- [ ] Broadcast opt-in for WhatsApp marketing is still open ([FEATURE-GAPS.md](FEATURE-GAPS.md) 6.3).
+- [x] Broadcast opt-in for WhatsApp marketing (built 4 Oct 2026, see "Marketing consent" below). Have the lawyer check the consent sentence and the Broadcasts section of the terms.
+- [ ] Have the lawyer confirm which label details (MRP, country of origin, maker/packer/importer) apply to fashion and handmade sellers.

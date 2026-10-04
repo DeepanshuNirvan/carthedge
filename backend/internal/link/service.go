@@ -57,8 +57,10 @@ type Resolved struct {
 	Title  string           `json:"title"`
 	Amount int              `json:"amount,omitempty"`
 	Items  []product.Public `json:"items,omitempty"`
-	Refs   []ItemRef        `json:"-"`
-	Paused bool             `json:"paused"`
+	// what the seller put in the link, so checkout opens on the option and
+	// quantity they chose rather than the first one
+	Refs   []ItemRef `json:"refs,omitempty"`
+	Paused bool      `json:"paused"`
 }
 
 type Service struct {

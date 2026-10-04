@@ -15,7 +15,8 @@ export type CartItem = {
 type CartState = {
   businessCode: string | null;
   items: CartItem[];
-  add: (businessCode: string, product: PublicProduct, variant?: PublicVariant, qty?: number) => void;
+  /** image: the photo of the chosen option, when it has its own */
+  add: (businessCode: string, product: PublicProduct, variant?: PublicVariant, qty?: number, image?: string) => void;
   setQty: (productId: string, variantId: string | undefined, qty: number) => void;
   remove: (productId: string, variantId?: string) => void;
   clear: () => void;
@@ -28,7 +29,7 @@ export const useCart = create<CartState>()(
     (set, get) => ({
       businessCode: null,
       items: [],
-      add: (businessCode, product, variant, qty = 1) => {
+      add: (businessCode, product, variant, qty = 1, image) => {
         // one cart per store — switching stores starts fresh
         const items = get().businessCode === businessCode ? [...get().items] : [];
         const entry: CartItem = {
@@ -37,7 +38,7 @@ export const useCart = create<CartState>()(
           name: product.name,
           variantName: variant?.name,
           price: variant && variant.price > 0 ? variant.price : product.price,
-          image: product.images[0],
+          image: image ?? product.images[0],
           qty,
         };
         const existing = items.find((i) => keyOf(i) === keyOf(entry));

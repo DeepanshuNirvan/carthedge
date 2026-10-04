@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BadgeCheck, Banknote, CreditCard, MapPinOff, ShieldCheck, Smartphone, Tag, Truck } from 'lucide-react';
-import type { Address, CheckoutInfo, OnlinePayment, OrderRef, PlacedOrder, Quote } from '@/api/types';
+import type { Address, CheckoutInfo, MarketingConsent, OnlinePayment, OrderRef, PlacedOrder, Quote } from '@/api/types';
 import {
   buyerPay,
   buyerVerifyPayment,
@@ -73,6 +73,9 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
   const [gstOpen, setGstOpen] = useState(false);
   const [buyerGstin, setBuyerGstin] = useState('');
   const [buyerCompany, setBuyerCompany] = useState('');
+  // WhatsApp offers: an unticked box with the store's own wording, shown once the number is verified
+  const [marketing, setMarketing] = useState<MarketingConsent | null>(null);
+  const [offers, setOffers] = useState(false);
 
   const openRazorpay = useRazorpay();
 
@@ -165,6 +168,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
     try {
       const res = await verifyOtp(ctx.businessCode, phone, otp, { items: ctx.items, linkToken: ctx.linkToken });
       setOrderToken(res.orderToken);
+      setMarketing(res.marketing ?? null);
       // a verified buyer gets their own price (reseller) and coupon limits
       loadQuote('', res.orderToken).catch(() => setQuote(null));
       // repeat buyers get their saved details back
@@ -196,6 +200,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
         offerCode: quote?.offerCode && !quote.offerError ? quote.offerCode : undefined,
         buyerGstin: gstOpen && buyerGstin.trim() ? buyerGstin.trim().toUpperCase() : undefined,
         buyerCompany: gstOpen && buyerCompany.trim() ? buyerCompany.trim() : undefined,
+        marketingOptIn: offers || undefined,
       };
       const order = ctx.linkToken
         ? await placeLinkOrder(ctx.businessCode, ctx.linkToken, input)
@@ -537,6 +542,26 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                 </div>
               )}
             </div>
+
+            {/* optional and separate from the order: WhatsApp and the DPDP Act need a clear, unticked yes */}
+            {marketing &&
+              (marketing.optedIn ? (
+                <p className="text-xs leading-relaxed text-low">
+                  You get offers from {ctx.businessName} on WhatsApp. You can stop them any time from your order page.
+                </p>
+              ) : (
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg p-3.5 neu">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-jade-500"
+                    checked={offers}
+                    onChange={(e) => setOffers(e.target.checked)}
+                  />
+                  <span className="text-sm leading-snug text-mid">
+                    {marketing.wording} <span className="text-low">Optional.</span>
+                  </span>
+                </label>
+              ))}
 
             <Button
               size="lg"

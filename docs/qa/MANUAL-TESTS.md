@@ -76,3 +76,11 @@ Things automation could not do (real Meta accounts, real phones, third-party pay
 - [ ] Watch the logs through one deploy: no duplicate AI replies or COD nudges while old and new instances overlap.
 - [ ] `/robots.txt`, `/sitemap.xml`, `/privacy`, `/terms`, `/data-deletion` return 200 on the live domain (Meta app review needs them).
 - [ ] **Speed:** the Neon database is in AWS us-east-2 (Ohio). Check the Render service's region — if it is not Ohio (US East), every query crosses continents (~200 ms each, pages take seconds). Move the Render service to Ohio, or the database to the Render region; this matters more than any code change.
+
+## 8. Product options and WhatsApp offers (4 Oct build)
+
+- [ ] **STOP / START on a real WhatsApp number** (after WhatsApp is connected, see `docs/WHATSAPP-INSTAGRAM-GO-LIVE.md`): from a buyer phone send "STOP" to the seller's number → a confirmation arrives, the assistant does not reply, the customer drawer shows "Stopped, replied on WhatsApp". Send "START" → subscribed again. Send "Stop promotions" (the quick-reply button on marketing templates) → stopped.
+- [ ] **A real broadcast** to a buyer who ticked the offers box: it arrives once, the store link opens the store, and the stop link at the bottom opens the stop page in the WhatsApp in-app browser and works with one tap.
+- [ ] **Option photos inside Instagram/WhatsApp in-app browsers** on a mid-range Android: picking a colour swaps the gallery to that colour's photos without lag; the swatch chips are readable in both themes.
+- [ ] **Label details on a real listing:** a lawyer confirms which of MRP, country of origin and maker/packer/importer apply to fashion and handmade sellers, and the product page wording ("MRP ₹X, inclusive of all taxes", "Made or packed by") is acceptable.
+- [ ] **Consent wording:** a lawyer reviews "Send me offers and new arrivals from <store> on WhatsApp. I can stop them any time." and the Broadcasts section of the terms.

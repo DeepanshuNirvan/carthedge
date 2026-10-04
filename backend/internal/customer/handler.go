@@ -73,3 +73,32 @@ func (h *Handler) Erase(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.OK(w, httpx.M{"ok": true})
 }
+
+// ProofFrom is where a consent or acceptance was given from.
+func ProofFrom(r *http.Request) Proof {
+	return Proof{IP: middleware.ClientIP(r), UserAgent: r.UserAgent()}
+}
+
+// Consents is a buyer's WhatsApp-offers record: every yes and no, newest first.
+func (h *Handler) Consents(w http.ResponseWriter, r *http.Request) {
+	events, err := h.svc.ConsentHistory(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"))
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not load the consent record")
+		return
+	}
+	httpx.OK(w, httpx.M{"consents": events})
+}
+
+// StopMarketing turns WhatsApp offers off for a buyer who asked the seller to.
+func (h *Handler) StopMarketing(w http.ResponseWriter, r *http.Request) {
+	err := h.svc.StopMarketing(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id"), ProofFrom(r))
+	if errors.Is(err, ErrNotFound) {
+		httpx.Err(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not stop offers for this customer")
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
+}

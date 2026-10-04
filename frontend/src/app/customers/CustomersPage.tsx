@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import { AlertTriangle, Search, UserX, Users } from 'lucide-react';
-import type { Customer } from '@/api/types';
-import { useCustomer, useCustomers, useEraseCustomer, useUpdateCustomer } from '@/api/customers';
+import type { ConsentSource, Customer } from '@/api/types';
+import {
+  useCustomer,
+  useCustomerConsents,
+  useCustomers,
+  useEraseCustomer,
+  useStopMarketing,
+  useUpdateCustomer,
+} from '@/api/customers';
 import { useOrders } from '@/api/orders';
 import { toast } from '@/store/ui';
-import { formatDate, timeAgo } from '@/lib/date';
+import { formatDate, formatDateTime, timeAgo } from '@/lib/date';
 import { PageHeader } from '../shell/PageHeader';
 import { Input, Select, Field } from '@/ui/Input';
 import { Table, Td, Th, Tr } from '@/ui/Table';
@@ -16,6 +23,70 @@ import { Button } from '@/ui/Button';
 import { Avatar } from '@/ui/Avatar';
 import { Skeleton, SkeletonRows } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/EmptyState';
+
+const consentSources: Record<ConsentSource, string> = {
+  checkout: 'ticked the box at checkout',
+  order_page: 'on their order page',
+  whatsapp: 'replied on WhatsApp',
+  unsubscribe_link: 'with the link in an offer',
+  seller: 'stopped by you',
+};
+
+/**
+ * WhatsApp offers: whether broadcasts reach this buyer, and the record behind
+ * it — every yes and no, where it came from and the exact words agreed to.
+ * A seller can stop offers on request but never turn them on.
+ */
+function OffersRecord({ customer }: { customer: Customer }) {
+  const { data: consents } = useCustomerConsents(customer.id);
+  const stop = useStopMarketing();
+  return (
+    <section>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <h3 className="text-[13px] font-semibold text-mid">Offers on WhatsApp</h3>
+        <Badge tone={customer.marketingOptIn ? 'jade' : 'neutral'}>{customer.marketingOptIn ? 'Subscribed' : 'Not subscribed'}</Badge>
+      </div>
+      <p className="text-xs leading-relaxed text-low">
+        {customer.marketingOptIn
+          ? 'They said yes, so your broadcasts reach them.'
+          : 'Broadcasts skip them until they say yes themselves: at checkout, on their order page or by replying START.'}
+      </p>
+      {consents && consents.length > 0 && (
+        <ol className="mt-3 flex flex-col gap-3">
+          {consents.map((c, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="bulb mt-1.5 size-2 shrink-0" data-state={c.optIn ? 'done' : undefined} />
+              <div className="min-w-0 text-sm">
+                <p className="text-hi">
+                  {c.optIn ? 'Said yes' : 'Stopped'}, {consentSources[c.source]}
+                  {c.orderCode && <span className="font-mono text-xs text-low"> #{c.orderCode}</span>}
+                </p>
+                {c.wording && <p className="text-xs leading-relaxed text-mid">“{c.wording}”</p>}
+                <p className="text-xs text-low">{formatDateTime(c.at)}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {customer.marketingOptIn && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-2"
+          loading={stop.isPending}
+          onClick={() =>
+            stop.mutate(customer.id, {
+              onSuccess: () => toast('success', 'Offers stopped', `${customer.name} won't get broadcasts.`),
+              onError: (e) => toast('error', 'Could not stop offers', e.message),
+            })
+          }
+        >
+          Stop offers for this buyer
+        </Button>
+      )}
+    </section>
+  );
+}
 
 function CustomerDrawer({ customerId, onClose }: { customerId: string | null; onClose: () => void }) {
   const { data: customer } = useCustomer(customerId ?? undefined);
@@ -103,6 +174,8 @@ function CustomerDrawer({ customerId, onClose }: { customerId: string | null; on
               {customer.lastAddress.pincode}
             </p>
           )}
+
+          <OffersRecord customer={customer} />
 
           <section>
             <h3 className="mb-2 text-[13px] font-semibold text-mid">Order history</h3>

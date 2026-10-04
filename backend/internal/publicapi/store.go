@@ -7,10 +7,8 @@ import (
 	"net/http"
 
 	"carthedge/internal/courier"
-	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
 	"carthedge/internal/link"
-	"carthedge/internal/order"
 	"carthedge/internal/product"
 	"carthedge/internal/shop"
 
@@ -177,19 +175,7 @@ func (h *Handler) StoreProduct(w http.ResponseWriter, r *http.Request) {
 // StoreOrder places a direct storefront order after OTP verification —
 // same trust gates as the link flow, catalog-wide item choice.
 func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		OrderToken    string           `json:"orderToken"`
-		Name          string           `json:"name"`
-		Phone         string           `json:"phone"`
-		Email         string           `json:"email"`
-		Address       customer.Address `json:"address"`
-		Items         []order.Ref      `json:"items"`
-		PaymentMethod string           `json:"paymentMethod"`
-		OfferCode     string           `json:"offerCode"`
-		Notes         string           `json:"notes"`
-		BuyerGstin    string           `json:"buyerGstin"`
-		BuyerCompany  string           `json:"buyerCompany"`
-	}
+	var in orderInput
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
@@ -197,17 +183,9 @@ func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
 		httpx.Err(w, http.StatusBadRequest, "cart is empty")
 		return
 	}
-	phone, ok := httpx.NormalizePhone(in.Phone)
-	if !ok {
-		httpx.Err(w, http.StatusBadRequest, "invalid phone number")
-		return
-	}
-	if !httpx.ValidPincode(in.Address.Pincode) {
-		httpx.Err(w, http.StatusBadRequest, "invalid pincode — please recheck, wrong pincodes cause failed deliveries")
-		return
-	}
-	if in.Email != "" && !httpx.ValidEmail(in.Email) {
-		httpx.Err(w, http.StatusBadRequest, "invalid email")
+	phone, err := in.phone()
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	bizCode := r.PathValue("businessCode")
@@ -228,20 +206,12 @@ func (h *Handler) StoreOrder(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusForbidden, "this store is temporarily paused")
 		return
 	}
-	o, err := h.orders.Create(r.Context(), order.CreateParams{
-		BusinessID: biz.ID, Source: "store",
-		Name: in.Name, Phone: phone, Email: in.Email, Address: in.Address,
-		Refs: in.Items, PaymentMethod: in.PaymentMethod, OfferCode: in.OfferCode, Notes: in.Notes,
-		BuyerGstin: in.BuyerGstin, BuyerCompany: in.BuyerCompany,
-	})
+	params := in.params(r, biz.ID, phone, "store")
+	params.Refs = in.Items
+	o, err := h.orders.Create(r.Context(), params)
 	if err != nil {
 		fail(http.StatusBadRequest, err.Error())
 		return
 	}
-	next := "pay"
-	if o.PaymentMethod == "cod" {
-		next = "codPending"
-	}
-	httpx.Created(w, httpx.M{"orderCode": o.Code, "total": o.Total, "tokenAmount": o.TokenAmount,
-		"paymentMethod": o.PaymentMethod, "next": next})
+	placed(w, o)
 }

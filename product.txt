@@ -83,7 +83,8 @@ AI insights panel: best sellers this month, COD-risk buyers to watch, repeat-rat
 Monthly report with export, for the seller's accountant.
 8.3 Seller — catalog & inventory
 Products: name, description, category, price / reseller price / compare-at price, SKU, multi-image upload.
-Variants (size, colour) per product.
+Options per product: up to three groups of any kind (Size, Colour, Storage, Finish, Pack…). Every combination gets its own price, SKU and stock, and a combination the seller does not make can be removed. A choice can carry its own photos (pink photos for Pink), picked from the product's gallery; buyers who pick it see those first.
+Label details: MRP (inclusive of all taxes; the price can never be above it), country of origin, and the name and address of the maker, packer or importer. Shown on the product page.
 Add one-by-one or bulk import (CSV/JSON) with per-row validation.
 In-stock toggle, trending toggle (drives the storefront's trending row).
 Stock quantity per product and per variant: orders draw it down, the item shows sold out at 0, cancellations and received returns put it back. Leave it empty to manage stock with the switch only.
@@ -147,7 +148,7 @@ Honest by design: never claims to be human — asked "bot ho?", it says it is th
 Live inbox on the AI desk: every chat with its state — needs you, confirm order, awaiting buyer, AI paused, order placed — and who wrote each message (buyer / AI / seller).
 Works inside Meta's rules: replies only within the 24-hour window after the buyer's message; human handover; data-deletion and deauthorize callbacks.
 8.8 Seller — messaging
-Broadcast drops: new-collection blasts to past buyers, segmented (all / retail / reseller / repeat). Schedule or send now, with sent counts.
+Broadcast drops: new-collection blasts to past buyers who said yes to offers, segmented (all / retail / reseller / repeat). Schedule or send now, with sent counts. Buyers opt in with an unticked box at checkout, on their order page or by replying START on WhatsApp, and stop with STOP, the link at the end of every offer, their order page, or by asking the seller. Every yes and no is kept with the words agreed to, where, when and from which device. The seller accepts the broadcast rules once before the first send.
 Auto status updates pushed to the buyer on confirmed / shipped / delivered — on the same Instagram/WhatsApp chat the order came from (inside Meta's 24-hour window, WhatsApp after it) — kills the "order kahan hai" spam.
 COD confirmation sequence — the automated flow that re-confirms intent before dispatch.
 Dropped-checkout reminder — one WhatsApp message 1–24 hours after a buyer verified their number but did not order, at most once a week per buyer (Growth and Pro; the seller can switch it off).
@@ -162,7 +163,7 @@ Business header: logo, name, city, socials.
 Trust strip: "Payments secured by Razorpay · Seller verified".
 Category chips, trending row, live offers, product grid.
 Real filtering: category, price range, in-stock, search, sort.
-Product detail: image gallery, variant picker, price + compare-at, product details and size chart, stock state, waitlist if out of stock, delivery charge and free-delivery threshold.
+Product detail: image gallery that switches to the chosen colour's photos, one row of choices per option group (combinations that do not exist or are sold out are marked), price + MRP or compare-at, product details, label details and size chart, stock state, waitlist if out of stock, delivery charge and free-delivery threshold.
 Store policies page at /s/<store>/policies, linked from the storefront footer, checkout and order pages.
 8.11 Buyer — checkout (no login)
 Cart → address form with pincode validation + serviceability check (bad addresses are a top RTO cause) → autofill on repeat via phone.

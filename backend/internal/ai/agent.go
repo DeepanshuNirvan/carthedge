@@ -666,18 +666,50 @@ func (st Store) catalogLines() string {
 		if !p.InStock {
 			stock = "OUT of stock"
 		}
-		var opts []string
-		for _, v := range p.Variants {
-			o := v.Name
-			if v.InStock != nil && !*v.InStock {
-				o += " (out)"
-			}
-			opts = append(opts, o)
-		}
 		fmt.Fprintf(&b, "%s | %s | %s | %s | %s | %s | %s\n", p.ID, p.Name, p.Category, inr(p.Price),
-			strings.Join(opts, ", "), stock, clip(strings.TrimSpace(p.Description+" "+detailLine(p.Details)), 100))
+			optionsCell(p), stock, clip(strings.TrimSpace(p.Description+" "+detailLine(p.Details)), 100))
 	}
 	return b.String()
+}
+
+// manyOptions is where listing every combination stops paying: a 5 × 4 size
+// and colour grid crowds the prompt, so long lists go by group instead and Go
+// matches "pink M" against the groups (product.Choose).
+const manyOptions = 20
+
+// optionsCell is a product's options for the understanding step.
+func optionsCell(p product.Product) string {
+	if len(p.Variants) > manyOptions {
+		return p.ChoiceText(nil)
+	}
+	var opts []string
+	for _, v := range p.Variants {
+		o := v.Name
+		if !v.Stocked() {
+			o += " (out)"
+		}
+		opts = append(opts, o)
+	}
+	return strings.Join(opts, ", ")
+}
+
+// optionFacts is what the writer may say about a product's options: every
+// combination with its availability and own price while the list is short;
+// past that only the ones that differ (sold out, or priced apart), since
+// "choices" already names the groups.
+func optionFacts(p product.Product) []map[string]any {
+	var opts []map[string]any
+	for _, v := range p.Variants {
+		if len(p.Variants) > manyOptions && v.Stocked() && v.Price == 0 {
+			continue
+		}
+		o := map[string]any{"name": v.Name, "available": v.Stocked()}
+		if v.Price > 0 {
+			o["price"] = inr(v.Price)
+		}
+		opts = append(opts, o)
+	}
+	return opts
 }
 
 func clip(s string, n int) string {
@@ -734,24 +766,22 @@ func (s *Service) facts(in TurnInput, c Cart, q Quote, problems, missing []strin
 		if p.SizeChart != "" {
 			item["sizeChart"] = p.SizeChart
 		}
-		if p.ComparePrice > p.Price {
-			item["mrp"] = inr(p.ComparePrice)
+		if list := p.ListPrice(); list > p.Price {
+			item["mrp"] = inr(list)
+		}
+		if p.OriginCountry != "" {
+			item["madeIn"] = p.OriginCountry
 		}
 		// counted stock stays private (see product.Public); "few left" is the
 		// honest version of the urgency a seller would mention
 		if p.StockQty >= 0 && p.StockQty <= 3 && p.InStock {
 			item["note"] = "only a few left"
 		}
-		var opts []map[string]any
-		for _, v := range p.Variants {
-			o := map[string]any{"name": v.Name, "available": v.InStock == nil || *v.InStock}
-			if v.Price > 0 {
-				o["price"] = inr(v.Price)
-			}
-			opts = append(opts, o)
-		}
-		if len(opts) > 0 {
+		if opts := optionFacts(p); len(opts) > 0 {
 			item["options"] = opts
+		}
+		if p.Grouped() {
+			item["choices"] = p.ChoiceText(nil)
 		}
 		products = append(products, item)
 	}

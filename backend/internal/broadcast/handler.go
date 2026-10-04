@@ -3,6 +3,7 @@ package broadcast
 import (
 	"net/http"
 
+	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
 )
@@ -58,4 +59,24 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// Audience is who a broadcast reaches (buyers who said yes, per segment) and
+// whether the seller has accepted the broadcast rules.
+func (h *Handler) Audience(w http.ResponseWriter, r *http.Request) {
+	a, err := h.svc.Audience(r.Context(), middleware.BusinessID(r.Context()))
+	if err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not load the audience")
+		return
+	}
+	httpx.OK(w, a)
+}
+
+// AcceptTerms records the seller accepting the broadcast rules, with where from.
+func (h *Handler) AcceptTerms(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.AcceptTerms(r.Context(), middleware.BusinessID(r.Context()), customer.ProofFrom(r)); err != nil {
+		httpx.Err(w, http.StatusInternalServerError, "could not record that, try again")
+		return
+	}
+	h.Audience(w, r)
 }

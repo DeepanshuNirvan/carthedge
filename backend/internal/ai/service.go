@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
@@ -169,11 +168,8 @@ func (s *Service) priceFromCatalog(ctx context.Context, bizID string, items []Dr
 			continue
 		}
 		items[i].Price = p.Price
-		for _, v := range p.Variants {
-			if v.Price > 0 && strings.EqualFold(v.Name, items[i].Variant) {
-				items[i].Price = v.Price
-				break
-			}
+		if ch := p.Choose(items[i].Variant); ch.Found && ch.Variant.Price > 0 {
+			items[i].Price = ch.Variant.Price
 		}
 	}
 }
@@ -214,10 +210,7 @@ func (s *Service) ConfirmDraft(ctx context.Context, bizID, draftID string, overr
 	}
 	for _, item := range data.Items {
 		if item.ProductID != "" {
-			variantID, err := s.variantIDByName(ctx, item.ProductID, item.Variant)
-			if err != nil {
-				return nil, err
-			}
+			variantID := s.variantID(ctx, bizID, item.ProductID, item.Variant)
 			params.Refs = append(params.Refs, order.Ref{ProductID: item.ProductID, VariantID: variantID, Qty: item.Qty})
 		} else {
 			params.CustomLines = append(params.CustomLines, product.Line{Name: item.Name, Variant: item.Variant, Qty: item.Qty, Price: item.Price})
@@ -226,17 +219,20 @@ func (s *Service) ConfirmDraft(ctx context.Context, bizID, draftID string, overr
 	return s.orders.Create(ctx, params)
 }
 
-func (s *Service) variantIDByName(ctx context.Context, productID, variantName string) (string, error) {
-	if variantName == "" {
-		return "", nil
+// variantID finds the variant a draft line names ("pink M" or "M / Pink"). An
+// unmatched one orders the base product; the seller adjusts it on review.
+func (s *Service) variantID(ctx context.Context, bizID, productID, said string) string {
+	if said == "" {
+		return ""
 	}
-	var id string
-	err := s.pool.QueryRow(ctx, `select id from product_variants where product_id=$1 and lower(name)=lower($2)`,
-		productID, variantName).Scan(&id)
+	p, err := s.products.Get(ctx, bizID, productID)
 	if err != nil {
-		return "", nil // unmatched variant: order the base product, seller adjusts on review
+		return ""
 	}
-	return id, nil
+	if ch := p.Choose(said); ch.Found {
+		return ch.Variant.ID
+	}
+	return ""
 }
 
 func (s *Service) DiscardDraft(ctx context.Context, bizID, draftID string) error {

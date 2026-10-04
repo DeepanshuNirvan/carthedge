@@ -97,6 +97,8 @@ export type BuyerOrderInput = {
   notes?: string;
   buyerGstin?: string;
   buyerCompany?: string;
+  /** the unticked "offers on WhatsApp" box; true only when the buyer ticked it */
+  marketingOptIn?: boolean;
 };
 
 export const placeStoreOrder = (code: string, input: BuyerOrderInput) =>
@@ -143,6 +145,21 @@ export const buyerRequestReturn = (orderCode: string, auth: BuyerAuth, input: Re
 
 export const buyerWithdrawReturn = (orderCode: string, returnId: string, auth: BuyerAuth) =>
   post<{ ok: boolean }>(`/p/orders/${orderCode}/returns/${returnId}/withdraw`, auth, 'none');
+
+export const buyerSetMarketing = (orderCode: string, auth: BuyerAuth, optIn: boolean) =>
+  post<{ ok: boolean; optedIn: boolean }>(`/p/orders/${orderCode}/marketing`, { ...auth, optIn }, 'none');
+
+// the stop link at the foot of every broadcast: a signed token, no code needed
+export type MarketingLink = { store: string; optedIn: boolean };
+export const useMarketingLink = (token: string) =>
+  useQuery({
+    queryKey: ['marketingLink', token],
+    queryFn: () => get<MarketingLink>(`/api/v1/marketing/${token}`, undefined, 'none'),
+    enabled: !!token,
+    retry: false,
+  });
+export const setMarketingLink = (token: string, optIn: boolean) =>
+  post<MarketingLink>(`/api/v1/marketing/${token}`, { optIn }, 'none');
 
 export async function buyerUploadPhoto(orderCode: string, auth: BuyerAuth, file: File) {
   const formData = new FormData();

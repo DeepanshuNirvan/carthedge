@@ -17,6 +17,7 @@ const StorePoliciesPage = lazy(() => import('./store-front/policies/StorePolicie
 const LinkCheckoutPage = lazy(() => import('./store-front/checkout/LinkCheckoutPage'));
 const TrackPage = lazy(() => import('./store-front/tracking/TrackPage'));
 const CodConfirmPage = lazy(() => import('./store-front/tracking/CodConfirmPage'));
+const UnsubscribePage = lazy(() => import('./store-front/UnsubscribePage'));
 const NotFound = lazy(() => import('./NotFound'));
 
 const wrap = (node: ReactNode) => (
@@ -44,5 +45,7 @@ export const router = createBrowserRouter([
   { path: '/track', element: wrap(<TrackPage />) },
   { path: '/o/:orderCode', element: wrap(<TrackPage />) },
   { path: '/o/:orderCode/confirm', element: wrap(<CodConfirmPage />) },
+  // the stop link at the foot of every WhatsApp broadcast
+  { path: '/unsubscribe/:token', element: wrap(<UnsubscribePage />) },
   { path: '*', element: wrap(<NotFound />) },
 ]);

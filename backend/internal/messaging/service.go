@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 
 	"carthedge/internal/ai"
 	"carthedge/internal/alert"
+	"carthedge/internal/customer"
 	"carthedge/internal/events"
 	"carthedge/internal/httpx"
 	"carthedge/internal/secure"
@@ -261,15 +263,21 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 			s.recordEcho(ctx, bizID, in)
 			continue
 		}
+		// a bare STOP or START on WhatsApp is a request about offers: it is
+		// answered below and must not wake the assistant
+		optIn, keyword := false, false
+		if in.Channel == "whatsapp" {
+			optIn, keyword = customer.Keyword(in.Text)
+		}
 		var convID, name string
 		err = s.pool.QueryRow(ctx, `insert into conversations
 			(business_id, channel, contact_id, contact_name, last_message_at, last_inbound_at, unread, parse_pending)
-			values ($1,$2,$3,$4,now(),now(),1,true)
+			values ($1,$2,$3,$4,now(),now(),1,$5)
 			on conflict (business_id, channel, contact_id) do update set
 			  last_message_at=now(), last_inbound_at=now(),
-			  unread=conversations.unread+1, parse_pending=true,
+			  unread=conversations.unread+1, parse_pending=conversations.parse_pending or excluded.parse_pending,
 			  contact_name=case when conversations.contact_name='' then excluded.contact_name else conversations.contact_name end
-			returning id, contact_name`, bizID, in.Channel, in.ContactID, in.Name).Scan(&convID, &name)
+			returning id, contact_name`, bizID, in.Channel, in.ContactID, in.Name, !keyword).Scan(&convID, &name)
 		if err != nil {
 			s.log.Error("upsert conversation failed", "err", err)
 			continue
@@ -290,6 +298,35 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 		}
 		s.bus.Publish(ctx, bizID, "messageReceived", httpx.M{
 			"conversationId": convID, "channel": in.Channel, "contact": name, "preview": preview(in.Text)})
+		if keyword {
+			s.answerKeyword(ctx, bizID, convID, name, in, optIn)
+		}
+	}
+}
+
+// answerKeyword records a STOP or START sent to the shop's WhatsApp number and
+// confirms it in the chat; the buyer just wrote, so the window is open.
+func (s *Service) answerKeyword(ctx context.Context, bizID, convID, name string, in Inbound, optIn bool) {
+	phone, ok := httpx.NormalizePhone(in.ContactID)
+	if !ok {
+		return
+	}
+	var store string
+	if err := s.pool.QueryRow(ctx, `select name from businesses where id=$1`, bizID).Scan(&store); err != nil {
+		return
+	}
+	if err := customer.RecordConsent(ctx, s.pool, customer.Consent{BusinessID: bizID, Phone: phone, OptIn: optIn,
+		Source: customer.SourceWhatsApp, Name: name,
+		Wording: fmt.Sprintf("Sent %q to %s on WhatsApp", strings.TrimSpace(in.Text), store)}); err != nil {
+		s.log.Error("whatsapp consent not recorded", "businessId", bizID, "err", err)
+		return
+	}
+	reply := fmt.Sprintf("Done, you won't get offers from %s on WhatsApp any more. Order updates still come here. Reply START to get offers again.", store)
+	if optIn {
+		reply = fmt.Sprintf("You're subscribed to offers and new arrivals from %s. Reply STOP any time to stop them.", store)
+	}
+	if err := s.send(ctx, convID, "system", reply); err != nil {
+		s.log.Warn("consent confirmation not sent", "businessId", bizID, "err", err)
 	}
 }
 

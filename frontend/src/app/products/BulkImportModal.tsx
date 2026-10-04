@@ -31,10 +31,9 @@ function parseCsv(text: string): Row[] {
         comparePrice: rupeesToPaise(comparePrice) ?? 0,
         sku,
         description,
-        images: [],
+        // photos and options are left out: a re-imported sheet updates stock and prices, never wipes them
         inStock: inStock.toLowerCase() !== 'false',
         trending: false,
-        variants: [],
       },
     };
   });

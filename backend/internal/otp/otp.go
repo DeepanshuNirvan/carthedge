@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"carthedge/internal/cache"
 	"carthedge/internal/notify"
 	"carthedge/internal/secure"
 
@@ -31,12 +32,9 @@ func New(rdb *redis.Client, n *notify.Notifier) *Service {
 
 func (s *Service) Send(ctx context.Context, bizCode, phone, email string) error {
 	sendKey := fmt.Sprintf("otpsend:%s:%s", bizCode, phone)
-	sends, err := s.rdb.Incr(ctx, sendKey).Result()
+	sends, err := cache.Count(ctx, s.rdb, sendKey, time.Hour)
 	if err != nil {
 		return err
-	}
-	if sends == 1 {
-		s.rdb.Expire(ctx, sendKey, time.Hour)
 	}
 	if sends > 5 {
 		return ErrTooMany
@@ -62,12 +60,9 @@ func (s *Service) Send(ctx context.Context, bizCode, phone, email string) error 
 // Verify checks the code and returns an order token valid for 15 minutes.
 func (s *Service) Verify(ctx context.Context, bizCode, phone, code string) (string, error) {
 	key := fmt.Sprintf("otp:%s:%s", bizCode, phone)
-	tries, err := s.rdb.Incr(ctx, key+":tries").Result()
+	tries, err := cache.Count(ctx, s.rdb, key+":tries", 5*time.Minute)
 	if err != nil {
 		return "", err
-	}
-	if tries == 1 {
-		s.rdb.Expire(ctx, key+":tries", 5*time.Minute)
 	}
 	if tries > 5 {
 		return "", ErrAttempts
