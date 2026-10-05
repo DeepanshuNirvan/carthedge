@@ -17,9 +17,9 @@ export function Hero() {
       id="product"
       className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col justify-center px-5 pb-14 pt-[calc(8.5rem+env(safe-area-inset-top))] sm:px-8 lg:pt-32"
     >
-      <h1 className="text-[clamp(2.4rem,1.3rem+3.7vw,4.35rem)] font-semibold leading-[1.02] tracking-tightest">
+      <h1 className="text-hero font-semibold">
         {[hero.title, hero.titleAccent].map((line, i) => (
-          <span key={line} className="block overflow-hidden pb-[0.06em]">
+          <span key={line} className="block overflow-hidden pb-1">
             <motion.span
               className={cn('block', i === 0 ? 'text-hi' : 'text-mid')}
               initial={reduced ? false : { y: '106%' }}
@@ -38,7 +38,7 @@ export function Hero() {
         transition={{ duration: 0.8, delay: 0.32, ease }}
         className="mt-6 flex flex-col gap-7 lg:mt-7 lg:flex-row lg:items-end lg:justify-between"
       >
-        <p className="max-w-[46ch] text-[17px] leading-relaxed text-mid sm:text-lg">{hero.sub}</p>
+        <p className="max-w-[46ch] text-lead leading-relaxed text-mid sm:text-lg">{hero.sub}</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Tilt className="w-full sm:w-auto">
             <Link to="/app/register" className={cn(buttonLink('primary', 'lg'), 'w-full sm:w-auto')}>

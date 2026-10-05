@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { del, get, post, put } from './http';
 import type { Channel, ConversationDetail, ConversationSummary } from './types';
 
-type ChannelsResponse = { channels: Channel[]; oauth: Record<'whatsapp' | 'instagram', boolean> };
+type ChannelsResponse = {
+  channels: Channel[];
+  oauth: Record<'whatsapp' | 'instagram', boolean>;
+  /** sellers can connect their own WhatsApp; false = assisted (they reply from the WhatsApp Business app) */
+  whatsappChannel: boolean;
+};
 
 export const useChannelsInfo = () =>
   useQuery({

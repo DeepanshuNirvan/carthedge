@@ -50,45 +50,45 @@ export function StorefrontPreview() {
 
         {/* notes, the closest layer */}
         <Float y={v(near)} className="absolute left-[4%] top-[46%] z-20 hidden lg:block">
-          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium text-hi">
+          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-ui font-medium text-hi">
             <CheckCircle2 className="size-4 text-jade-ink" aria-hidden /> {storefrontPreview.notes[0]}
           </p>
         </Float>
         <Float y={v(near)} className="absolute right-[2%] top-[8%] z-20 hidden lg:block">
-          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium text-hi">
+          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-ui font-medium text-hi">
             <CheckCircle2 className="size-4 text-jade-ink" aria-hidden /> {storefrontPreview.notes[1]}
           </p>
         </Float>
         <Float y={v(mid)} className="absolute bottom-16 right-[6%] z-20 hidden lg:block">
-          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium text-hi">
+          <p className="glass-nav sheen flex items-center gap-2 rounded-full px-4 py-2.5 text-ui font-medium text-hi">
             <CheckCircle2 className="size-4 text-jade-ink" aria-hidden /> {storefrontPreview.notes[2]}
           </p>
         </Float>
 
         {/* the phone */}
-        <div className="relative z-10 w-full max-w-[300px] rounded-[2.75rem] bg-[linear-gradient(160deg,rgb(var(--ink-700)),rgb(var(--ink-950)))] p-[9px] shadow-float">
-          <div className="relative overflow-hidden rounded-[2.2rem] bg-bg">
+        <div className="relative z-10 w-full max-w-[300px] rounded-device bg-gradient-to-br from-ink-700 to-ink-950 p-2 shadow-float">
+          <div className="relative overflow-hidden rounded-screen bg-bg">
             <div className="glass-bar flex items-center gap-2.5 border-b px-4 pb-3 pt-4">
-              <span className="flex size-8 items-center justify-center rounded-full bg-jade-500/15 text-[11px] font-semibold text-jade-ink">
+              <span className="flex size-8 items-center justify-center rounded-full bg-jade-500/15 text-caption font-semibold text-jade-ink">
                 RC
               </span>
               <div className="min-w-0">
-                <p className="truncate text-[12px] font-semibold text-hi">Ritika&apos;s Closet</p>
-                <p className="font-mono text-[10px] text-low">/s/ritikas-closet</p>
+                <p className="truncate text-note font-semibold text-hi">Ritika&apos;s Closet</p>
+                <p className="font-mono text-nano text-low">/s/ritikas-closet</p>
               </div>
-              <span className="ml-auto flex items-center gap-1 rounded-full bg-jade-500/14 px-2 py-0.5 text-[10px] font-semibold text-jade-ink">
+              <span className="ml-auto flex items-center gap-1 rounded-full bg-jade-500/14 px-2 py-0.5 text-nano font-semibold text-jade-ink">
                 <ShieldCheck className="size-3" aria-hidden /> Verified
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 p-2.5">
               {demoCatalog.map((p) => (
-                <div key={p.name} className="overflow-hidden rounded-[14px] panel">
+                <div key={p.name} className="overflow-hidden rounded-md panel">
                   <img src={p.img} alt={p.name} loading="lazy" decoding="async" className="aspect-[4/5] w-full object-cover" />
                   <div className="p-2">
-                    <p className="truncate text-[10.5px] font-medium text-hi">{p.name}</p>
+                    <p className="truncate text-nano font-medium text-hi">{p.name}</p>
                     <div className="flex items-baseline gap-1.5">
-                      <MoneyText paise={p.price} className="text-[10.5px] font-semibold text-hi" />
-                      {p.compareAt && <MoneyText paise={p.compareAt} strike className="text-[9px]" />}
+                      <MoneyText paise={p.price} className="text-nano font-semibold text-hi" />
+                      {p.compareAt && <MoneyText paise={p.compareAt} strike className="text-nano" />}
                     </div>
                   </div>
                 </div>
@@ -101,22 +101,22 @@ export function StorefrontPreview() {
               whileInView={{ y: '0%' }}
               viewport={{ once: true, margin: '-30%' }}
               transition={{ type: 'spring', stiffness: 160, damping: 22, delay: 0.3 }}
-              className="glass-nav absolute inset-x-0 bottom-0 rounded-t-[1.6rem] px-4 pb-5 pt-2"
+              className="glass-nav absolute inset-x-0 bottom-0 rounded-t-xl px-4 pb-5 pt-2"
             >
               <span aria-hidden className="mx-auto mb-3 block h-1 w-9 rounded-full bg-low/35" />
-              <p className="text-[12.5px] font-semibold text-hi">Verify your number</p>
-              <p className="text-[10.5px] text-low">Sent to 98110 43210. No account needed.</p>
+              <p className="text-note font-semibold text-hi">Verify your number</p>
+              <p className="text-nano text-low">Sent to 98110 43210. No account needed.</p>
               <div className="mt-2.5 flex gap-1.5" aria-hidden>
                 {['4', '8', '2', '9', '1', '6'].map((d, i) => (
                   <span
                     key={i}
-                    className="flex h-9 flex-1 items-center justify-center rounded-[10px] neu-inset font-mono text-[13px] font-semibold text-hi"
+                    className="flex h-9 flex-1 items-center justify-center rounded-sm neu-inset font-mono text-ui font-semibold text-hi"
                   >
                     {d}
                   </span>
                 ))}
               </div>
-              <span className="mt-3 flex h-10 items-center justify-center rounded-full bg-[linear-gradient(180deg,rgb(var(--jade-400)),rgb(var(--jade-500)))] text-[12px] font-semibold text-[rgb(var(--text-on-accent))] clay">
+              <span className="mt-3 flex h-10 items-center justify-center rounded-full bg-gradient-to-b from-jade-400 to-jade-500 text-note font-semibold text-on-accent clay">
                 Pay <MoneyText paise={149900} className="mx-1" /> with UPI
               </span>
             </motion.div>

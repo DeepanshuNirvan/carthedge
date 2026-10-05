@@ -10,7 +10,7 @@ export const capabilityLabels: Record<Capability, { label: string; blurb: string
   invoices: { label: 'GST invoices', blurb: 'Tax invoices with HSN, CGST/SGST or IGST, and credit notes on refunds' },
   courier: { label: 'Courier handoff', blurb: 'Push shipments to your courier and track them back' },
   waitlist: { label: 'Back-in-stock waitlist', blurb: 'Buyers leave their number on sold-out items' },
-  recovery: { label: 'Abandoned checkout reminder', blurb: 'One WhatsApp nudge to buyers who verified but did not order' },
+  recovery: { label: 'Abandoned checkout reminder', blurb: 'See who verified but did not order, and nudge them on WhatsApp' },
 };
 
 export const capabilityLabel = (c: Capability) => capabilityLabels[c]?.label ?? c;

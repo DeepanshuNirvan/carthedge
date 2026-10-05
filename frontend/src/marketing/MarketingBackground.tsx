@@ -23,21 +23,21 @@ export function MarketingBackground() {
         style={reduced ? undefined : { y }}
         className="absolute inset-x-0 top-0 h-[120vh] will-change-transform"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(110%_55%_at_50%_-8%,rgb(var(--bulb)/0.13),transparent_62%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(70%_40%_at_82%_0%,rgb(var(--jade-500)/0.07),transparent_60%)]" />
+        <div className="absolute inset-0 lane-wash" />
+        <div className="absolute inset-0 lane-wash-jade" />
       </motion.div>
-      <div className="absolute inset-0 bg-[radial-gradient(140%_100%_at_50%_30%,transparent_55%,rgb(var(--ink-950)/0.22)_100%)]" />
+      <div className="absolute inset-0 lane-vignette" />
       {/* the side lamps sit above the edge shading; --lamp-a dims them by day */}
       <div className="absolute inset-0 opacity-[var(--lamp-a)]">
         {/* a warm stall lamp off the right edge, lighting mid to low */}
         <motion.div
           style={reduced ? { opacity: 0.8 } : { opacity: right, y: drift }}
-          className="absolute inset-y-0 right-0 w-[75vw] bg-[radial-gradient(55%_48%_at_100%_62%,rgb(var(--bulb)/0.2),transparent_72%)]"
+          className="absolute inset-y-0 right-0 w-[75vw] lamp-warm"
         />
         {/* its jade reflection on the ground, low on the left */}
         <motion.div
           style={reduced ? { opacity: 0.8 } : { opacity: left }}
-          className="absolute inset-y-0 left-0 w-[70vw] bg-[radial-gradient(55%_45%_at_0%_82%,rgb(var(--jade-500)/0.16),transparent_72%)]"
+          className="absolute inset-y-0 left-0 w-[70vw] lamp-jade"
         />
       </div>
     </div>

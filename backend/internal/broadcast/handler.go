@@ -1,11 +1,13 @@
 package broadcast
 
 import (
+	"errors"
 	"net/http"
 
 	"carthedge/internal/customer"
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
+	"carthedge/internal/notify"
 )
 
 type Handler struct {
@@ -26,7 +28,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := h.svc.Create(r.Context(), middleware.BusinessID(r.Context()), in.Name, in.Message, in.Segment, in.ScheduledAt)
 	if err != nil {
-		httpx.Err(w, http.StatusBadRequest, err.Error())
+		httpx.Err(w, status(err), err.Error())
 		return
 	}
 	httpx.Created(w, b)
@@ -47,10 +49,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Send(r.Context(), middleware.BusinessID(r.Context()), r.PathValue("id")); err != nil {
-		httpx.Err(w, http.StatusBadRequest, err.Error())
+		httpx.Err(w, status(err), err.Error())
 		return
 	}
 	httpx.OK(w, httpx.M{"ok": true, "status": "sending"})
+}
+
+// status: offers that cannot go out yet are a state of the platform, not a
+// bad request.
+func status(err error) int {
+	if errors.Is(err, notify.ErrOffersOff) {
+		return http.StatusConflict
+	}
+	return http.StatusBadRequest
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {

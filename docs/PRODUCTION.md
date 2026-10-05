@@ -333,7 +333,7 @@ The UPI path is a real NPCI `upi://pay` intent with `am` (amount) and `tr` (orde
 - **What you must do:** create a Meta app with the WhatsApp product, complete **business verification**, and pass **app review** for `whatsapp_business_messaging`. Budget **2–4 weeks**. Start it the same week you start DLT.
 - **Free for testing:** Meta gives every app a **free test phone number** and lets you message up to **5 verified test recipients** with no cost and no review. The entire integration can be built and demoed on this.
 - **Open source:** none that is legitimate. Unofficial libraries that drive WhatsApp Web (`whatsapp-web.js`, Baileys) exist and **will get seller numbers banned** — they violate WhatsApp's terms. Do not ship them. This is a hard line.
-- **Env:** `META_APP_ID`, `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_GRAPH_VERSION`, `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN`.
+- **Env:** `META_APP_ID`, `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_GRAPH_VERSION`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN` (CartHedge's own number), `WHATSAPP_SELLER_CHANNEL` (off until sellers can connect WhatsApp; see [WHATSAPP-INSTAGRAM-GO-LIVE.md](WHATSAPP-INSTAGRAM-GO-LIVE.md)).
 
 ### 8.5 Instagram — DM capture
 
@@ -646,7 +646,7 @@ Four surfaces, one Go API, one Postgres, one Redis. Handler + service per domain
 | Subscription billing | **platform** Razorpay | `RAZORPAY_KEY_ID/SECRET`, `RAZORPAY_WEBHOOK_SECRET` | No |
 | Product images | local disk or S3-compatible | `STORAGE_DRIVER`, `UPLOAD_DIR` or `S3_BUCKET/S3_REGION` | Local works out of the box |
 | Courier handoff + serviceability | Shiprocket | `SHIPROCKET_EMAIL/PASSWORD` | Yes — manual courier entry; serviceability returns "not checked" and never blocks a sale |
-| WhatsApp status/confirm messages | Meta Cloud API | `WHATSAPP_API_URL/TOKEN` | Dev: console; **prod needs it** |
+| WhatsApp codes, order updates, seller alerts | Meta Cloud API, CartHedge's own number, 3 approved templates | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN` | Dev: console; **prod needs it** (codes fall back to email, else 503) |
 | Email | SMTP | `SMTP_*`, `ADMIN_EMAIL` | Dev: console |
 | Background jobs | in-process scheduler | — | Always on |
 

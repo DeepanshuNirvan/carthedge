@@ -84,3 +84,16 @@ Things automation could not do (real Meta accounts, real phones, third-party pay
 - [ ] **Option photos inside Instagram/WhatsApp in-app browsers** on a mid-range Android: picking a colour swaps the gallery to that colour's photos without lag; the swatch chips are readable in both themes.
 - [ ] **Label details on a real listing:** a lawyer confirms which of MRP, country of origin and maker/packer/importer apply to fashion and handmade sellers, and the product page wording ("MRP ₹X, inclusive of all taxes", "Made or packed by") is acceptable.
 - [ ] **Consent wording:** a lawyer reviews "Send me offers and new arrivals from <store> on WhatsApp. I can stop them any time." and the Broadcasts section of the terms.
+
+## 9. Assisted WhatsApp (4 Oct build, after the owner's Meta steps)
+
+Do these once `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_TOKEN` are on Render (`docs/WHATSAPP-INSTAGRAM-GO-LIVE.md`, "Phase 1").
+
+- [ ] **Seller signup code** on your own phone: arrives on WhatsApp from "CartHedge" with a **Copy code** button; tapping it fills the code. Render logs show no `notify failed` line.
+- [ ] **Buyer checkout code** in the storefront on a second phone: same template, code works.
+- [ ] **Order update** for that storefront order (COD): "Order update from <your shop>: …" with the confirm link; the link opens the COD confirm page. Mark it shipped with a courier → "… is on the way! Courier: …".
+- [ ] **Seller alert:** with WhatsApp alerts on (Settings → Account), a new storefront order sends "CartHedge alert: New order …" with a link that opens the order.
+- [ ] **Order drawer → WhatsApp button** on a phone: WhatsApp opens on the buyer's chat with the update typed in, ready to send.
+- [ ] **Settings → Channels** shows WhatsApp as "You reply from your own WhatsApp · Auto-replies soon"; no WhatsApp connect button anywhere.
+- [ ] **Broadcasts:** the page says offers start once your WhatsApp can be connected; "Save as draft" works; there is no Send or Schedule.
+- [ ] **Without the env vars** (staging only): a checkout code request without email shows "verification codes cannot be sent right now"; with an email, the code arrives by email.

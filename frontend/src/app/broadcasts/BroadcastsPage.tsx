@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCheck, Podcast, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import { CheckCheck, Clock, Podcast, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import type { Broadcast } from '@/api/types';
 import { useBroadcastAudience, useBroadcastMutations, useBroadcasts } from '@/api/broadcasts';
 import { useBusiness } from '@/api/business';
@@ -45,6 +45,9 @@ export default function BroadcastsPage() {
   const [agreed, setAgreed] = useState(false);
 
   const accepted = !!audience?.termsAcceptedAt;
+  // offers leave from the seller's own WhatsApp; until that can be connected
+  // only drafts are possible (the API refuses the rest)
+  const paused = audience?.canSend === false;
   const reach = audience?.optedIn[segment] ?? 0;
   const storeUrl = business ? `${window.location.origin}/s/${business.code}` : '';
 
@@ -101,6 +104,15 @@ export default function BroadcastsPage() {
         <Card className="lg:col-span-3">
           <CardHeader title="Compose a drop" />
           <div className="flex flex-col gap-4 p-5 pt-4">
+            {paused && (
+              <p className="flex items-start gap-2.5 rounded-lg p-3.5 text-sm leading-snug text-mid neu">
+                <Clock className="mt-0.5 size-4 shrink-0 text-jade-ink" aria-hidden />
+                <span>
+                  Offers go out from your own WhatsApp number, which you can connect soon. Until then, write and save drafts. Buyers&apos;
+                  yes or no to offers keeps being recorded, so your audience is ready on day one.
+                </span>
+              </p>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Name">
                 <Input placeholder="Diwali collection drop" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -138,27 +150,29 @@ export default function BroadcastsPage() {
                 onChange={(e) => setMessage(e.target.value)}
               />
             </Field>
-            <div className="flex flex-col gap-3">
-              <Tabs
-                className="w-fit"
-                tabs={[
-                  { value: 'now', label: 'Send now' },
-                  { value: 'later', label: 'Schedule' },
-                ]}
-                value={when}
-                onChange={(v) => {
-                  setWhen(v);
-                  if (v === 'now') setScheduledAt('');
-                }}
-              />
-              {when === 'later' && (
-                <Field label="Send at">
-                  <Input type="datetime-local" min={nowLocal()} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-                </Field>
-              )}
-            </div>
+            {!paused && (
+              <div className="flex flex-col gap-3">
+                <Tabs
+                  className="w-fit"
+                  tabs={[
+                    { value: 'now', label: 'Send now' },
+                    { value: 'later', label: 'Schedule' },
+                  ]}
+                  value={when}
+                  onChange={(v) => {
+                    setWhen(v);
+                    if (v === 'now') setScheduledAt('');
+                  }}
+                />
+                {when === 'later' && (
+                  <Field label="Send at">
+                    <Input type="datetime-local" min={nowLocal()} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                  </Field>
+                )}
+              </div>
+            )}
 
-            {audience && !accepted && (
+            {audience && !accepted && !paused && (
               <label className="flex cursor-pointer items-start gap-3 rounded-lg p-3.5 neu">
                 <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-jade-500" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
                 <span className="text-sm leading-snug text-mid">
@@ -172,20 +186,22 @@ export default function BroadcastsPage() {
             )}
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button
-                icon={<Send className="size-4" />}
-                loading={create.isPending || send.isPending || acceptTerms.isPending}
-                disabled={(when === 'later' && !scheduledAt) || (!accepted && !agreed) || reach === 0}
-                onClick={() => submit(!scheduledAt)}
-              >
-                {when === 'later' ? 'Schedule' : 'Send now'}
-              </Button>
+              {!paused && (
+                <Button
+                  icon={<Send className="size-4" />}
+                  loading={create.isPending || send.isPending || acceptTerms.isPending}
+                  disabled={(when === 'later' && !scheduledAt) || (!accepted && !agreed) || reach === 0}
+                  onClick={() => submit(!scheduledAt)}
+                >
+                  {when === 'later' ? 'Schedule' : 'Send now'}
+                </Button>
+              )}
               {when === 'now' && (
-                <Button variant="ghost" onClick={() => submit(false)}>
+                <Button variant={paused ? 'primary' : 'ghost'} loading={paused && create.isPending} onClick={() => submit(false)}>
                   Save as draft
                 </Button>
               )}
-              {audience && reach === 0 && (
+              {audience && reach === 0 && !paused && (
                 <span className="text-xs text-low">No one in this audience has said yes to offers yet.</span>
               )}
             </div>
@@ -240,7 +256,7 @@ export default function BroadcastsPage() {
                     {b.sentCount > 0 && `${b.sentCount} sent, `}
                     {b.scheduledAt ? formatDateTime(b.scheduledAt) : timeAgo(b.createdAt)}
                   </span>
-                  {b.status === 'draft' && (
+                  {b.status === 'draft' && !paused && (
                     <Button size="sm" variant="secondary" disabled={!accepted && !agreed} onClick={() => sendNow(b.id)}>
                       Send
                     </Button>

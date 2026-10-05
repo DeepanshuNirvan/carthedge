@@ -26,9 +26,9 @@ export function FinalCta() {
           loading="lazy"
           decoding="async"
           style={reduced ? undefined : { y: imgY }}
-          className="absolute inset-0 size-full scale-[1.18] object-cover object-[60%_40%] opacity-80"
+          className="absolute inset-0 size-full scale-125 object-cover object-[60%_40%] opacity-80"
         />
-        <div aria-hidden className="absolute inset-0 bg-[linear-gradient(90deg,rgb(var(--ink-950))_8%,rgb(var(--ink-950)/0.72)_48%,rgb(var(--ink-950)/0.15)_100%)]" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink-950 from-10% via-ink-950/72 via-50% to-ink-950/15" />
 
         {/* the strand, lit end to end */}
         <div aria-hidden className="absolute inset-x-6 top-0 h-12">
@@ -56,8 +56,8 @@ export function FinalCta() {
         </div>
 
         <div className="relative flex min-h-[26rem] flex-col justify-end gap-6 px-6 pb-10 pt-24 sm:min-h-[30rem] sm:px-12 sm:pb-14">
-          <h2 className="max-w-[14ch] text-d1 font-semibold text-[rgb(var(--text-hi))]">{finalCta.title}</h2>
-          <p className="max-w-[40ch] text-lg text-[rgb(var(--text-mid))]">{finalCta.sub}</p>
+          <h2 className="max-w-[14ch] text-d1 font-semibold text-hi">{finalCta.title}</h2>
+          <p className="max-w-[40ch] text-lg text-mid">{finalCta.sub}</p>
           <div>
             <Tilt>
               <Link to="/app/register" className={buttonLink('primary', 'lg')}>

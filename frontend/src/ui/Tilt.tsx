@@ -7,7 +7,18 @@ import { cn } from '@/lib/cn';
  * pointermove (the rect is read once on enter), no React state per frame.
  * Touch and reduced-motion users get a flat, ordinary control.
  */
-export function Tilt({ children, className, max = 9 }: { children: ReactNode; className?: string; max?: number }) {
+export function Tilt({
+  children,
+  className,
+  max = 9,
+  shine = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  max?: number;
+  /** the capsule-shaped highlight; off for cards, which lean without it */
+  shine?: boolean;
+}) {
   const el = useRef<HTMLSpanElement>(null);
   const rect = useRef<DOMRect | null>(null);
 
@@ -46,10 +57,12 @@ export function Tilt({ children, className, max = 9 }: { children: ReactNode; cl
       )}
     >
       {children}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-std [background:radial-gradient(90px_circle_at_var(--tx,50%)_var(--ty,50%),rgb(255_255_255/0.32),transparent_70%)] [@media(hover:hover)]:group-hover/tilt:opacity-100"
-      />
+      {shine && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-std [background:radial-gradient(90px_circle_at_var(--tx,50%)_var(--ty,50%),rgb(255_255_255/0.32),transparent_70%)] [@media(hover:hover)]:group-hover/tilt:opacity-100"
+        />
+      )}
     </span>
   );
 }

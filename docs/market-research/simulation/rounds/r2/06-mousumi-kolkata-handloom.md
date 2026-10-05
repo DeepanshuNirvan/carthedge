@@ -1,0 +1,9 @@
+**Mousumi → @Shabnam:** Shabnam didi, same boat, 25 orders for you and 40 for me. ReplyKaro at ₹99 only answers a keyword, it will not say "ei Baluchari ta ar ekta-i ache". So I think ₹499 for real AI is fair, if it is clean. But I disagree on per-order fees. In Puja month a fee on every order lands when I am most tired and least counting. Flat fee, and anything above quota only with a cap I set myself.
+
+**Mousumi → @Vikram:** Vikram bhai, your chatbot going from ₹1,500 to ₹3,800 is why I now want the price written for 12 months. And quota money quietly joining autopay: same fear, I forget debits. I want a WhatsApp reminder 3 days before, my own monthly cap, and pause not delete if I miss. Has anyone got a real person on the phone yet? Tell us.
+
+**Mousumi → @Pooja:** Pooja, you screenshot everything, so tell me: if the robot quotes you ₹2,100 for a saree and my price is ₹2,400, whose screenshot wins? I had not thought of that, and it is worse than a wrong price, it lives forever. Agree it must say it is an assistant to new people. My regulars should never meet it. Also the token is only for COD, my buyers pay full UPI.
+
+**Mousumi → @Lakshmi:** Lakshmi didi, your number question is mine too, my regulars know only that one number. The product file says coexistence will keep the Business app on my phone, but it is "coming", so for me also it is after Puja. On Meta message costs: CartHedge should not add its own extra. Show Meta's charge as a separate line on the bill, and warn me before it grows.
+
+**Mousumi → @Tanya:** Tanya, you find ₹1,999 too cheap to trust. For me it is ₹50 an order, 6 percent of my profit. Both can be true only if plans are cut by volume, not by features: drop sellers like you carry the big plan, I get AI replies at ₹799 to ₹999. Percent of sales, still no. What changed in my mind: I thought a small free plan was enough, now I also want the price lock and cap in writing before I even try.

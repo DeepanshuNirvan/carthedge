@@ -9,6 +9,7 @@ import { LampStrand } from '@/ui/LaneGround';
 import { Hero } from '../sections/Hero';
 import { Problem } from '../sections/Problem';
 import { Autopilot } from '../sections/Autopilot';
+import { Voice } from '../sections/Voice';
 import { Languages } from '../sections/Languages';
 import { OrderJourney } from '../sections/OrderJourney';
 import { StorefrontPreview } from '../sections/StorefrontPreview';
@@ -51,6 +52,7 @@ export default function HomePage() {
         <Hero />
         <Problem />
         <Autopilot />
+        <Voice />
         <Languages />
         <OrderJourney />
         <StorefrontPreview />

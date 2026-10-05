@@ -8,6 +8,7 @@ import (
 
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
+	"carthedge/internal/otp"
 )
 
 type Handler struct {
@@ -106,6 +107,10 @@ func (h *Handler) SignupOtp(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.SendSignupOtp(r.Context(), phone); err != nil {
 		if errors.Is(err, ErrTaken) {
 			httpx.Err(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, otp.ErrUnavailable) {
+			httpx.Err(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
 		httpx.Err(w, http.StatusTooManyRequests, err.Error())

@@ -35,7 +35,9 @@ type Broadcast struct {
 }
 
 // Service sends drops (new collection, festive sales) over WhatsApp to the
-// buyers who said yes to offers, immediately or on schedule.
+// buyers who said yes to offers, immediately or on schedule. Offers are
+// marketing, so they leave from the seller's own WhatsApp (notify.Offer);
+// until sellers can connect one, drafts are all a seller can make.
 type Service struct {
 	pool      *pgxpool.Pool
 	notify    *notify.Notifier
@@ -69,7 +71,11 @@ func (s *Service) Create(ctx context.Context, bizID, name, message, segment, sch
 		if err != nil {
 			return nil, errors.New("scheduledAt must be RFC3339")
 		}
-		// a scheduled drop goes out on its own, so the rules are accepted now
+		// a scheduled drop goes out on its own, so it must be able to, and
+		// the rules are accepted now
+		if !s.notify.OffersOn() {
+			return nil, notify.ErrOffersOff
+		}
 		if err := s.requireTerms(ctx, bizID); err != nil {
 			return nil, err
 		}
@@ -109,6 +115,9 @@ func (s *Service) List(ctx context.Context, bizID string, limit, offset int) ([]
 
 // Send dispatches a draft/scheduled broadcast now.
 func (s *Service) Send(ctx context.Context, bizID, id string) error {
+	if !s.notify.OffersOn() {
+		return notify.ErrOffersOff
+	}
 	if err := s.requireTerms(ctx, bizID); err != nil {
 		return err
 	}
@@ -136,12 +145,14 @@ func (s *Service) Delete(ctx context.Context, bizID, id string) error {
 }
 
 // Audience is who a broadcast can reach: buyers who said yes to offers, per
-// segment, beside everyone in the ledger, and whether the rules are accepted.
+// segment, beside everyone in the ledger, whether the rules are accepted, and
+// whether offers can go out at all yet.
 type Audience struct {
 	Customers       int            `json:"customers"`
 	OptedIn         map[string]int `json:"optedIn"`
 	TermsVersion    string         `json:"termsVersion"`
 	TermsAcceptedAt string         `json:"termsAcceptedAt,omitempty"`
+	CanSend         bool           `json:"canSend"`
 }
 
 func (s *Service) Audience(ctx context.Context, bizID string) (*Audience, error) {
@@ -155,7 +166,7 @@ func (s *Service) Audience(ctx context.Context, bizID string) (*Audience, error)
 	if err != nil {
 		return nil, err
 	}
-	a := &Audience{Customers: all, TermsVersion: TermsVersion,
+	a := &Audience{Customers: all, TermsVersion: TermsVersion, CanSend: s.notify.OffersOn(),
 		OptedIn: map[string]int{"all": yes, "retail": retail, "reseller": reseller, "repeat": repeat}}
 	a.TermsAcceptedAt, err = s.termsAcceptedAt(ctx, bizID)
 	return a, err
@@ -199,6 +210,9 @@ func (s *Service) StartScheduler(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				if !s.notify.OffersOn() {
+					continue // nothing can be scheduled until offers can go out
+				}
 				rows, err := s.pool.Query(ctx, `update broadcasts set status='sending', updated_at=now()
 					where status='scheduled' and scheduled_at <= now() returning id, business_id`)
 				if err != nil {
@@ -274,7 +288,7 @@ func (s *Service) dispatch(id, bizID string) {
 	storeURL := s.baseURL + "/s/" + code
 	for _, r := range recipients {
 		stopURL := s.baseURL + "/unsubscribe/" + s.customers.UnsubscribeToken(r.id)
-		if err := s.notify.WhatsApp(r.phone, compose(message, store, storeURL, stopURL)); err == nil {
+		if err := s.notify.Offer(ctx, bizID, r.phone, compose(message, store, storeURL, stopURL)); err == nil {
 			sent++
 		}
 	}

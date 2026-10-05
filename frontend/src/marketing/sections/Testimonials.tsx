@@ -43,13 +43,13 @@ export function Testimonials() {
               exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
               transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
             >
-              <blockquote className="max-w-[30ch] text-[clamp(1.6rem,1.2rem+1.7vw,2.6rem)] font-medium leading-[1.18] tracking-[-0.03em] text-hi">
+              <blockquote className="max-w-[30ch] text-quote font-medium text-hi">
                 “{t.quote}”
               </blockquote>
               <figcaption className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span className="text-[15px] font-semibold text-hi">{t.name}</span>
+                <span className="text-title font-semibold text-hi">{t.name}</span>
                 <span className="text-sm text-low">{t.business}</span>
-                <span className="rounded-full bg-jade-500/12 px-3 py-1 text-[12.5px] font-semibold tnum text-jade-ink">
+                <span className="rounded-full bg-jade-500/12 px-3 py-1 text-note font-semibold tnum text-jade-ink">
                   {t.metric}
                 </span>
               </figcaption>

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"carthedge/internal/alert"
 	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
 	"carthedge/internal/shop"
@@ -164,11 +165,12 @@ type Line struct {
 type Service struct {
 	pool   *pgxpool.Pool
 	notify *notify.Notifier
+	alerts *alert.Service
 	log    *slog.Logger
 }
 
-func NewService(pool *pgxpool.Pool, n *notify.Notifier, log *slog.Logger) *Service {
-	return &Service{pool: pool, notify: n, log: log}
+func NewService(pool *pgxpool.Pool, n *notify.Notifier, alerts *alert.Service, log *slog.Logger) *Service {
+	return &Service{pool: pool, notify: n, alerts: alerts, log: log}
 }
 
 type Input struct {
@@ -873,12 +875,15 @@ func (s *Service) AddWaitlist(ctx context.Context, bizID, productID, phone strin
 	return nil
 }
 
+// notifyWaitlist tells everyone waiting that a product is back. That is
+// marketing, so it goes from the seller's own WhatsApp (notify.Offer); buyers
+// that cannot reach are handed to the seller in one alert, to message by hand.
 func (s *Service) notifyWaitlist(bizID, productID string) {
 	s.notify.Async("waitlist", func() error {
 		ctx := context.Background()
 		var name, bizName string
 		if err := s.pool.QueryRow(ctx, `select p.name, b.name from products p join businesses b on b.id = p.business_id
-			where p.id=$1`, productID).Scan(&name, &bizName); err != nil {
+			where p.id=$1 and p.business_id=$2`, productID, bizID).Scan(&name, &bizName); err != nil {
 			return err
 		}
 		rows, err := s.pool.Query(ctx, `select id, phone from waitlist where product_id=$1 and notified_at is null`, productID)
@@ -896,13 +901,36 @@ func (s *Service) notifyWaitlist(bizID, productID string) {
 			entries = append(entries, e)
 		}
 		msg := fmt.Sprintf("%s is back in stock at %s! Reply to order before it sells out.", name, bizName)
+		var byHand []string
 		for _, e := range entries {
-			if err := s.notify.WhatsApp(e.phone, msg); err == nil {
-				s.pool.Exec(ctx, `update waitlist set notified_at=now() where id=$1`, e.id)
+			err := s.notify.Offer(ctx, bizID, e.phone, msg)
+			if errors.Is(err, notify.ErrOffersOff) {
+				byHand = append(byHand, e.phone)
+			} else if err != nil {
+				continue // still waiting; the next restock tries again
 			}
+			s.pool.Exec(ctx, `update waitlist set notified_at=now() where id=$1`, e.id)
+		}
+		if len(byHand) > 0 {
+			s.alerts.Seller(bizID, alert.Alert{Kind: "waitlist", Title: "Back in stock · " + name,
+				Body: waitlistNote(name, byHand), Path: "/app/products"})
 		}
 		return nil
 	})
+}
+
+// waitlistNote asks the seller to message the buyers who were waiting.
+func waitlistNote(product string, phones []string) string {
+	const shown = 10
+	list := strings.Join(phones[:min(len(phones), shown)], ", ")
+	if len(phones) > shown {
+		list += fmt.Sprintf(" and %d more", len(phones)-shown)
+	}
+	who := "1 buyer"
+	if len(phones) > 1 {
+		who = fmt.Sprintf("%d buyers", len(phones))
+	}
+	return fmt.Sprintf("%s asked to hear when %s is back: %s. Message them on WhatsApp.", who, product, list)
 }
 
 // variantRow is one variant as the write statement reads it.

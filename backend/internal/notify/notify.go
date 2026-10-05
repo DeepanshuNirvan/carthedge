@@ -1,8 +1,6 @@
 package notify
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,39 +12,21 @@ import (
 	"carthedge/internal/config"
 )
 
-// Notifier delivers WhatsApp and email messages. Providers are env-based;
-// when unconfigured, messages are logged so dev flows keep working.
+// Notifier delivers CartHedge's own messages: WhatsApp templates from
+// CartHedge's number (one-time codes, order updates, seller alerts) and email.
+// Unconfigured outside production, messages are logged so dev flows work.
 type Notifier struct {
-	cfg *config.Config
-	log *slog.Logger
-	hc  *http.Client
+	cfg   *config.Config
+	log   *slog.Logger
+	hc    *http.Client
+	graph string // Graph API origin (META_GRAPH_URL)
+	// offers sends marketing from a seller's own WhatsApp; nil until sellers
+	// can connect WhatsApp (SetOffers)
+	offers OfferFunc
 }
 
 func New(cfg *config.Config, log *slog.Logger) *Notifier {
-	return &Notifier{cfg: cfg, log: log, hc: &http.Client{Timeout: 10 * time.Second}}
-}
-
-func (n *Notifier) WhatsApp(phone, message string) error {
-	if n.cfg.WhatsAppAPIURL == "" {
-		n.log.Info("whatsapp (dev log)", "to", phone, "message", message)
-		return nil
-	}
-	body, _ := json.Marshal(map[string]string{"to": phone, "message": message})
-	req, err := http.NewRequest(http.MethodPost, n.cfg.WhatsAppAPIURL, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+n.cfg.WhatsAppToken)
-	resp, err := n.hc.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("whatsapp provider returned %d", resp.StatusCode)
-	}
-	return nil
+	return &Notifier{cfg: cfg, log: log, hc: &http.Client{Timeout: 10 * time.Second}, graph: cfg.MetaGraphURL}
 }
 
 func (n *Notifier) Email(to, subject, body string) error {

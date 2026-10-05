@@ -1,0 +1,9 @@
+**Farheen → @Shabnam Ansari:** Wa alaikum assalam, baji. Pro-only replies felt like bait and switch to me too. One correction though: you do not need Razorpay. product.txt has a plain UPI ID option and an alert when a buyer reports paying, but you still tap to confirm, so my screenshot chore only shrinks. And ReplyKaro at ₹99 is a keyword bot, it does not collect an address. Still, price by feature, not order count: Starter plus night replies, about ₹800 to 900 all-in.
+
+**Farheen → @Hiren Patel:** "GST extra is fine, I take credit" is easy to say with 1,200 orders. I am not registered, so ₹499 plus 18% is ₹589 leaving my Google Pay, and ₹999 becomes ₹1,179. Flat ₹1,999 may suit you, but the same plan is thirty times my size. Please show the all-in price on the page.
+
+**Farheen → @Vikram Sethi:** Your autopay overage point was new for me. I had accepted ₹3 per order above 100, thinking it only bites when I earn. A silent add-on is exactly the chatbot wala game. I want a written monthly cap, a WhatsApp reminder two days before renewal, and a pause instead of a surprise bill. WhatsApp message costs I will pay at Meta's rate, shown line by line, never inside a "pack".
+
+**Farheen → @Devanshi Rathod:** Your 35% to 32% on Shiprocket changed my mind. I was counting COD confirmation as half my reason to pay. With my 35 COD orders a free "haan" will not even save ₹500. So now I pay only for the night replies, nothing for RTO. Sharp question: are your refusals mostly first-time buyers? Mine are, and a token only works if it is adjusted in the price.
+
+**Farheen → @Pooja Yadav:** Baji, you are exactly who buys from me. Yes, the bot must say "main Noor Modest ka assistant hoon" with one tap to Farheen. Your ₹100 token only above ₹1,500 fits my ₹1,600 order. What would make you pay it to a new shop: photo of the seller, voice note, or reviews?

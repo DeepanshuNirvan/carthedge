@@ -377,7 +377,7 @@ func (s *Service) SetStatus(ctx context.Context, bizID, id string, in StatusInpu
 	}
 	s.event(ctx, orderID, "return_"+in.Status, strings.TrimSpace(r.Code+" "+strings.ReplaceAll(in.Status, "_", " ")+". "+in.Note))
 	if msg := s.buyerMessage(ctx, bizID, r, in); msg != "" {
-		s.tell(convID, phone, msg)
+		s.tell(bizID, convID, phone, msg)
 	}
 	s.events.Publish(ctx, bizID, "returnUpdated", r)
 	return r, nil
@@ -604,8 +604,8 @@ func (s *Service) event(ctx context.Context, orderID, status, note string) {
 }
 
 // tell reaches the buyer on the order's chat, or WhatsApp.
-func (s *Service) tell(convID, phone, text string) {
-	s.orders.TellBuyer("aftersale", convID, phone, text)
+func (s *Service) tell(bizID, convID, phone, text string) {
+	s.orders.TellBuyer("aftersale", bizID, convID, phone, text)
 }
 
 var reasonLabels = map[string]string{

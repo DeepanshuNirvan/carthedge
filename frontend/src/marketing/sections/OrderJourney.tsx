@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { motion, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
-import { Instagram } from 'lucide-react';
+import { Instagram, Link2, Phone, Store } from 'lucide-react';
 import { journey } from '@/strings/marketing';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/cn';
@@ -11,21 +11,34 @@ import { Reveal, SectionHead } from '../Section';
 
 const cols = journey.columns;
 const c = journey.card;
+const sourceIcon = { instagram: Instagram, link: Link2, store: Store, phone: Phone } as const;
+
+/** An order already resting in a lane: quiet, so the one being followed stays the subject. */
+function RestingOrder({ buyer, source, total }: (typeof journey.others)[number]) {
+  const Icon = sourceIcon[source as keyof typeof sourceIcon];
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-surface/60 px-2.5 py-2 opacity-70 hairline">
+      <Icon className="size-3.5 shrink-0 text-low" aria-hidden />
+      <span className="min-w-0 flex-1 truncate text-note font-medium text-mid">{buyer}</span>
+      <MoneyText paise={total} className="text-caption text-low" />
+    </div>
+  );
+}
 
 function OrderCard({ status, className }: { status: string; className?: string }) {
   return (
     <div className={cn('glass-nav sheen rounded-lg p-3.5 shadow-float', className)}>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-low">
+        <span className="flex items-center gap-1.5 text-caption font-medium text-low">
           <Instagram className="size-3.5" aria-hidden /> {c.source}
         </span>
-        <span className="font-mono text-[11px] text-low">#{c.code}</span>
+        <span className="font-mono text-caption text-low">#{c.code}</span>
       </div>
-      <p className="mt-2.5 text-[14px] font-semibold tracking-snug text-hi">{c.buyer}</p>
-      <p className="mt-0.5 truncate text-[12.5px] text-mid">{c.item}</p>
+      <p className="mt-2.5 text-copy font-semibold tracking-snug text-hi">{c.buyer}</p>
+      <p className="mt-0.5 truncate text-note text-mid">{c.item}</p>
       <div className="mt-3 flex items-center justify-between gap-2">
         <StatusChip status={status} />
-        <MoneyText paise={c.total} className="text-[13px] font-semibold text-hi" />
+        <MoneyText paise={c.total} className="text-ui font-semibold text-hi" />
       </div>
     </div>
   );
@@ -88,7 +101,7 @@ export function OrderJourney() {
             {cols.map((column, i) => (
               <div key={column.status} className="flex items-center gap-2 px-1">
                 <span className="bulb size-2.5" data-lit={i === idx} data-state={i < idx ? 'done' : undefined} />
-                <span className={cn('text-[13px] font-semibold transition-colors duration-std', i <= idx ? 'text-hi' : 'text-low')}>
+                <span className={cn('text-ui font-semibold transition-colors duration-std', i <= idx ? 'text-hi' : 'text-low')}>
                   {column.label}
                 </span>
               </div>
@@ -104,12 +117,13 @@ export function OrderJourney() {
                   className={cn(
                     'relative flex h-[clamp(13.5rem,32dvh,20rem)] flex-col justify-end gap-2 rounded-lg p-2.5 transition-[background-color,box-shadow] duration-expr',
                     i === idx
-                      ? 'bg-[rgb(var(--bulb)/0.07)] shadow-[inset_0_0_0_1px_rgb(var(--bulb)/0.28)]'
-                      : 'bg-[rgb(var(--field)/0.035)] shadow-[inset_0_0_0_1px_rgb(var(--line)/var(--line-a))]',
+                      ? 'bg-bulb/7 ring-1 ring-inset ring-bulb/28'
+                      : 'bg-field/4 hairline',
                   )}
                 >
-                  {/* the lane at rest: unlit until the order reaches it */}
-                  <span className="flex justify-center pb-2">
+                  <RestingOrder {...journey.others[i]} />
+                  {/* the lane's lamps: lit while the followed order stands in it */}
+                  <span className="flex justify-center pb-1">
                     <BulbString count={5} lit={i === idx ? 2 : -1} />
                   </span>
                 </div>
@@ -125,7 +139,7 @@ export function OrderJourney() {
               <p
                 key={column.status}
                 className={cn(
-                  'px-1 text-[12.5px] leading-snug transition-[color,opacity] duration-std',
+                  'px-1 text-note leading-snug transition-[color,opacity] duration-std',
                   i === idx ? 'text-hi' : i < idx ? 'text-mid' : 'text-low opacity-60',
                 )}
               >

@@ -414,7 +414,7 @@ export default function ProductPage() {
 
       <Modal open={waitlistOpen} onClose={() => setWaitlistOpen(false)} title="Back-in-stock alert">
         <p className="text-sm text-mid">
-          We&apos;ll message you on WhatsApp the moment <span className="font-medium text-hi">{product.name}</span> is
+          The shop will message you on WhatsApp when <span className="font-medium text-hi">{product.name}</span> is
           back.
         </p>
         <div className="mt-4 flex flex-col gap-4">

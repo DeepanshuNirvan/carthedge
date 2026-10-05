@@ -375,7 +375,7 @@ func (s *Service) tellRefund(ctx context.Context, bizID, id string) {
 	if reference != "" && method != "cash" {
 		msg += " Reference: " + reference
 	}
-	s.tell(convID, phone, strings.Replace(msg, " .", ".", 1))
+	s.tell(bizID, convID, phone, strings.Replace(msg, " .", ".", 1))
 }
 
 // OnOrderClosed runs when an order is cancelled or comes back RTO: money the

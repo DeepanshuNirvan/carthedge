@@ -17,6 +17,8 @@ var (
 	ErrInvalid  = errors.New("invalid or expired otp")
 	ErrTooMany  = errors.New("too many otp requests, try later")
 	ErrAttempts = errors.New("too many wrong attempts, request a new otp")
+	// ErrUnavailable: no way to deliver a code (WhatsApp not set up, no email)
+	ErrUnavailable = errors.New("verification codes cannot be sent right now, please try again later")
 )
 
 // Service verifies buyer phone numbers before order placement. A verified
@@ -31,6 +33,10 @@ func New(rdb *redis.Client, n *notify.Notifier) *Service {
 }
 
 func (s *Service) Send(ctx context.Context, bizCode, phone, email string) error {
+	// say so now rather than send the buyer to wait for a code that cannot come
+	if !s.notify.WhatsAppOn() && email == "" {
+		return ErrUnavailable
+	}
 	sendKey := fmt.Sprintf("otpsend:%s:%s", bizCode, phone)
 	sends, err := cache.Count(ctx, s.rdb, sendKey, time.Hour)
 	if err != nil {
@@ -47,12 +53,13 @@ func (s *Service) Send(ctx context.Context, bizCode, phone, email string) error 
 	}
 	s.rdb.Del(ctx, key+":tries")
 
-	msg := fmt.Sprintf("Your order verification code is %s. Valid for 5 minutes.", code)
+	msg := notify.Code(code)
 	s.notify.Async("otp", func() error {
-		if err := s.notify.WhatsApp(phone, msg); err != nil && email != "" {
-			return s.notify.Email(email, "Your verification code", msg)
+		err := s.notify.WhatsApp(phone, msg)
+		if err != nil && email != "" {
+			return s.notify.Email(email, "Your verification code", msg.Text)
 		}
-		return nil
+		return err
 	})
 	return nil
 }

@@ -441,6 +441,8 @@ export type BroadcastAudience = {
   optedIn: Record<Broadcast['segment'], number>;
   termsVersion: string;
   termsAcceptedAt?: string;
+  /** offers leave from the seller's own WhatsApp; false until sellers can connect it */
+  canSend: boolean;
 };
 
 // invoices

@@ -1,0 +1,5 @@
+Namaste all, Rohit from Indore. I run a small agency setting up WhatsApp and Instagram automation (AiSensy, Interakt, WATI) for about 40 local sellers. Setup ₹5k to ₹15k, then ₹2k to ₹5k a month to manage, plus BSP partner commission. Around ₹1.1 lakh a month coming in.
+
+I'm here for the agency view. Honest take: the product thinking is better than I expected. The order summary is calculated by the system, not the AI, COD gets re-confirmed, and there is a practice chat. That I can demo to a nervous seller. But today it is one login per seller, no partner program, no white-label, and auto-replies on the seller's own WhatsApp are still "coming". Half my clients live on WhatsApp. And AI replies sit only in the ₹1,999 plan, which is exactly what the ad promises.
+
+I'd pay ₹800 to ₹1,000 per seller with auto-replies included. ₹1,999 is my ceiling. As an agency I want 25 to 30 percent recurring for life, monthly payout, one dashboard for all clients, and a support number that picks up. Get me those and I'll test with 3 clients. Bina iske, recommend nahi karunga.

@@ -29,7 +29,7 @@ function Slider({
     <div>
       <p className="flex items-baseline justify-between text-sm">
         <span className="font-medium text-mid">{label}</span>
-        <span className="text-[15px] font-semibold tnum text-hi">{format(value)}</span>
+        <span className="text-title font-semibold tnum text-hi">{format(value)}</span>
       </p>
       <input
         type="range"
@@ -95,10 +95,10 @@ export function RtoCalculator() {
             <p className="text-xs leading-relaxed text-low">{calculator.assumption}</p>
           </div>
 
-          <div className="flex flex-col justify-center gap-6 border-t bg-[rgb(var(--field)/0.03)] p-5 sm:p-8 lg:border-l lg:border-t-0">
+          <div className="flex flex-col justify-center gap-6 border-t bg-field/3 p-5 sm:p-8 lg:border-l lg:border-t-0">
             <div>
               <p className="text-sm font-medium text-mid">{calculator.savedLabel}</p>
-              <p className="mt-1 whitespace-nowrap text-[clamp(2.2rem,1.6rem+2vw,3.25rem)] font-semibold leading-none tracking-tightest text-gold-ink">
+              <p className="mt-1 whitespace-nowrap text-stat font-semibold text-gold-ink">
                 <AnimatedRupees paise={saved} />
               </p>
             </div>

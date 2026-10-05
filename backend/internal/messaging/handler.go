@@ -23,21 +23,34 @@ type Handler struct {
 	jwtSecret   string
 	appBaseURL  string
 	oauth       OAuthConfig
+	// whatsappSellers: sellers may connect their own WhatsApp (config
+	// WHATSAPP_SELLER_CHANNEL); off, WhatsApp is assisted and only
+	// Instagram connects
+	whatsappSellers bool
 }
 
 type HandlerDeps struct {
-	Service     *Service
-	Client      *Client
-	Rdb         *redis.Client
-	VerifyToken string
-	JWTSecret   string
-	AppBaseURL  string
-	OAuth       OAuthConfig
+	Service         *Service
+	Client          *Client
+	Rdb             *redis.Client
+	VerifyToken     string
+	JWTSecret       string
+	AppBaseURL      string
+	OAuth           OAuthConfig
+	WhatsAppSellers bool
 }
 
 func NewHandler(d HandlerDeps) *Handler {
 	return &Handler{svc: d.Service, client: d.Client, rdb: d.Rdb, verifyToken: d.VerifyToken,
-		jwtSecret: d.JWTSecret, appBaseURL: d.AppBaseURL, oauth: d.OAuth}
+		jwtSecret: d.JWTSecret, appBaseURL: d.AppBaseURL, oauth: d.OAuth, whatsappSellers: d.WhatsAppSellers}
+}
+
+// errWhatsAppClosed: sellers cannot connect WhatsApp yet.
+var errWhatsAppClosed = errors.New("connecting WhatsApp opens soon. Until then, reply to buyers from your WhatsApp Business app")
+
+// closed says a channel cannot be connected on this deployment.
+func (h *Handler) closed(channel string) bool {
+	return channel == "whatsapp" && !h.whatsappSellers
 }
 
 // Verify answers Meta's webhook subscription handshake.
@@ -107,7 +120,8 @@ func (h *Handler) ListChannels(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.OK(w, httpx.M{"channels": items,
 		// the UI offers manual entry when a channel has no app credentials yet
-		"oauth": httpx.M{"whatsapp": h.oauth.enabled("whatsapp"), "instagram": h.oauth.enabled("instagram")}})
+		"oauth":           httpx.M{"whatsapp": h.oauth.enabled("whatsapp") && h.whatsappSellers, "instagram": h.oauth.enabled("instagram")},
+		"whatsappChannel": h.whatsappSellers})
 }
 
 // ConnectURL starts the OAuth handshake. The state is a short-lived signed
@@ -116,6 +130,10 @@ func (h *Handler) ListChannels(w http.ResponseWriter, r *http.Request) {
 // being replayed.
 func (h *Handler) ConnectURL(w http.ResponseWriter, r *http.Request) {
 	channel := r.PathValue("channel")
+	if h.closed(channel) {
+		httpx.Err(w, http.StatusConflict, errWhatsAppClosed.Error())
+		return
+	}
 	nonce := secure.Token(16)
 	state, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": middleware.BusinessID(r.Context()), "channel": channel,
@@ -149,6 +167,10 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 			reason = "The connection was cancelled."
 		}
 		http.Redirect(w, r, h.settingsURL("", reason), http.StatusFound)
+		return
+	}
+	if h.closed(channel) {
+		http.Redirect(w, r, h.settingsURL("", errWhatsAppClosed.Error()), http.StatusFound)
 		return
 	}
 	externalID, token, name, err := h.client.ExchangeCode(r.Context(), h.oauth, channel, q.Get("code"))
@@ -207,6 +229,10 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"displayName"`
 	}
 	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	if h.closed(in.Channel) {
+		httpx.Err(w, http.StatusConflict, errWhatsAppClosed.Error())
 		return
 	}
 	// typed by hand, so proven before it becomes a routing key (OAuth reads

@@ -95,7 +95,7 @@ func main() {
 
 	bus := events.New(rdb, log)
 	customerSvc := customer.NewService(pool, cfg.JWTSecret)
-	productSvc := product.NewService(pool, notifier, log)
+	productSvc := product.NewService(pool, notifier, alerts, log)
 	orderSvc := order.NewService(pool, rdb, customerSvc, productSvc, notifier, alerts, shiprocket, bus, log, cfg.PublicBaseURL)
 	linkSvc := link.NewService(pool, productSvc, cfg.PublicBaseURL)
 	planSvc := plan.NewService(pool, rdb, cfg, platformRzp, notifier, log)
@@ -150,6 +150,7 @@ func main() {
 		Messaging: messaging.NewHandler(messaging.HandlerDeps{
 			Service: messagingSvc, Client: metaClient, Rdb: rdb,
 			VerifyToken: cfg.MetaVerifyToken, JWTSecret: cfg.JWTSecret, AppBaseURL: cfg.PublicBaseURL,
+			WhatsAppSellers: cfg.WhatsAppSellers,
 			OAuth: messaging.OAuthConfig{
 				AppID: cfg.MetaAppID, AppSecret: cfg.MetaAppSecret,
 				IgAppID: cfg.MetaIgAppID, IgAppSecret: cfg.MetaIgAppSecret,

@@ -1,8 +1,15 @@
 package broadcast
 
 import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
+
+	"carthedge/internal/config"
+	"carthedge/internal/notify"
 )
 
 func TestComposeFillsStoreLinkAndAddsStopLink(t *testing.T) {
@@ -20,5 +27,16 @@ func TestSegmentFilterAlwaysNeedsConsent(t *testing.T) {
 		if !strings.Contains(segmentFilter(seg), "marketing_opt_in") {
 			t.Errorf("%s reaches buyers who never said yes", seg)
 		}
+	}
+}
+
+func TestOffersWaitForTheSellersWhatsApp(t *testing.T) {
+	s := &Service{notify: notify.New(&config.Config{}, slog.New(slog.NewTextHandler(io.Discard, nil)))}
+	ctx := context.Background()
+	if err := s.Send(ctx, "b", "x"); !errors.Is(err, notify.ErrOffersOff) {
+		t.Fatalf("send must wait for the seller's own WhatsApp, got %v", err)
+	}
+	if _, err := s.Create(ctx, "b", "Drop", "New stock", "all", "2030-01-01T10:00:00Z"); !errors.Is(err, notify.ErrOffersOff) {
+		t.Fatalf("a schedule would never fire, got %v", err)
 	}
 }

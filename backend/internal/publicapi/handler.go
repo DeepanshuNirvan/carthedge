@@ -77,10 +77,19 @@ func (h *Handler) SendOtp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.otp.Send(r.Context(), r.PathValue("businessCode"), phone, in.Email); err != nil {
-		httpx.Err(w, http.StatusTooManyRequests, err.Error())
+		httpx.Err(w, otpStatus(err), err.Error())
 		return
 	}
 	httpx.OK(w, httpx.M{"ok": true})
+}
+
+// otpStatus: a code that cannot be delivered at all is on us; anything else
+// is the send limit.
+func otpStatus(err error) int {
+	if errors.Is(err, otp.ErrUnavailable) {
+		return http.StatusServiceUnavailable
+	}
+	return http.StatusTooManyRequests
 }
 
 // VerifyOtp returns the order token plus repeat-buyer prefill data.

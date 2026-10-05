@@ -107,7 +107,7 @@ export default function ContactPage() {
               <Mail className="size-5" aria-hidden />
             </span>
             <span>
-              <span className="block text-[15px] font-semibold text-hi group-hover:underline">
+              <span className="block text-title font-semibold text-hi group-hover:underline">
                 {site?.contact.email || 'hello@carthedge.in'}
               </span>
               <span className="mt-0.5 block text-sm text-low">Best for detailed questions</span>
@@ -118,7 +118,7 @@ export default function ContactPage() {
               <Clock className="size-5" aria-hidden />
             </span>
             <span>
-              <span className="block text-[15px] font-semibold text-hi">{site?.contact.supportHours}</span>
+              <span className="block text-title font-semibold text-hi">{site?.contact.supportHours}</span>
               <span className="mt-0.5 block text-sm text-low">We reply within a working day</span>
             </span>
           </div>

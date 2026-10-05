@@ -16,8 +16,10 @@ export const nav = {
 export const strand = [
   { id: 'product', label: 'The chat' },
   { id: 'autopilot', label: 'Automations' },
+  { id: 'voice', label: 'Your voice' },
   { id: 'journey', label: 'The board' },
   { id: 'storefront', label: 'Your store' },
+  { id: 'features', label: 'The whole shop' },
   { id: 'pricing', label: 'Plans' },
   { id: 'guides', label: 'Get started' },
 ];
@@ -152,6 +154,50 @@ export const autopilot = {
   ],
 };
 
+// the assistant's settings, played back as a practice chat
+export const voice = {
+  title: 'It sells in your voice, by your rules.',
+  sub: 'Set the tone once. It quotes your policies, keeps your hours and hands you the chats you choose.',
+  store: 'Ritika’s Closet',
+  practice: 'Practice chat. Nothing is sent.',
+  toneLabel: 'Tone',
+  tones: [
+    { value: 'polite', label: 'Polite' },
+    { value: 'warm', label: 'Warm' },
+    { value: 'fun', label: 'Fun' },
+  ],
+  addressLabel: 'Speaks to buyers as',
+  addresses: [
+    { value: 'aap', label: 'Aap' },
+    { value: 'tum', label: 'Tum' },
+  ],
+  emojiLabel: 'Emoji',
+  buyer: 'ye pink kurti M me milegi? price kya hai',
+  replies: {
+    polite: {
+      aap: 'Ji, Rose Chikankari Kurti pink mein M size available hai. Keemat ₹1,499 hai, delivery free. Kya aap order karna chahenge?',
+      tum: 'Ji, Rose Chikankari Kurti pink mein M size available hai. Keemat ₹1,499 hai, delivery free. Kya tum order karna chahoge?',
+    },
+    warm: {
+      aap: 'Haan ji, pink M bilkul hai! Pure cotton, haath ki kadhai. ₹1,499 free delivery ke saath. Aapke liye rakh doon?',
+      tum: 'Haan, pink M bilkul hai! Pure cotton, haath ki kadhai. ₹1,499 free delivery ke saath. Tumhare liye rakh doon?',
+    },
+    fun: {
+      aap: 'Pink M ready hai aapke liye! ₹1,499 aur delivery free. Yeh kurti har function mein hit hai. Aapka order bana doon?',
+      tum: 'Pink M ready hai tumhare liye! ₹1,499 aur delivery free. Yeh kurti har function mein hit hai. Tumhara order bana doon?',
+    },
+  },
+  emoji: { polite: '🙏', warm: '😊', fun: '✨' },
+  teach: [
+    { title: 'Your policies, quoted', copy: 'Returns, cancellation, delivery and payment rules, in the exact words of your store policy.' },
+    { title: 'FAQ answers, word for word', copy: 'Your answer to “fabric kaisa hai?” goes out exactly as you wrote it.' },
+    { title: 'Business hours', copy: 'One away message per chat while you are closed, or answers around the clock.' },
+    { title: 'What comes to you', copy: 'Pick bargaining, bulk deals, returns or any order above an amount. Those chats come straight to you.' },
+    { title: 'Product details and size charts', copy: 'Fabric, fit, care and the size chart, used in its answers instead of guesses.' },
+    { title: 'Practice before buyers do', copy: 'Write as a buyer and see the exact reply with your live catalog and settings.' },
+  ],
+};
+
 export const languages = {
   title: 'It replies the way your buyers type.',
   sub: 'Hinglish, Hindi, English and regional scripts, answered in the same language and script.',
@@ -182,6 +228,14 @@ export const journey = {
     { status: 'delivered', label: 'Delivered', note: 'Buyer told, invoice numbered, customer ledger updated' },
   ],
   card: { buyer: 'Priya', item: 'Rose Chikankari Kurti, M', code: 'CH-4F7K2Q', total: 149900, source: 'Instagram' },
+  // the other orders already on the board, one per lane, from every way an order arrives
+  others: [
+    { buyer: 'Ananya', source: 'link', total: 89900 },
+    { buyer: 'Meher', source: 'store', total: 169900 },
+    { buyer: 'Sana', source: 'phone', total: 129900 },
+    { buyer: 'Riya', source: 'instagram', total: 249800 },
+    { buyer: 'Pooja', source: 'store', total: 219800 },
+  ],
 };
 
 export const aiDemo = {
@@ -201,36 +255,110 @@ export const calculator = {
   assumption: 'Assumes COD confirmation brings refusals down to about 8%. Your results depend on your buyers.',
 };
 
+// the whole shop behind the chat: one desk per job, each with a sample of the real screen
 export const features = {
-  title: 'And the rest of the desk.',
-  groups: [
+  title: 'The whole shop, already built.',
+  sub: 'Catalog, links, orders, returns, GST and reports live in the same app the assistant works from. Open any desk.',
+  sample: 'Sample data',
+  desks: [
     {
-      title: 'Sell',
+      key: 'catalog',
+      label: 'Catalog & stock',
+      lede: 'Every size, colour and photo, with stock that keeps itself honest.',
       items: [
-        { key: 'store', title: 'Storefront and share links', copy: 'Product, cart or custom links with QR codes and live click counts.' },
-        { key: 'reseller', title: 'Offers and reseller pricing', copy: 'Percent or flat offers, and a second price list for resellers.' },
-        { key: 'broadcast', title: 'Broadcast drops', copy: 'New collection to past buyers, retail, resellers or repeat customers.' },
-        { key: 'waitlist', title: 'Back-in-stock waitlists', copy: 'Sold out items collect numbers and sell again on restock.' },
+        { title: 'Options that fit the product', copy: 'Up to three groups, like size, colour or finish. Every combination gets its own price, SKU, stock and photos.' },
+        { title: 'Stock that counts itself', copy: 'Orders draw it down and sold out shows at zero. Cancellations and received returns put it back.' },
+        { title: 'Label details', copy: 'MRP, country of origin and maker on every product page. A price can never cross its MRP.' },
+        { title: 'Bulk import', copy: 'Bring the whole catalog in one CSV, checked row by row before anything is saved.' },
+        { title: 'Offers with limits', copy: 'Percent or flat codes with a cap, minimum order, first order only and uses per buyer.' },
+        { title: 'Reseller prices and waitlists', copy: 'A second price list for resellers. Sold-out items collect numbers for the restock.' },
       ],
     },
     {
-      title: 'Run',
+      key: 'links',
+      label: 'Links & storefront',
+      lede: 'One branded link takes the buyer from browsing to paying to tracking.',
       items: [
-        { key: 'board', title: 'Order board', copy: 'Kanban across every source, with filters, search and a table view.' },
-        { key: 'ledger', title: 'Customer ledger', copy: 'Lifetime value, repeat rate and COD refusals on every buyer.' },
-        { key: 'courier', title: 'Courier handoff', copy: 'Hand orders to the courier with addresses already checked.' },
-        { key: 'insights', title: 'Insights and reports', copy: 'Best sellers, buyers to watch and a monthly report for your accountant.' },
+        { title: 'Product, cart and custom links', copy: 'Send one item or a ready cart, or type any item and price in ten seconds.' },
+        { title: 'QR codes and live counts', copy: 'Every link gets a QR code and a WhatsApp share, with clicks and orders counted.' },
+        { title: 'A storefront in your name', copy: 'Your logo and code in the URL, with filters, a trending row, live offers and a policies page.' },
+        { title: 'Checkout without an account', copy: 'Phone OTP, a coupon box, then UPI, card or COD. Totals are quoted by the server.' },
+        { title: 'Buyers track it themselves', copy: 'The order page shows live status, courier and tracking id. “Order kahan hai?” stops.' },
+        { title: 'Self-service inside your rules', copy: 'Buyers cancel, change the address or ask for a return, each step confirmed by OTP.' },
       ],
     },
     {
-      title: 'Get paid',
+      key: 'orders',
+      label: 'Orders & shipping',
+      lede: 'Every source lands on one board, and the busywork comes in bulk.',
       items: [
-        { key: 'razorpay', title: 'Your own Razorpay', copy: 'Buyer money settles in your account. CartHedge never holds it.' },
-        { key: 'checkout', title: 'UPI, cards and COD', copy: 'UPI intent opens GPay or PhonePe directly. COD with an optional token.' },
-        { key: 'invoice', title: 'GST-lite invoices', copy: 'Numbered, printable invoices from any order.' },
-        { key: 'live', title: 'Live selling', copy: 'Comment-to-order during Instagram Lives.', badge: 'Coming soon' },
+        { title: 'One board for every order', copy: 'Instagram, links, storefront and walk-ins on one kanban, with search, filters and a table view.' },
+        { title: 'Bulk actions', copy: 'Select up to 100 orders to change status, print packing slips or a pick list, or cancel.' },
+        { title: 'Packing slips with a QR', copy: 'Both addresses, the items and the COD amount to collect, with a QR to the order page.' },
+        { title: 'Dropped checkouts', copy: 'See who verified their number but did not order this week, and what was in the cart.' },
+        { title: 'Courier handoff', copy: 'Hand orders over with checked addresses. The tracking id reaches the buyer on the chat.' },
+        { title: 'Alerts where you are', copy: 'New orders, returns and chats that need you, on WhatsApp, email and phone notifications.' },
       ],
     },
+    {
+      key: 'returns',
+      label: 'Returns & refunds',
+      lede: 'After-sales that runs on the return rules you set.',
+      items: [
+        { title: 'Requests with photos', copy: 'Buyers ask from their order page with the reason, the pieces and photos.' },
+        { title: 'Approve, pick up, receive', copy: 'Each step is one tap, and the buyer hears about every one of them.' },
+        { title: 'Stock back on receipt', copy: 'Pieces return to stock only when they arrive, so a damaged one stays off the shelf.' },
+        { title: 'Exchanges in one tap', copy: 'A linked replacement order is created and the buyer pays only the difference.' },
+        { title: 'Refunds on record', copy: 'Through your Razorpay for online payments, or UPI, bank or cash with a reference. Never above what was paid.' },
+        { title: 'Credit notes', copy: 'Every refund on an invoiced order gets its GST credit note.' },
+      ],
+    },
+    {
+      key: 'money',
+      label: 'GST & payments',
+      lede: 'Paid into your account, invoiced the way your CA expects.',
+      items: [
+        { title: 'Real GST invoices', copy: 'Tax invoice or bill of supply, HSN and rate per product, numbered fresh each financial year.' },
+        { title: 'CGST and SGST, or IGST', copy: 'Split by the place of supply on the delivery address, with the buyer’s GSTIN for B2B.' },
+        { title: 'Your own Razorpay', copy: 'Buyer money settles in your account. CartHedge never holds it and takes no cut.' },
+        { title: 'UPI, cards and COD', copy: 'UPI opens GPay or PhonePe directly. COD can ask for a ₹50 to ₹100 token first.' },
+        { title: 'Checkout charges', copy: 'Free delivery above an amount, a COD charge, a pay-online discount and a COD limit. One total everywhere.' },
+        { title: 'Your plan, invoiced too', copy: 'Every CartHedge payment comes with its own GST invoice, with autopay if you want it.' },
+      ],
+    },
+    {
+      key: 'insights',
+      label: 'Insights & reports',
+      lede: 'Numbers in rupees, and what to do about them.',
+      items: [
+        { title: 'Today at a glance', copy: 'Sales today, month revenue, pending orders, COD at risk and your repeat rate.' },
+        { title: 'Money kept from RTO', copy: 'A meter of rupees saved from refused COD this month, against your old refusal rate.' },
+        { title: 'Suggestions that point somewhere', copy: 'Best sellers, buyers to watch, and the best window for your next drop.' },
+        { title: 'Customer ledger', copy: 'Lifetime value, repeat orders, returns and COD refusals on every buyer.' },
+        { title: 'Monthly report', copy: 'Export the month for your accountant in one tap.' },
+        { title: 'Drops to buyers who said yes', copy: 'Plan new-collection broadcasts by segment. Only buyers who opted in receive them.' },
+      ],
+    },
+    {
+      key: 'security',
+      label: 'Security & data',
+      lede: 'Built like it handles money, because it does.',
+      items: [
+        { title: 'Keys kept locked', copy: 'Your Razorpay keys and Instagram connection are stored encrypted, and the connection renews itself.' },
+        { title: 'Official Instagram login', copy: 'No password sharing. Every message from Instagram is checked to be genuine. Disconnect anytime.' },
+        { title: 'Your business, walled off', copy: 'Each store is isolated. No seller can ever see another seller’s orders or buyers.' },
+        { title: 'Sessions you control', copy: 'Changing your password signs out every other device at once.' },
+        { title: 'Consent on record', copy: 'Every buyer’s yes or no to offers is kept with the words, the place and the time.' },
+        { title: 'Ready for India’s data law', copy: 'Export everything in one file, erase a buyer on request, or delete your account with 30 days to undo it.' },
+      ],
+    },
+  ],
+  roadmapTitle: 'Coming next',
+  roadmap: [
+    { title: 'Comment-to-DM', copy: 'Reply to “price?” comments on posts and Reels with a DM that starts the sale.' },
+    { title: 'Live selling', copy: 'Comment-to-order while you are live on Instagram.' },
+    { title: 'Auto-replies on WhatsApp', copy: 'The same assistant on your own WhatsApp number, while you keep the Business app.' },
+    { title: 'Photo and story replies', copy: 'Match “ye wala” screenshots and story replies to your catalog.' },
   ],
 };
 
@@ -243,6 +371,8 @@ export const storefrontPreview = {
 export const pricing = {
   title: 'Plans that grow with your DMs.',
   sub: 'Every plan starts with 15 days free. No card to try.',
+  replacesLead: 'One plan replaces',
+  replaces: ['the DM chatbot', 'the store builder', 'the Google Form', 'the invoice app', 'the Excel sheet', 'the order notebook'],
   popular: 'Most popular',
   perMonth: '/month',
   quotaNote: (quota: number, fee: string) => `${quota} orders included, then ${fee} an order`,

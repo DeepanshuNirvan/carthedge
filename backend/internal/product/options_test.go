@@ -202,3 +202,17 @@ func TestVariantsByNameJoinTheirGroups(t *testing.T) {
 		t.Fatal("a name that does not cover every group must be refused")
 	}
 }
+
+func TestWaitlistNoteForTheSeller(t *testing.T) {
+	if got := waitlistNote("Kurti", []string{"9876543210"}); got != "1 buyer asked to hear when Kurti is back: 9876543210. Message them on WhatsApp." {
+		t.Fatalf("one buyer: %q", got)
+	}
+	var phones []string
+	for i := 0; i < 12; i++ {
+		phones = append(phones, "98765432"+string(rune('a'+i)))
+	}
+	got := waitlistNote("Kurti", phones)
+	if !strings.HasPrefix(got, "12 buyers") || !strings.Contains(got, "and 2 more") || strings.Contains(got, phones[10]) {
+		t.Fatalf("many buyers: %q", got)
+	}
+}

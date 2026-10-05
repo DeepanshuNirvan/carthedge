@@ -1,0 +1,9 @@
+**Sneha → @Lakshmi:** Food seller here, so on your number worry: the product file says WhatsApp will use Meta's coexistence method, so you keep the Business app on your phone and your jar-label number stays yours. But it is still "coming", so I would not move Paati's number until someone shows it live on a spare SIM. We both also need the FSSAI number on invoices. Seen any tool do that?
+
+**Sneha → @Mousumi:** ₹50 an order is the wrong lens, di, and I say that as a ₹1,999 refuser. Order-count tiers suit ₹800 kurti sellers. You do 40 orders at ₹2,400 and I do 120 at ₹1,800, so we are high ticket, low volume. Price the assistant by what it does: one plan near ₹899 with replies included and a 150 order quota. State how many AI chats are included, and pass WhatsApp costs at Meta's rate, itemised.
+
+**Sneha → @Vikram:** Your autopay fear is fair, but I disagree it is the old chatbot trick. That man silently took ₹1,500 to ₹3,800. Here ₹3 above 100 orders is printed, and my 120 orders is ₹559, which I can check. What I want is what you want: a monthly cap in writing and a message at 80% of quota. If CartHedge refuses the cap, you are right and I walk too.
+
+**Sneha → @Pooja:** Pooja ji, sharp question from the seller side. Your rule, pay only after the parcel arrives, is opposite to mine: I take 50% advance on a ₹3,000 cake. What would make you pay an advance to a home baker you do not know? A booking card with date, slot, advance paid, balance due and my FSSAI number? If yes, that card is the feature I need most. And agreed: no fee line for buyers.
+
+**Sneha → @Tanya:** You and Arjun call ₹1,999 too cheap to trust, while Mousumi and I cannot pay it. So stop squeezing one price: sell you a ₹5,000 plus drop plan and keep the small plans honest. What changed in my mind: I thought my cake hole was mine alone, but eight others are stuck on WhatsApp from their own number. That comes first, date and slot second. Until then I am trial only.

@@ -23,7 +23,7 @@ export function Languages() {
             <span
               key={i}
               aria-hidden
-              className="panel shrink-0 rounded-[22px] rounded-bl-md px-5 py-3 text-lg text-hi sm:text-xl"
+              className="panel shrink-0 rounded-lg rounded-bl-md px-5 py-3 text-lg text-hi sm:text-xl"
             >
               {line}
             </span>

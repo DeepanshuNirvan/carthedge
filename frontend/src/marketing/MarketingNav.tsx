@@ -24,13 +24,13 @@ export function MarketingNav() {
   useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 20));
 
   const linkCls =
-    'relative isolate rounded-full px-3.5 py-2 text-[13.5px] font-medium text-mid transition-colors duration-micro hover:text-hi';
+    'relative isolate rounded-full px-3.5 py-2 text-ui font-medium text-mid transition-colors duration-micro hover:text-hi';
 
   // one pill shared across links via layoutId, so it glides from item to item
   const pill = (
     <motion.span
       layoutId="navHover"
-      className="absolute inset-0 -z-10 rounded-full bg-[rgb(var(--field)/0.08)]"
+      className="absolute inset-0 -z-10 rounded-full bg-field/8"
       transition={{ type: 'spring', stiffness: 460, damping: 36 }}
     />
   );

@@ -60,13 +60,22 @@ type Config struct {
 	SMTPPass string
 	SMTPFrom string
 
-	WhatsAppAPIURL string
-	WhatsAppToken  string
+	// CartHedge's own WhatsApp number on the Cloud API (one-time codes, order
+	// updates, seller alerts). Blank = logged outside production.
+	WhatsAppPhoneID string
+	WhatsAppToken   string
+	// WhatsAppSellers lets sellers connect their own WhatsApp (needs Tech
+	// Provider review and a partner; docs/WHATSAPP-INSTAGRAM-GO-LIVE.md §4A).
+	// Off = WhatsApp is assisted: sellers reply from their own app.
+	WhatsAppSellers bool
 
-	MetaAppID         string
-	MetaAppSecret     string
-	MetaVerifyToken   string
-	MetaGraphVersion  string
+	MetaAppID        string
+	MetaAppSecret    string
+	MetaVerifyToken  string
+	MetaGraphVersion string
+	// MetaGraphURL is where CartHedge's own WhatsApp messages are posted;
+	// end-to-end tests point it at a fake Graph API
+	MetaGraphURL      string
 	MetaIgAppID       string
 	MetaIgAppSecret   string
 	MetaOAuthRedirect string
@@ -124,13 +133,15 @@ func Load() (*Config, error) {
 		SMTPPass: os.Getenv("SMTP_PASS"),
 		SMTPFrom: os.Getenv("SMTP_FROM"),
 
-		WhatsAppAPIURL: os.Getenv("WHATSAPP_API_URL"),
-		WhatsAppToken:  os.Getenv("WHATSAPP_API_TOKEN"),
+		WhatsAppPhoneID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
+		WhatsAppToken:   os.Getenv("WHATSAPP_TOKEN"),
+		WhatsAppSellers: envBool("WHATSAPP_SELLER_CHANNEL"),
 
 		MetaAppID:        os.Getenv("META_APP_ID"),
 		MetaAppSecret:    os.Getenv("META_APP_SECRET"),
 		MetaVerifyToken:  os.Getenv("META_VERIFY_TOKEN"),
 		MetaGraphVersion: env("META_GRAPH_VERSION", "v25.0"),
+		MetaGraphURL:     strings.TrimRight(env("META_GRAPH_URL", "https://graph.facebook.com"), "/"),
 		MetaIgAppID:      os.Getenv("META_IG_APP_ID"),
 		MetaIgAppSecret:  os.Getenv("META_IG_APP_SECRET"),
 		// must match the redirect registered on the Meta app
@@ -147,6 +158,9 @@ func Load() (*Config, error) {
 	}
 	if key, err := hex.DecodeString(c.EncryptionKey); err != nil || len(key) != 32 {
 		return nil, fmt.Errorf("ENCRYPTION_KEY must be 64 hex chars (32 bytes)")
+	}
+	if (c.WhatsAppPhoneID == "") != (c.WhatsAppToken == "") {
+		return nil, fmt.Errorf("WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_TOKEN go together")
 	}
 	if c.StorageDriver == "s3" && (c.S3Bucket == "" || c.S3Region == "") {
 		return nil, fmt.Errorf("S3_BUCKET and S3_REGION are required when STORAGE_DRIVER=s3")
@@ -168,6 +182,15 @@ func envInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+// envBool is true for 1/true/on/yes, anything else is false.
+func envBool(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "on", "yes":
+		return true
+	}
+	return false
 }
 
 func envDur(key string, fallback time.Duration) time.Duration {

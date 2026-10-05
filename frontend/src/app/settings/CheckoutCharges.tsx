@@ -124,7 +124,8 @@ export function CheckoutCharges() {
           title="Remind buyers who did not finish checkout"
           disabled={!canRecover.allowed}
         >
-          One WhatsApp message, an hour after a buyer verified their number but did not order. At most once a week per buyer.
+          One WhatsApp message from your own number, an hour after a buyer verified their number but did not order. At most
+          once a week per buyer. Starts once your WhatsApp is connected; until then, nudge them from Orders.
         </ToggleRow>
         {!canRecover.allowed && !canRecover.isLoading && (
           <p className="-mt-3 flex items-center gap-2 text-xs text-low">

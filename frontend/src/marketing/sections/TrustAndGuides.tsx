@@ -22,8 +22,8 @@ function Steps() {
             data-lit={inView}
             style={{ transitionDelay: `${i * 260}ms` }}
           />
-          <p className="text-[12px] font-medium tnum text-low">Step {i + 1}</p>
-          <h3 className="mt-1 text-[16px] font-semibold tracking-snug text-hi">{step.title}</h3>
+          <p className="text-note font-medium tnum text-low">Step {i + 1}</p>
+          <h3 className="mt-1 text-base font-semibold tracking-snug text-hi">{step.title}</h3>
           <p className="mt-1.5 text-sm leading-relaxed text-mid">{step.copy}</p>
         </li>
       ))}
@@ -52,8 +52,8 @@ export function Guides() {
                     <Icon className="size-4" aria-hidden />
                   </span>
                   <div>
-                    <p className="text-[14.5px] font-semibold tracking-snug text-hi">{point.title}</p>
-                    <p className="mt-0.5 text-[13.5px] leading-relaxed text-mid">{point.copy}</p>
+                    <p className="text-copy font-semibold tracking-snug text-hi">{point.title}</p>
+                    <p className="mt-0.5 text-ui leading-relaxed text-mid">{point.copy}</p>
                   </div>
                 </div>
               );
@@ -72,10 +72,10 @@ export function Guides() {
                     aria-expanded={isOpen}
                     onClick={() => setOpen(isOpen ? null : i)}
                   >
-                    <span className="text-[15px] font-medium tracking-snug text-hi">{faq.q}</span>
+                    <span className="text-title font-medium tracking-snug text-hi">{faq.q}</span>
                     <Plus
                       className={cn(
-                        'size-[18px] shrink-0 text-low transition-transform duration-std ease-spring',
+                        'size-4.5 shrink-0 text-low transition-transform duration-std ease-spring',
                         isOpen && 'rotate-45 text-jade-ink',
                       )}
                       aria-hidden

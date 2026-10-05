@@ -100,16 +100,14 @@ Two flows depend on it: the **seller's signup verification** and the **buyer's c
 
 ### 3c. Wiring it into CartHedge
 
-The OTP send path is `internal/notify/notify.go` → `Notifier.WhatsApp`, called by `otp.Service.Send`. It POSTs `{"to": "...", "message": "..."}` with a bearer token to whatever URL you configure — so any provider that accepts a JSON POST works with **no code change**:
+Codes go out on **WhatsApp from CartHedge's own number** through Meta's Cloud API (`internal/notify/whatsapp.go`, called by `otp.Service.Send`). It sends the approved authentication template `carthedge_code`; the same number sends `order_update` and `seller_alert`. WhatsApp needs **no DLT registration**, so this replaces the SMS route above. Setup and the exact template texts: [WHATSAPP-INSTAGRAM-GO-LIVE.md](WHATSAPP-INSTAGRAM-GO-LIVE.md), "Phase 1".
 
 ```env
-WHATSAPP_API_URL=https://your-provider-endpoint
-WHATSAPP_API_TOKEN=your_auth_key
+WHATSAPP_PHONE_NUMBER_ID=123456789012345   # WhatsApp Manager → phone number id
+WHATSAPP_TOKEN=EAAG...                     # system-user token
 ```
 
-If your provider's payload differs (MSG91's flow API wants `template_id` + `recipients`), add a small case in `Notifier.WhatsApp` — it is one function, one HTTP call.
-
-**With these unset, codes are logged to the console.** That is a complete, working development and demo path; you do not need DLT to build.
+**With these unset, codes are logged to the console in development.** In production nothing is logged (codes never reach the logs): a buyer who gave an email gets the code by email, otherwise the API answers 503 "codes cannot be sent right now".
 
 ---
 
@@ -343,8 +341,9 @@ RAZORPAY_KEY_ID=rzp_live_...
 RAZORPAY_KEY_SECRET=...
 RAZORPAY_WEBHOOK_SECRET=...
 
-WHATSAPP_API_URL=https://your-sms-or-whatsapp-endpoint
-WHATSAPP_API_TOKEN=...
+WHATSAPP_PHONE_NUMBER_ID=...       # CartHedge's own number (codes, order updates, seller alerts)
+WHATSAPP_TOKEN=...
+WHATSAPP_SELLER_CHANNEL=off        # on only after sellers can connect their own WhatsApp
 
 SMTP_HOST=...
 SMTP_PORT=587

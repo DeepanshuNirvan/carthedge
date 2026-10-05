@@ -28,7 +28,7 @@ type Key = keyof typeof icons;
 function ReplyPreview({ on }: { on: boolean }) {
   return (
     <div className="mt-auto flex flex-col gap-2 pt-6" aria-hidden>
-      <span className="w-fit max-w-[80%] rounded-2xl rounded-bl-md bg-[rgb(var(--field)/0.1)] px-3.5 py-2 text-[13px] text-hi">
+      <span className="w-fit max-w-[80%] rounded-2xl rounded-bl-md bg-field/10 px-3.5 py-2 text-ui text-hi">
         {autopilot.sampleIn}
       </span>
       <AnimatePresence mode="wait" initial={false}>
@@ -39,10 +39,10 @@ function ReplyPreview({ on }: { on: boolean }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            className="w-fit max-w-[85%] self-end rounded-2xl rounded-br-md bg-jade-500/16 px-3.5 py-2 text-[13px] text-hi shadow-[inset_0_0_0_1px_rgb(var(--jade-500)/0.2)]"
+            className="w-fit max-w-[85%] self-end rounded-2xl rounded-br-md bg-jade-500/16 px-3.5 py-2 text-ui text-hi ring-1 ring-inset ring-jade-500/20"
           >
             {autopilot.sampleReply}
-            <span className="mt-1 block text-[10.5px] font-medium text-jade-ink">Sent in 4s</span>
+            <span className="mt-1 block text-nano font-medium text-jade-ink">Sent in 4s</span>
           </motion.span>
         ) : (
           <motion.span
@@ -50,7 +50,7 @@ function ReplyPreview({ on }: { on: boolean }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-2 self-end text-[12px] text-low"
+            className="flex items-center gap-2 self-end text-note text-low"
           >
             <span className="bulb size-1.5" data-lit="true" /> Waiting for you
           </motion.span>
@@ -63,17 +63,17 @@ function ReplyPreview({ on }: { on: boolean }) {
 function CapturePreview({ on }: { on: boolean }) {
   return (
     <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1.1fr]" aria-hidden>
-      <pre className="whitespace-pre-wrap rounded-md bg-[rgb(var(--field)/0.07)] p-3 font-sans text-[12px] leading-relaxed text-mid">
+      <pre className="whitespace-pre-wrap rounded-md bg-field/7 p-3 font-sans text-note leading-relaxed text-mid">
         {autopilot.capturePaste}
       </pre>
       <dl className="flex flex-col justify-center gap-1.5">
         {autopilot.captureFields.map(([k, v]) => (
           <div key={k} className="flex flex-col">
-            <dt className="text-[11px] text-low">{k}</dt>
+            <dt className="text-caption text-low">{k}</dt>
             <dd
               className={cn(
-                'text-[12.5px] transition-colors duration-expr',
-                on ? 'font-medium text-hi' : 'text-mid underline decoration-dotted underline-offset-[3px]',
+                'text-note transition-colors duration-expr',
+                on ? 'font-medium text-hi' : 'text-mid underline decoration-dotted underline-offset-2',
               )}
             >
               {v}
@@ -117,17 +117,17 @@ export function Autopilot() {
                   className={cn(
                     'glass sheen flex flex-col rounded-xl p-4 transition-[background-color,box-shadow] duration-expr sm:p-5',
                     span[item.key],
-                    on && 'bg-[linear-gradient(180deg,rgb(var(--jade-500)/0.13),transparent_70%)]',
+                    on && 'bg-gradient-to-b from-jade-500/13 to-transparent to-70%',
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span
                       className={cn(
                         'flex size-10 items-center justify-center rounded-full transition-colors duration-std',
-                        on ? 'bg-jade-500 text-[rgb(var(--text-on-accent))]' : 'bg-[rgb(var(--field)/0.1)] text-mid',
+                        on ? 'bg-jade-500 text-on-accent' : 'bg-field/10 text-mid',
                       )}
                     >
-                      <Icon className="size-[18px]" aria-hidden />
+                      <Icon className="size-4.5" aria-hidden />
                     </span>
                     <span>
                       <Switch
@@ -138,7 +138,7 @@ export function Autopilot() {
                       />
                     </span>
                   </div>
-                  <h3 className={cn('mt-4 font-semibold tracking-snug text-hi', item.key === 'reply' ? 'text-xl' : 'text-[15px]')}>
+                  <h3 className={cn('mt-4 font-semibold tracking-snug text-hi', item.key === 'reply' ? 'text-xl' : 'text-title')}>
                     {item.title}
                   </h3>
                   <AnimatePresence mode="wait" initial={false}>
@@ -148,7 +148,7 @@ export function Autopilot() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
                       transition={{ duration: 0.22 }}
-                      className={cn('mt-1.5 text-[13px] leading-relaxed text-mid', item.key === 'reply' && 'max-w-[38ch] text-sm')}
+                      className={cn('mt-1.5 text-ui leading-relaxed text-mid', item.key === 'reply' && 'max-w-[38ch] text-sm')}
                     >
                       {on ? item.on : item.off}
                     </motion.p>

@@ -53,7 +53,7 @@ func (s *Service) Seller(bizID string, a Alert) {
 		link := s.baseURL + a.Path
 		var errs []error
 		if prefs.WhatsAppOn() {
-			errs = append(errs, s.notify.WhatsApp(phone, a.Title+"\n"+a.Body+"\n"+link))
+			errs = append(errs, s.notify.WhatsApp(phone, notify.SellerAlert(a.Title, a.Body, link)))
 		}
 		if prefs.EmailOn() && email != "" {
 			errs = append(errs, s.notify.Email(email, a.Title, "Hi "+owner+",\n\n"+a.Body+"\n\nOpen it here: "+link+"\n\n— CartHedge"))

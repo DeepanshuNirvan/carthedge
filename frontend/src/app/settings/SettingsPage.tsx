@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,11 +34,14 @@ const channelMeta = {
 
 function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
   const { data } = useChannelsInfo();
+  const { data: business } = useBusiness();
   const { connect, disconnect } = useChannelMutations();
   const existing = data?.channels?.find((c) => c.channel === channel);
   // a failed token refresh flips status to 'error'; DMs stop until reconnect
   const broken = !!existing && existing.status !== 'connected';
   const oauthReady = !!data?.oauth?.[channel];
+  // until sellers can connect WhatsApp, they answer from their own app
+  const assisted = channel === 'whatsapp' && !existing && !data?.whatsappChannel;
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [externalId, setExternalId] = useState('');
@@ -86,9 +89,11 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
         <div className="min-w-0 flex-1 basis-40">
           <p className="text-sm font-medium text-hi">{meta.label}</p>
           <p className="truncate text-xs text-low">
-            {!existing
-              ? 'Not connected'
-              : broken
+            {assisted
+              ? 'You reply from your own WhatsApp'
+              : !existing
+                ? 'Not connected'
+                : broken
                 ? 'Access expired, reconnect to keep capturing DMs'
                 : `Connected · ${existing.displayName || `id ${existing.externalId}`}`}
           </p>
@@ -110,6 +115,8 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
               Disconnect
             </Button>
           </>
+        ) : assisted ? (
+          <Badge tone="neutral">Auto-replies soon</Badge>
         ) : oauthReady ? (
           <Button size="sm" loading={starting} onClick={startOauth}>
             Connect {meta.label}
@@ -120,6 +127,18 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
           </Button>
         )}
       </div>
+      {assisted && (
+        <p className="mt-3 text-xs leading-relaxed text-low">
+          {/* the store's chat buttons only show once the profile has a WhatsApp number */}
+          {business?.whatsapp
+            ? 'Buyers tap Chat on WhatsApp in your store and message you directly.'
+            : 'Add your WhatsApp number to the business profile and your store shows buyers a Chat on WhatsApp button.'}{' '}
+          Paste any chat on the AI desk and it becomes an order draft.{' '}
+          <Link to="/app/ai" className="font-medium text-jade-ink hover:underline">
+            Open AI desk
+          </Link>
+        </p>
+      )}
       {!existing && oauthReady && (
         <button
           onClick={() => setOpen((v) => !v)}
@@ -146,6 +165,7 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
 }
 
 function ChannelsSection() {
+  const { data } = useChannelsInfo();
   // the OAuth callback redirects back here with the outcome in the query string
   const [params, setParams] = useSearchParams();
   useEffect(() => {
@@ -161,7 +181,10 @@ function ChannelsSection() {
 
   return (
     <Card>
-      <CardHeader title="Connected channels" subtitle="Instagram and WhatsApp DMs become orders, no copy-paste" />
+      <CardHeader
+        title="Connected channels"
+        subtitle={data?.whatsappChannel ? 'Instagram and WhatsApp DMs become orders, no copy-paste' : 'Instagram DMs become orders on their own, no copy-paste'}
+      />
       <div className="flex flex-col gap-3 p-5 pt-4">
         <ChannelRow channel="whatsapp" />
         <ChannelRow channel="instagram" />

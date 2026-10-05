@@ -32,6 +32,9 @@ export const carthedgePreset = {
       low: v('text-low'),
       dim: v('text-dim'),
       line: v('line'),
+      // the recessed-well tint (white by night, ink by day); always used with an alpha step
+      field: v('field'),
+      'on-accent': v('text-on-accent'),
       bulb: v('bulb'),
       wire: v('wire'),
       success: v('success'),
@@ -64,6 +67,19 @@ export const carthedgePreset = {
         5.5: '1.375rem',
       },
       fontSize: {
+        // UI and marketing text: one half-pixel step scale (~8% apart) instead of
+        // ad-hoc px values. Names avoid colour keys so `text-*` stays unambiguous.
+        nano: ['10.5px', { lineHeight: '1.3' }], // inside sample screens and device mockups
+        caption: ['11.5px', { lineHeight: '1.4' }], // chips, meta, small labels
+        note: ['12.5px', { lineHeight: '1.45' }], // secondary lines, captions under controls
+        ui: ['13.5px', { lineHeight: '1.45' }], // controls, nav links, compact body
+        copy: ['14.5px', { lineHeight: '1.6' }], // ledger and list copy
+        title: ['15.5px', { lineHeight: '1.35' }], // item and card titles
+        lead: ['17px', { lineHeight: '1.6' }], // intro paragraphs
+        figure: ['2.6rem', { lineHeight: '1', letterSpacing: '-0.04em' }], // a price
+        stat: ['clamp(2.2rem, 1.6rem + 2vw, 3.25rem)', { lineHeight: '1', letterSpacing: '-0.04em' }],
+        quote: ['clamp(1.6rem, 1.2rem + 1.7vw, 2.6rem)', { lineHeight: '1.18', letterSpacing: '-0.03em' }],
+        hero: ['clamp(2.4rem, 1.3rem + 3.7vw, 4.35rem)', { lineHeight: '1.02', letterSpacing: '-0.04em' }],
         d0: ['clamp(2.75rem, 1.6rem + 4.6vw, 5.75rem)', { lineHeight: '0.98', letterSpacing: '-0.04em' }],
         d1: ['clamp(2.5rem, 1.7rem + 3.4vw, 4.75rem)', { lineHeight: '1.0', letterSpacing: '-0.04em' }],
         d2: ['clamp(2rem, 1.5rem + 2.2vw, 3.5rem)', { lineHeight: '1.04', letterSpacing: '-0.035em' }],
@@ -81,6 +97,9 @@ export const carthedgePreset = {
         lg: 'var(--r-lg)',
         xl: 'var(--r-xl)',
         '2xl': 'var(--r-2xl)',
+        // the phone mockup: bezel, and the screen inset 8px inside it
+        device: '2.75rem',
+        screen: '2.25rem',
       },
       backdropBlur: {
         sm: 'var(--blur-sm)',

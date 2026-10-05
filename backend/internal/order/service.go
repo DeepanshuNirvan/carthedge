@@ -148,17 +148,23 @@ func (s *Service) SetDirectMessenger(fn func(ctx context.Context, conversationID
 }
 
 // TellBuyer reaches the buyer on the chat the order came from, and falls back
-// to WhatsApp when there is no chat or its messaging window has closed.
-func (s *Service) TellBuyer(name, convID, phone, text string) {
+// to an order update from CartHedge's WhatsApp number, in the shop's name,
+// when there is no chat or its messaging window has closed.
+func (s *Service) TellBuyer(name, bizID, convID, phone, text string) {
 	s.notify.Async(name, func() error {
+		ctx := context.Background()
 		if convID != "" && s.dm != nil {
-			err := s.dm(context.Background(), convID, text)
+			err := s.dm(ctx, convID, text)
 			if err == nil {
 				return nil
 			}
 			s.log.Info("chat message not sent, falling back to WhatsApp", "name", name, "err", err)
 		}
-		return s.notify.WhatsApp(phone, text)
+		var store string
+		if err := s.pool.QueryRow(ctx, `select name from businesses where id=$1`, bizID).Scan(&store); err != nil {
+			return err
+		}
+		return s.notify.WhatsApp(phone, notify.OrderUpdate(store, text))
 	})
 }
 
@@ -484,17 +490,17 @@ func (s *Service) Announce(ctx context.Context, p CreateParams, pl *Placed) (*Or
 
 	switch {
 	case replacement && t.Total == 0:
-		s.TellBuyer("exchangePlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+		s.TellBuyer("exchangePlaced", p.BusinessID, p.ConversationID, p.Phone, fmt.Sprintf(
 			"Your exchange is confirmed: order %s (%s). We will ship it soon.\nTrack it: %s (enter %s on the page)",
 			code, itemSummary(lines), s.trackURL(code), p.Phone))
 	case chatCodConfirmed:
-		s.TellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+		s.TellBuyer("orderPlaced", p.BusinessID, p.ConversationID, p.Phone, fmt.Sprintf(
 			"✅ Order confirmed: %s\nTotal %s, pay cash on delivery.\nTrack it anytime: %s (enter %s on the page)",
 			code, notify.Rupees(t.Total), s.trackURL(code), p.Phone))
 	case p.PaymentMethod == "cod":
-		s.startCodFlow(code, p.Phone, bizName, t.Total, tokenAmount, p.ConversationID)
+		s.startCodFlow(p.BusinessID, code, p.Phone, bizName, t.Total, tokenAmount, p.ConversationID)
 	default:
-		s.TellBuyer("orderPlaced", p.ConversationID, p.Phone, fmt.Sprintf(
+		s.TellBuyer("orderPlaced", p.BusinessID, p.ConversationID, p.Phone, fmt.Sprintf(
 			"Order %s placed at %s for %s. Complete payment here to confirm it: %s (enter %s on the page)",
 			code, bizName, notify.Rupees(t.Total), s.trackURL(code), p.Phone))
 	}
@@ -552,7 +558,7 @@ func sourceLabel(source string) string {
 
 // startCodFlow sends the RTO-cutting confirmation sequence: summary + address
 // confirm link (+ token payment ask when the seller has one configured).
-func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount int, convID string) {
+func (s *Service) startCodFlow(bizID, code, phone, bizName string, total, tokenAmount int, convID string) {
 	confirmToken := secure.Hex(16)
 	s.rdb.Set(context.Background(), "codconfirm:"+code, confirmToken, 72*time.Hour)
 	msg := fmt.Sprintf("Order %s at %s — total %s (Cash on Delivery).\nPlease confirm your order and address here: %s/o/%s/confirm?token=%s",
@@ -560,7 +566,7 @@ func (s *Service) startCodFlow(code, phone, bizName string, total, tokenAmount i
 	if tokenAmount > 0 {
 		msg += fmt.Sprintf("\nPay a %s token now to guarantee your order (adjusted in the COD amount).", notify.Rupees(tokenAmount))
 	}
-	s.TellBuyer("codConfirm", convID, phone, msg)
+	s.TellBuyer("codConfirm", bizID, convID, phone, msg)
 }
 
 // ConfirmCod is hit from the buyer's WhatsApp confirmation link.
@@ -598,7 +604,7 @@ func (s *Service) ResendCodConfirmation(ctx context.Context, bizID, orderID stri
 	if err != nil {
 		return err
 	}
-	s.startCodFlow(code, phone, bizName, total, tokenAmount, convID)
+	s.startCodFlow(bizID, code, phone, bizName, total, tokenAmount, convID)
 	s.pool.Exec(ctx, `update orders set cod_reminder_at=now() where id=$1`, orderID)
 	return nil
 }
@@ -612,19 +618,19 @@ func (s *Service) NudgePendingCod(ctx context.Context, after time.Duration) (int
 		and o.payment_method='cod' and o.cod_confirmed_at is null and o.cod_reminder_at is null
 		and o.payment_status <> 'token_paid' and o.status = 'new'
 		and o.created_at < now() - make_interval(mins => $1) and b.status = 'active'
-		returning o.order_code, c.phone, b.name, o.total, o.token_amount, coalesce(o.conversation_id::text, '')`, int(after.Minutes()))
+		returning o.business_id, o.order_code, c.phone, b.name, o.total, o.token_amount, coalesce(o.conversation_id::text, '')`, int(after.Minutes()))
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
 	sent := 0
 	for rows.Next() {
-		var code, phone, bizName, convID string
+		var bizID, code, phone, bizName, convID string
 		var total, tokenAmount int
-		if err := rows.Scan(&code, &phone, &bizName, &total, &tokenAmount, &convID); err != nil {
+		if err := rows.Scan(&bizID, &code, &phone, &bizName, &total, &tokenAmount, &convID); err != nil {
 			return sent, err
 		}
-		s.startCodFlow(code, phone, bizName, total, tokenAmount, convID)
+		s.startCodFlow(bizID, code, phone, bizName, total, tokenAmount, convID)
 		sent++
 	}
 	return sent, rows.Err()
@@ -673,7 +679,7 @@ func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
 		note = "COD token payment received"
 	}
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed',$2)`, orderID, note)
-	s.TellBuyer("paid", convID, phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
+	s.TellBuyer("paid", bizID, convID, phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
 	s.publishOrder(ctx, bizID, orderID, "orderPaid")
 	return nil
 }
@@ -751,7 +757,7 @@ func (s *Service) SetStatus(ctx context.Context, bizID, orderID, newStatus, note
 			text += fmt.Sprintf(" Courier: %s, tracking id %s.", courierName, courierTracking)
 		}
 		text += " Track: " + s.trackURL(code)
-		s.TellBuyer("statusUpdate", convID, phone, text)
+		s.TellBuyer("statusUpdate", bizID, convID, phone, text)
 	}
 
 	o, err := s.GetByID(ctx, bizID, orderID)
@@ -795,7 +801,7 @@ func (s *Service) ChangeAddress(ctx context.Context, bizID, orderID string, addr
 			Body: "The buyer changed the delivery address to: " + where + ". Check it before you pack.",
 			Path: "/app/orders?order=" + orderID})
 	} else {
-		s.TellBuyer("addressChanged", convID, phone, fmt.Sprintf("The delivery address for order %s is now: %s. Track: %s",
+		s.TellBuyer("addressChanged", bizID, convID, phone, fmt.Sprintf("The delivery address for order %s is now: %s. Track: %s",
 			code, where, s.trackURL(code)))
 	}
 	o, err := s.GetByID(ctx, bizID, orderID)
@@ -1016,11 +1022,17 @@ func (s *Service) trackURL(code string) string {
 // number at checkout but did not order: an hour after, within a day, at most
 // once a week per buyer, for sellers whose plan includes recovery (can) and
 // who keep it on. Claimed by stamping reminded_at, so instances never double up.
+// A cart reminder is marketing, so it goes from the seller's own WhatsApp
+// (notify.Offer); until sellers can connect one, nothing is claimed or sent
+// and the seller nudges from Orders → Abandoned checkouts.
 func (s *Service) RemindAbandoned(ctx context.Context, can func(ctx context.Context, bizID, feature string) bool) (int, error) {
 	// keep a dropped checkout only as long as it is useful: the weekly
 	// reminder cap looks back 7 days, the seller's list shows this week
 	if _, err := s.pool.Exec(ctx, `delete from checkout_sessions where verified_at < now() - interval '30 days'`); err != nil {
 		return 0, err
+	}
+	if !s.notify.OffersOn() {
+		return 0, nil
 	}
 	rows, err := s.pool.Query(ctx, `update checkout_sessions cs set reminded_at=now()
 		from businesses b
@@ -1062,7 +1074,7 @@ func (s *Service) RemindAbandoned(ctx context.Context, can func(ctx context.Cont
 			what = names
 		}
 		msg := fmt.Sprintf("Hi! You were checking out %s at %s. It is still waiting for you — finish your order here: %s", what, d.name, link)
-		if err := s.notify.WhatsApp(d.phone, msg); err != nil {
+		if err := s.notify.Offer(ctx, d.bizID, d.phone, msg); err != nil {
 			s.log.Warn("abandoned checkout reminder failed", "businessId", d.bizID, "err", err)
 			continue
 		}

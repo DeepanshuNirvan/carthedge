@@ -57,7 +57,7 @@ export function Strand() {
               />
               <span
                 className={cn(
-                  'whitespace-nowrap text-[12px] font-medium transition-[opacity,transform,color] duration-std ease-enter',
+                  'whitespace-nowrap text-note font-medium transition-[opacity,transform,color] duration-std ease-enter',
                   'glass-nav rounded-full px-2.5 py-1',
                   now ? 'text-hi opacity-0 2xl:opacity-100' : 'text-low opacity-0 -translate-x-1',
                   'group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:opacity-100',

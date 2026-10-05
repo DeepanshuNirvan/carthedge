@@ -210,6 +210,7 @@ A cool-neutral ground lit by two signal hues: jade for what is settled, bulb-gol
 - **Body** (400, 14px in UI and 16px to 18px in marketing, -0.006em, features ss01 and cv11): running text, capped at 52–65ch.
 - **Label** (500–600, 13px): field labels, tabs, small buttons, card titles (15px, 600).
 - **Chip** (600, 11.5px, +0.005em): status chips and badges, in sentence case or capitalized.
+- **Text scale tokens** (preset `fontSize`, marketing uses only these): `nano` 10.5px inside sample screens and device mockups, `caption` 11.5px, `note` 12.5px, `ui` 13.5px for controls and nav, `copy` 14.5px for ledger and list copy, `title` 15.5px for item titles, `base` 16px, `lead` 17px for intro lines; `figure` (2.6rem) for a price, `stat` and `quote` (fluid) and `hero` (fluid, the landing h1). Half-pixel steps about 8% apart; no `text-[Npx]` values in marketing.
 
 ### Named Rules
 **The Tabular Money Rule.** Every amount, count and metric is set in tabular figures (`.tnum`). Money columns must not jitter.

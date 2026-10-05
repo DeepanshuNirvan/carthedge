@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BellRing, FileText, IndianRupee, Lock, MapPin, MessageCircle, Pencil, Phone, Printer, Truck } from 'lucide-react';
-import type { Address, OrderStatus } from '@/api/types';
+import type { Address, Order, OrderStatus } from '@/api/types';
 import { orderStatuses } from '@/api/types';
 import { useOrder, useOrderMutations } from '@/api/orders';
 import { useCan } from '@/api/plans';
+import { useBusiness } from '@/api/business';
 import { InvoiceDialog } from '../invoices/InvoiceDialog';
 import { AfterSalePanel } from './AfterSalePanel';
 import { toast } from '@/store/ui';
@@ -17,6 +18,29 @@ import { MoneyText } from '@/ui/MoneyText';
 import { StatusChip } from '@/ui/Badge';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { whatsappHref } from '@/lib/validators';
+import { formatPaise } from '@/lib/money';
+import { appUrl } from '../shell/ShareActions';
+
+/** The update a seller sends the buyer for where the order stands, typed in
+    and ready to send from their own WhatsApp. */
+function buyerUpdate(order: Order, store: string) {
+  const first = order.customerName.trim().split(/\s+/)[0];
+  const yours = `your order ${order.code} from ${store}`;
+  const courier = order.courierName
+    ? ` Courier: ${order.courierName}${order.courierTrackingId ? `, tracking id ${order.courierTrackingId}` : ''}.`
+    : '';
+  const news: Record<OrderStatus, string> = {
+    new: `thanks for ${yours}. Total ${formatPaise(order.total)}${order.paymentMethod === 'cod' ? ', cash on delivery' : ''}.`,
+    confirmed: `${yours} is confirmed. We will pack it soon.`,
+    packed: `${yours} is packed and ready to ship.`,
+    shipped: `${yours} is on the way!${courier}`,
+    delivered: `${yours} was delivered. Thank you for shopping with us!`,
+    rto: `${yours} came back to us. Reply here and we will sort it out.`,
+    cancelled: `${yours} has been cancelled.`,
+  };
+  return `Hi${first ? ` ${first}` : ''}, ${news[order.status]}
+Track it: ${appUrl(`/o/${order.code}`)}`;
+}
 
 /** Where the parcel goes, editable until it ships. */
 function AddressEditor({ orderId, address, onDone }: { orderId: string; address: Address; onDone: () => void }) {
@@ -67,6 +91,7 @@ function AddressEditor({ orderId, address, onDone }: { orderId: string; address:
 
 export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId ?? undefined);
+  const { data: business } = useBusiness();
   const { setStatus, ship, resendCodConfirmation, confirmPayment } = useOrderMutations();
   const canInvoice = useCan('invoices').allowed;
   const [courierName, setCourierName] = useState('Shiprocket');
@@ -138,10 +163,10 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
               {/* the seller's next move is usually a message: one tap to the buyer's chat or phone */}
               <div className="flex shrink-0 gap-1">
                 <a
-                  href={whatsappHref(order.customerPhone)}
+                  href={whatsappHref(order.customerPhone, buyerUpdate(order, business?.name ?? 'us'))}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label={`WhatsApp ${order.customerName}`}
+                  aria-label={`WhatsApp ${order.customerName} an update on this order`}
                   className="flex size-10 items-center justify-center rounded-full bg-jade-500/12 text-jade-ink transition-colors hover:bg-jade-500/20"
                 >
                   <MessageCircle className="size-4" />

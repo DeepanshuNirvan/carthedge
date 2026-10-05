@@ -117,6 +117,43 @@
     var(--shadow-soft);
 }
 
+/* a display stage inside a panel: lamp light falling on a recessed floor,
+   with a faint jade pool where the lit object stands */
+.stage-lit {
+  background:
+    radial-gradient(70% 90% at 50% -12%, rgb(var(--bulb) / 0.13), transparent 70%),
+    radial-gradient(55% 45% at 50% 112%, rgb(var(--jade-500) / 0.09), transparent 72%),
+    rgb(var(--field) / var(--field-a));
+}
+
+/* ---------- marketing light: the lane's lamps, named so pages compose them ----------
+   Every pool is anchored to an edge like a lamp just out of frame. */
+.lane-wash {
+  background: radial-gradient(110% 55% at 50% -8%, rgb(var(--bulb) / 0.13), transparent 62%);
+}
+.lane-wash-jade {
+  background: radial-gradient(70% 40% at 82% 0%, rgb(var(--jade-500) / 0.07), transparent 60%);
+}
+.lane-vignette {
+  background: radial-gradient(140% 100% at 50% 30%, transparent 55%, rgb(var(--ink-950) / 0.22) 100%);
+}
+.lamp-warm {
+  background: radial-gradient(55% 48% at 100% 62%, rgb(var(--bulb) / 0.2), transparent 72%);
+}
+.lamp-jade {
+  background: radial-gradient(55% 45% at 0% 82%, rgb(var(--jade-500) / 0.16), transparent 72%);
+}
+
+/* Instagram's own avatar ring colours, for the sample DMs */
+.ig-mark {
+  background: linear-gradient(135deg, rgb(var(--gold-400)), rgb(var(--danger)) 55%, rgb(var(--info)));
+}
+
+/* a cell rule on the right and bottom edges, so a grid of cells never doubles its lines */
+.rule-br {
+  box-shadow: inset -1px -1px 0 rgb(var(--line) / var(--line-a));
+}
+
 /* ---------- controls ---------- */
 /* raised control: chips, small buttons, icon wells */
 .neu {
@@ -281,7 +318,8 @@
   border-radius: 2px;
   background: currentColor;
   transform-origin: left center;
-  animation: strikeDraw 360ms var(--ease-enter) forwards;
+  /* --strike-delay lets a row of words strike one after another */
+  animation: strikeDraw 360ms var(--ease-enter) var(--strike-delay, 0ms) both;
 }
 @keyframes strikeDraw {
   from {

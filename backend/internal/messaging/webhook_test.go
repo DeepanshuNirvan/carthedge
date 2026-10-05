@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -158,5 +160,31 @@ func TestChunksRespectInstagramLimit(t *testing.T) {
 	}
 	if got := chunks("short", 1000); len(got) != 1 || got[0] != "short" {
 		t.Fatalf("short text split: %v", got)
+	}
+}
+
+func TestWhatsAppConnectClosedUntilSwitchedOn(t *testing.T) {
+	h := NewHandler(HandlerDeps{OAuth: OAuthConfig{AppID: "a", AppSecret: "s", RedirectURL: "https://x.test/cb"}})
+	for _, tc := range []struct{ method, path, body string }{
+		{http.MethodGet, "/api/v1/channels/whatsapp/connect-url", ""},
+		{http.MethodPost, "/api/v1/channels", `{"channel":"whatsapp","externalId":"1","accessToken":"t"}`},
+	} {
+		r := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		r.SetPathValue("channel", "whatsapp")
+		w := httptest.NewRecorder()
+		if tc.method == http.MethodGet {
+			h.ConnectURL(w, r)
+		} else {
+			h.Connect(w, r)
+		}
+		if w.Code != http.StatusConflict {
+			t.Errorf("%s %s: want 409 while WhatsApp is assisted, got %d", tc.method, tc.path, w.Code)
+		}
+	}
+	if !h.closed("whatsapp") || h.closed("instagram") {
+		t.Fatal("only WhatsApp waits for the switch")
+	}
+	if (&Handler{whatsappSellers: true}).closed("whatsapp") {
+		t.Fatal("switched on, sellers connect WhatsApp")
 	}
 }

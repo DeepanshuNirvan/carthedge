@@ -57,18 +57,18 @@ export function Problem() {
                 hidden: { opacity: 0, y: -24, scale: 0.94 },
                 shown: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
               }}
-              className="glass-nav sheen flex items-center gap-3 rounded-[22px] p-3"
+              className="glass-nav sheen flex items-center gap-3 rounded-lg p-3"
               style={{ marginLeft: `${(i % 3) * 10}px`, marginRight: `${((i + 1) % 3) * 8}px` }}
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[linear-gradient(135deg,rgb(var(--gold-400)),rgb(var(--danger))_55%,rgb(var(--info)))] text-white">
-                <Instagram className="size-[18px]" aria-hidden />
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-sm ig-mark text-white">
+                <Instagram className="size-4.5" aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="flex items-baseline justify-between gap-2 text-[12.5px]">
+                <p className="flex items-baseline justify-between gap-2 text-note">
                   <span className="truncate font-semibold text-hi">{n.from}</span>
-                  <span className="shrink-0 text-[11px] text-low">{i < 2 ? 'now' : `${i * 7}m ago`}</span>
+                  <span className="shrink-0 text-caption text-low">{i < 2 ? 'now' : `${i * 7}m ago`}</span>
                 </p>
-                <p className="truncate text-[13px] text-mid">{n.text}</p>
+                <p className="truncate text-ui text-mid">{n.text}</p>
               </div>
             </motion.div>
           ))}
@@ -79,8 +79,8 @@ export function Problem() {
       <ul className="mt-16 grid gap-x-10 gap-y-4 border-t pt-8 md:grid-cols-3">
         {stats.map((stat, i) => (
           <Reveal key={stat.label} delay={i * 0.06}>
-            <li className="text-[15px] leading-relaxed text-mid">
-              <span className="mr-1.5 text-[17px] font-semibold tnum text-hi">
+            <li className="text-title leading-relaxed text-mid">
+              <span className="mr-1.5 text-lead font-semibold tnum text-hi">
                 <CountUp to={stat.value} />
                 {stat.suffix}
               </span>

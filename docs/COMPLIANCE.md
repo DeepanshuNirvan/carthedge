@@ -45,6 +45,7 @@ How CartHedge handles money and personal data, what the code guarantees, and wha
 - **Withdrawal is as easy:** reply STOP (or tap "Stop promotions"), one tap on the stop link at the end of every offer (no code needed), the order page, or ask the seller (Customers → Stop offers).
 - **Proof:** every yes and no is appended to `marketing_consents` with the exact sentence agreed to (or the message sent), source, order, IP address and browser, and time. The seller sees the history in the customer drawer and in their data export. Erasing a buyer deletes it.
 - **Sending:** broadcasts reach only buyers whose current answer is yes; the seller accepts the broadcast rules (version + time + IP recorded in `terms_acceptances`) before the first send or schedule.
+- **Which number:** marketing (offers, cart reminders, back-in-stock) only ever leaves from the seller's own WhatsApp number, never CartHedge's: the buyer said yes to the shop, not to CartHedge. Until sellers can connect WhatsApp, those messages wait (`notify.SetOffers` unset) and the seller reaches buyers by hand. CartHedge's number sends only one-to-one transactional templates (codes, order updates, seller alerts).
 - **Roles:** the seller is the data fiduciary for their buyers under the DPDP Act; CartHedge processes on the seller's behalf (terms, "Broadcasts and marketing messages").
 
 ## Owner actions (not code)

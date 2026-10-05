@@ -37,9 +37,9 @@ export function Footer() {
                   aria-label={s.label}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex size-10 items-center justify-center rounded-full text-low transition-colors hover:bg-[rgb(var(--field)/0.08)] hover:text-hi"
+                  className="inline-flex size-10 items-center justify-center rounded-full text-low transition-colors hover:bg-field/8 hover:text-hi"
                 >
-                  <s.icon className="size-[18px]" />
+                  <s.icon className="size-4.5" />
                 </a>
               ))}
             </div>
@@ -47,7 +47,7 @@ export function Footer() {
         </div>
         {columns.map((col) => (
           <nav key={col.title} aria-label={col.title}>
-            <p className="mb-2 text-[13px] font-semibold text-hi">{col.title}</p>
+            <p className="mb-2 text-ui font-semibold text-hi">{col.title}</p>
             <ul className="flex flex-col">
               {col.links.map((l) => (
                 <li key={l.href} className="flex">

@@ -1,0 +1,9 @@
+**Rohit → @Hiren:** Your ₹2,749 maths is right, and I see the same trap at 300 orders: Starter ₹499 plus 200 extra at ₹3 is ₹1,099, above Growth. I'll take a flat fee, but define "order" (does a cancelled or RTO one count?), alert at 80% of quota, and stop at the cap unless the seller taps to go over. Meta's WhatsApp charges go in a separate prepaid wallet at pass-through. That template shock made you leave Interakt. Also, how many AI replies does a plan include? Say the number, and a top-up per 1,000.
+
+**Rohit → @Devanshi:** Your 35% to 32% on Shiprocket matches what I see, a free "haan" reply is weak. For two of my jewellery clients, what actually moved refusals was a ₹30 to ₹50 discount for paying online plus a pincode check, and CartHedge has both on paper. Did your Shiprocket test have any prepaid nudge, or only the "haan"? If only that, retest before you write it off.
+
+**Rohit → @Meenal:** No commission for the CA, discount to the client, fair if you refer once. I carry setup, the 10 pm "AI ne galat bola" call and the Instagram token fix, so I need recurring pay with a GST invoice and TDS certificate, which keeps your books clean too. At 20%, a ₹499 plan pays me ₹100, so I'd never push Starter.
+
+**Rohit → @Vikram:** Your ₹1,500 turned ₹3,800 story is why I read all fine print. Agree on overage autopay. Fix: cap in writing, a WhatsApp alert before it bites, upgrade only on a tap. And you are right, no face. I need a named person on WhatsApp before I tell one client.
+
+**Rohit → @Lakshmi:** Your number question: on the API your own WhatsApp app goes dead unless Coexistence is on, so ask that first. What changed for me: I thought the partner program was the only gate, but about nine of us named own-number WhatsApp as the blocker, so that comes first. Devanshi's 35 to 32 also drops COD confirm from my number one excitement. Partner terms, multi-client login and real support stay my gate, nothing moved there.

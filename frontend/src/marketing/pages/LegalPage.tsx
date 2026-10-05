@@ -21,12 +21,12 @@ export default function LegalPage({ doc }: { doc: LegalDocId }) {
         <header className="max-w-[68ch]">
           <h1 className="text-d2 font-semibold text-hi">{title}</h1>
           <p className="mt-4 text-lg leading-relaxed text-mid">{intro}</p>
-          <p className="mt-3 text-[13px] text-low">Last updated {updated}</p>
+          <p className="mt-3 text-ui text-low">Last updated {updated}</p>
         </header>
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[13rem_1fr] lg:gap-14">
           <nav aria-label="Contents" className="hidden lg:block">
-            <ol className="sticky top-28 flex flex-col gap-1 border-l text-[13px]">
+            <ol className="sticky top-28 flex flex-col gap-1 border-l text-ui">
               {sections.map((section) => (
                 <li key={section.heading}>
                   <a
@@ -50,7 +50,7 @@ export default function LegalPage({ doc }: { doc: LegalDocId }) {
                 <h2 className="text-d4 font-semibold text-hi">{section.heading}</h2>
                 <div className="mt-4 grid gap-4">
                   {section.body.map((para) => (
-                    <p key={para} className="text-[15px] leading-[1.7] text-mid">
+                    <p key={para} className="text-title leading-relaxed text-mid">
                       {para}
                     </p>
                   ))}

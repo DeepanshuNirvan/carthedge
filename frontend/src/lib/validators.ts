@@ -51,5 +51,7 @@ export const addressSchema = z.object({
   pincode: pincodeSchema,
 });
 
-/** wa.me chat link for an Indian number in any of the forms sellers type it. */
-export const whatsappHref = (phone: string) => `https://wa.me/91${phone.replace(/\D/g, '').slice(-10)}`;
+/** wa.me chat link for an Indian number in any of the forms sellers type it,
+ *  optionally with a message typed in, ready to send. */
+export const whatsappHref = (phone: string, text?: string) =>
+  `https://wa.me/91${phone.replace(/\D/g, '').slice(-10)}${text ? `?text=${encodeURIComponent(text)}` : ''}`;

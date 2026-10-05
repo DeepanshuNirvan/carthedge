@@ -58,7 +58,7 @@ The migration file itself was **not** modified. A fresh database has no duplicat
 | `ADMIN_EMAIL` | `ddnirvan@gmail.com` | receives custom-plan requests and contact-form leads |
 | `META_VERIFY_TOKEN` | `carthedge_wh_56a1edb12db0f275` | paste this exact string into the Meta webhook config |
 | `META_APP_ID` / `META_APP_SECRET` | **blank** | §3 fills these |
-| `WHATSAPP_API_URL` / `_TOKEN` | **blank** | deliberately — OTP codes print to the server console until DLT, see §5 |
+| `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TOKEN` | **blank** | deliberately — in development, codes and messages print to the server console |
 
 > **`ENCRYPTION_KEY` changed — and six rows were affected.** The old value was 64 zeros, so anything encrypted under it stopped decrypting. Checked rather than assumed: five `qa-boutique-*` businesses held a Razorpay secret and one `channel_connections` row held a WhatsApp token. Decrypting them with the old key showed they were all mock values — `qasecret123` and `EAAmocktoken` — so nothing real was lost.
 >
@@ -474,12 +474,12 @@ A proprietorship registers on DLT with owner PAN + Udyam + address proof. Still 
 
 Until that lands, three options, cheapest first:
 
-1. **Leave `WHATSAPP_API_URL` blank.** OTP codes print to the server console. Complete dev and demo path, zero cost, already how your `.env` is set.
+1. **Leave `WHATSAPP_PHONE_NUMBER_ID` blank.** In development, OTP codes print to the server console. Complete dev and demo path, zero cost, already how your `.env` is set. (WhatsApp codes from CartHedge's own number need no DLT at all; that is the production route, see WHATSAPP-INSTAGRAM-GO-LIVE.md "Phase 1".)
 2. **Email OTP** instead of SMS for seller signup. Your SMTP is already wired, so this needs no vendor and no paperwork. Best temporary production stand-in.
 3. **Fast2SMS "Quick SMS" route** — delivers on *their* DLT-registered header, so no registration of your own. Fine for testing; not acceptable long-term because the sender ID is not yours.
 4. **Firebase Phone Auth** — Google carries the DLT burden. No paperwork, but per-verification pricing and it moves phone verification out of your backend.
 
-The send path is one function, `Notifier.WhatsApp` in [`internal/notify/notify.go`](../backend/internal/notify/notify.go). It POSTs `{"to": …, "message": …}` with a bearer token to whatever `WHATSAPP_API_URL` you set, so any provider accepting a JSON POST drops in with no code change.
+The send path is one function, `Notifier.WhatsApp` in [`internal/notify/whatsapp.go`](../backend/internal/notify/whatsapp.go): an approved template from CartHedge's own number through Meta's Cloud API.
 
 ---
 
