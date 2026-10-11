@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Tilt } from '@/ui/Tilt';
 import { Reveal, RevealGroup, RevealItem, SectionHead, revealItem } from '../Section';
 import { deskPreviews } from './DeskPreviews';
+import { scrollToSection } from '../useLenis';
 
 const ease = [0.16, 1, 0.3, 1] as const;
 const desks = features.desks;
@@ -25,14 +26,25 @@ export function FeaturesBento() {
   const Preview = deskPreviews[desk.key];
   const nextIdx = (active + 1) % desks.length;
 
-  // the last thing on a desk is the way to the next one: back up to the stage, and on
-  // phones slide the capsule rail so the new desk's chip is in view
-  const openNext = () => {
-    const behavior = reduced ? 'auto' : 'smooth';
-    setActive(nextIdx);
-    top.current?.scrollIntoView({ block: 'start', behavior });
-    const chip = tabs.current[nextIdx];
-    if (chip && rail.current) rail.current.scrollTo({ left: chip.offsetLeft - 20, behavior });
+  // Open a desk from anywhere (chip, arrow key, "Next"). The new desk starts at its
+  // sample, so if the reader is already below the top of the stage, bring them back up
+  // to it (through Lenis, or the glide undoes it); a stage already in view stays put.
+  // On phones the capsule rail also slides to centre the new chip.
+  const open = (i: number) => {
+    setActive(i);
+    const stage = top.current;
+    // "above the top" = higher than its nav clearance (scroll-mt-24)
+    if (stage && stage.getBoundingClientRect().top < parseFloat(getComputedStyle(stage).scrollMarginTop) - 1) {
+      scrollToSection(stage, !!reduced);
+    }
+    const chip = tabs.current[i];
+    const strip = rail.current;
+    if (chip && strip && strip.scrollWidth > strip.clientWidth) {
+      strip.scrollTo({
+        left: chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2,
+        behavior: reduced ? 'auto' : 'smooth',
+      });
+    }
   };
 
   // arrow keys walk the desks (both axes, since the index is a row on phones and a column on desktop)
@@ -50,8 +62,8 @@ export function FeaturesBento() {
               : null;
     if (next === null) return;
     e.preventDefault();
-    setActive(next);
-    tabs.current[next]?.focus();
+    open(next);
+    tabs.current[next]?.focus({ preventScroll: true });
   };
 
   return (
@@ -82,7 +94,7 @@ export function FeaturesBento() {
                   aria-selected={on}
                   aria-controls="desk-panel"
                   tabIndex={on ? 0 : -1}
-                  onClick={() => setActive(i)}
+                  onClick={() => open(i)}
                   onKeyDown={onKey}
                   className={cn(
                     'group relative flex min-h-11 shrink-0 snap-start items-center gap-2.5 whitespace-nowrap rounded-full px-4 text-ui font-medium transition-colors duration-std',
@@ -141,7 +153,7 @@ export function FeaturesBento() {
               </motion.dl>
               <button
                 type="button"
-                onClick={openNext}
+                onClick={() => open(nextIdx)}
                 className="group mt-8 inline-flex min-h-11 items-center gap-2 rounded-full text-copy font-medium text-mid transition-colors duration-std hover:text-hi"
               >
                 Next: {desks[nextIdx].label}

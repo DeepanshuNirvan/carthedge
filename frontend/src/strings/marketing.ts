@@ -30,7 +30,7 @@ export const hero = {
   sub: 'CartHedge replies to buyers in their language from your real catalog, collects the order and confirms it. You approve with a tap.',
   ctaPrimary: 'Start free trial',
   ctaSecondary: 'See the automations',
-  trial: '15 days free. No card.',
+  trial: '30 days free. No card.',
 };
 
 // the hero counter: one real-shaped conversation, played on a loop
@@ -370,7 +370,7 @@ export const storefrontPreview = {
 
 export const pricing = {
   title: 'Plans that grow with your DMs.',
-  sub: 'Every plan starts with 15 days free. No card to try.',
+  sub: 'Every plan starts with 30 days free. No card to try.',
   replacesLead: 'One plan replaces',
   replaces: ['the DM chatbot', 'the store builder', 'the Google Form', 'the invoice app', 'the Excel sheet', 'the order notebook'],
   popular: 'Most popular',
@@ -439,7 +439,7 @@ export const testimonials = {
 
 export const finalCta = {
   title: 'The stall stays open. Even at 2 a.m.',
-  sub: '15 days free. Set up in an evening. Cancel anytime.',
+  sub: '30 days free. Set up in an evening. Cancel anytime.',
   cta: 'Start free trial',
 };
 

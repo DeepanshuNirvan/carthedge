@@ -70,7 +70,7 @@ The AI reads the DM and drafts the order. The seller shares one branded link. Th
 ## 3. Complete feature inventory
 
 ### 3.1 Seller — account and onboarding
-- Self-serve registration → **mobile OTP** → business created → **15-day free trial, no card**.
+- Self-serve registration → **mobile OTP** → business created → **30-day free trial, no card**.
 - Four-step onboarding: business details and store link → verify mobile → contact and socials → done.
 - **Seller-chosen store link**, used in every buyer URL (`/s/ritika-closet`) so links carry the seller's identity, not yours. Checked for availability as they type, validated server-side (§26), and fixed after signup because every shared link depends on it.
 - Business profile: name, owner, email, phone, WhatsApp, Instagram, address, city, state, pincode, GSTIN, logo.
@@ -179,7 +179,7 @@ Every link is branded with the business code, has live click and order counts, a
 ## 4. Seller playbook
 
 ### Day 0 — signup to first link (target: under 10 minutes)
-1. **Register** at `/app/register` → business created, 15-day trial starts, no card.
+1. **Register** at `/app/register` → business created, 30-day trial starts, no card.
 2. **Onboarding**: business details → WhatsApp + Instagram handles → done. This sets the business code that appears in every buyer URL.
 3. **Settings → Business profile**: upload the logo, set city/state/pincode (the pincode is the courier pickup point that serviceability checks against).
 4. **Settings → Payments**: paste Razorpay Key ID and Secret. Until this is done the storefront still works but only COD is offered. Set COD on/off, the COD token amount, shipping fee, and the RTO baseline (industry default 25%).
@@ -542,7 +542,7 @@ A third position, worth considering once volume is real: keep the fee but make i
 | Pro | ₹1,999 | 2,000 | ₹2 | + `aiReply`, `courier`, `waitlist` |
 | Custom | negotiated | negotiated | negotiated | assigned from the admin console |
 
-15-day free trial, no card. Billed through your own Razorpay account.
+30-day free trial, no card. Billed through your own Razorpay account.
 
 **Why this pricing works:** it is anchored to ROI, not to features. A seller doing 150 COD orders a month at ₹800 AOV with 35% RTO loses ₹8,000–15,000 a month. Cutting RTO to 20% saves more than the ₹999 plan every single month. You are not selling software; you are selling back a fraction of the money they are currently setting on fire.
 

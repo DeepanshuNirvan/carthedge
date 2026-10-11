@@ -13,7 +13,7 @@ web
 - **Sellers** — Instagram/WhatsApp-first D2C sellers in India (fashion, jewellery, home decor, boutiques, reseller hubs). They run the business from a phone, often late at night, between DMs. The seller app is their daily tool.
 - **Buyers** — anyone who taps a seller's link inside the Instagram or WhatsApp in-app browser. They don't sign up; phone OTP is their only identity. Most are on mid-range Android phones over 4G *(inferred)*.
 - **CartHedge staff** — support, sales and ops, working in the platform admin console on a laptop *(inferred)*.
-- **Visitors** — prospective sellers on the marketing site who are deciding whether to start the 15-day trial.
+- **Visitors** — prospective sellers on the marketing site who are deciding whether to start the 30-day trial.
 
 ## Product Purpose
 

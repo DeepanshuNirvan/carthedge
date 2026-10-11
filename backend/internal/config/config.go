@@ -101,7 +101,7 @@ func Load() (*Config, error) {
 		RefreshTTL:    envDur("JWT_REFRESH_TTL", 30*24*time.Hour),
 		EncryptionKey: os.Getenv("ENCRYPTION_KEY"),
 
-		TrialDays:     envInt("TRIAL_DAYS", 15),
+		TrialDays:     envInt("TRIAL_DAYS", 30),
 		TrialPlanCode: env("TRIAL_PLAN_CODE", "pro"),
 		CORSOrigins:   strings.Split(env("CORS_ORIGINS", "*"), ","),
 

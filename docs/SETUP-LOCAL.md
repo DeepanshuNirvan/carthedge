@@ -424,7 +424,7 @@ curl -X POST https://<your-tunnel>/api/v1/channels \
 
 `channel` accepts only `whatsapp` or `instagram`. For Instagram, `externalId` is the Instagram **user/account ID**, not the `@handle`. The token is AES-GCM encrypted with `ENCRYPTION_KEY` before it hits the database and is never returned by the API.
 
-Endpoints: `GET /api/v1/channels`, `POST /api/v1/channels`, `DELETE /api/v1/channels/{channel}`, `GET /api/v1/channels/{channel}/connect-url`. All require an active subscription with the AI capability — the 15-day `pro` trial includes it.
+Endpoints: `GET /api/v1/channels`, `POST /api/v1/channels`, `DELETE /api/v1/channels/{channel}`, `GET /api/v1/channels/{channel}/connect-url`. All require an active subscription with the AI capability — the 30-day `pro` trial includes it.
 
 **End-to-end check:** DM the connected Instagram account (or WhatsApp test number) from a second handset. The conversation must appear in the AI desk inbox within a few seconds. If it does not, in order: is the tunnel up, did the `messages` subscription get added to the right object, and is Instagram's "Allow access to messages" toggle on.
 

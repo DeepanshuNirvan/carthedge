@@ -30,11 +30,11 @@ on conflict (id) do update set
   upi_id = excluded.upi_id, shipping_fee = excluded.shipping_fee, cod_token_amount = excluded.cod_token_amount,
   updated_at = now();
 
--- 15-day trial on the Pro plan.
+-- 30-day trial on the Pro plan.
 insert into subscriptions (business_id, plan_id, status, ends_at)
-select '10000000-0000-0000-0000-000000000001', id, 'trial', now() + interval '15 days' from plans where code='pro'
+select '10000000-0000-0000-0000-000000000001', id, 'trial', now() + interval '30 days' from plans where code='pro'
 on conflict (business_id) do update set plan_id = excluded.plan_id, status = 'trial',
-  ends_at = now() + interval '15 days', updated_at = now();
+  ends_at = now() + interval '30 days', updated_at = now();
 
 -- Catalog: wipe the demo seller's products (cascades variants/waitlist) and reinsert with images.
 delete from products where business_id = '10000000-0000-0000-0000-000000000001';

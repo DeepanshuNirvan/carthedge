@@ -128,7 +128,7 @@ function AsidePitch() {
     <div className="max-w-md">
       <p className="text-d2 font-semibold text-hi">A few minutes from now, your DMs start becoming orders.</p>
       <ul className="mt-7 flex flex-col gap-3 text-[15px] text-mid">
-        {['15-day free trial, no card', 'Your store link the moment you finish', 'An assistant that answers from your catalog'].map(
+        {['30-day free trial, no card', 'Your store link the moment you finish', 'An assistant that answers from your catalog'].map(
           (t) => (
             <li key={t} className="flex items-center gap-3">
               <span className="bulb size-2" data-lit="true" />
@@ -264,7 +264,7 @@ export default function RegisterPage() {
     <AuthLayout aside={<AsidePitch />}>
       <Seo title="Start your free trial | CartHedge" description="Create your CartHedge business in two minutes." path="/app/register" noIndex />
       <h1 className="text-d3 font-semibold text-hi">Start your free trial</h1>
-      <p className="mt-2 text-sm text-mid">15 days on us. No credit card.</p>
+      <p className="mt-2 text-sm text-mid">30 days on us. No credit card.</p>
       <div className="mt-7">
         <Stepper steps={steps} current={step} />
       </div>

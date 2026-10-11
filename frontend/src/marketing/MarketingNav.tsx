@@ -55,14 +55,15 @@ export function MarketingNav() {
       <nav
         aria-label="Main"
         className={cn(
-          'flex w-full max-w-6xl items-center justify-between gap-3 rounded-full py-2 pl-4 pr-2 transition-[background-color,box-shadow,max-width] duration-std ease-enter sm:pl-5',
+          // above the open menu sheet (z-40), so the close button stays reachable
+          'relative z-50 flex w-full max-w-6xl items-center justify-between gap-3 rounded-full py-2 pl-4 pr-2 transition-[background-color,box-shadow,max-width] duration-std ease-enter sm:pl-5',
           scrolled ? 'glass-nav sheen max-w-5xl' : 'bg-transparent',
         )}
       >
         <Link to="/" aria-label="CartHedge home" className="shrink-0">
           <Wordmark />
         </Link>
-        <div className="hidden items-center md:flex" onPointerLeave={() => setHovered(null)}>
+        <div className="hidden items-center lg:flex" onPointerLeave={() => setHovered(null)}>
           {nav.links.map((l) => (
             <SectionLink key={l.href} href={l.href} onPointerEnter={() => setHovered(l.href)} className={linkCls}>
               {hovered === l.href && pill}
@@ -70,7 +71,7 @@ export function MarketingNav() {
             </SectionLink>
           ))}
         </div>
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden items-center gap-1 lg:flex">
           <ThemeToggle />
           <Link to="/app/login" className={cn(buttonLink('ghost'), 'h-10 px-4')}>
             {nav.login}
@@ -79,7 +80,7 @@ export function MarketingNav() {
             {nav.cta}
           </Link>
         </div>
-        <div className="flex items-center gap-0.5 md:hidden">
+        <div className="flex items-center gap-0.5 lg:hidden">
           <ThemeToggle />
           <IconButton label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -94,7 +95,9 @@ export function MarketingNav() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="glass-bar fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5.5rem+env(safe-area-inset-top))] md:hidden"
+            // the page behind is locked: keep Lenis's wheel from scrolling it anyway
+            data-lenis-prevent
+            className="glass-bar fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5.5rem+env(safe-area-inset-top))] lg:hidden"
           >
             <div className="flex flex-col px-6">
               {nav.links.map((l, i) => (

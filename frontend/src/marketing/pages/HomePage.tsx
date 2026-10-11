@@ -36,7 +36,7 @@ export default function HomePage() {
     <div className="grain relative">
       <Seo
         title="CartHedge | AI sales assistant and order desk for Instagram & WhatsApp sellers"
-        description="CartHedge answers every buyer DM in seconds from your catalog, closes the order in the chat, and gives you a no-signup storefront, order board and COD confirmation. 15-day free trial."
+        description="CartHedge answers every buyer DM in seconds from your catalog, closes the order in the chat, and gives you a no-signup storefront, order board and COD confirmation. 30-day free trial."
         path="/"
         jsonLd={[organizationJsonLd, faqJsonLd]}
       />

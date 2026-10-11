@@ -90,7 +90,7 @@ func (h *Handler) StoreCode(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, status)
 }
 
-// SignupOtp sends the seller's mobile verification code. Without it the 15-day
+// SignupOtp sends the seller's mobile verification code. Without it the 30-day
 // trial is issued to an unverified identity, which is how trial farming starts.
 func (h *Handler) SignupOtp(w http.ResponseWriter, r *http.Request) {
 	var in struct {
