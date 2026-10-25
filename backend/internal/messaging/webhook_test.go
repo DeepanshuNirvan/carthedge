@@ -188,3 +188,30 @@ func TestWhatsAppConnectClosedUntilSwitchedOn(t *testing.T) {
 		t.Fatal("switched on, sellers connect WhatsApp")
 	}
 }
+
+// A seller on coexistence types in the WhatsApp Business app: the echo must
+// reach recordEcho (which pauses the assistant), routed to the buyer it went to.
+// The partner addresses both sides in E.164 whatever shape the number came in.
+func TestParseWhatsAppEchoAndE164(t *testing.T) {
+	body := []byte(`{"object":"whatsapp_business_account","entry":[{"id":"WABA","changes":[{"field":"smb_message_echoes","value":{
+		"metadata":{"phone_number_id":"PN1"},
+		"message_echoes":[{"from":"919000000000","to":"919812345670","id":"e1","type":"text","text":{"body":"main dekh leti hoon"}}]}}]}]}`)
+	got := parseWebhook(body)
+	if len(got) != 1 || !got[0].Echo || got[0].ContactID != "919812345670" || got[0].ExternalID != "PN1" {
+		t.Fatalf("echo not parsed for the buyer: %+v", got)
+	}
+	for in, want := range map[string]string{"+91 98765 43210": "+919876543210", "919812345670": "+919812345670"} {
+		if e164(in) != want {
+			t.Errorf("e164(%q) = %q, want %q", in, e164(in), want)
+		}
+	}
+}
+
+// Reconnecting must let a seller pick another Instagram account, not silently
+// reuse whichever one the browser is logged into.
+func TestInstagramAuthorizeForcesLogin(t *testing.T) {
+	u, err := OAuthConfig{AppID: "a", AppSecret: "s", RedirectURL: "https://x/cb", Version: "v25.0"}.AuthorizeURL("instagram", "st")
+	if err != nil || !strings.Contains(u, "force_reauth=true") {
+		t.Fatalf("instagram authorize url lacks force_reauth: %q %v", u, err)
+	}
+}

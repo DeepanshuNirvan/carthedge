@@ -121,7 +121,70 @@ func (h *Handler) ListChannels(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, httpx.M{"channels": items,
 		// the UI offers manual entry when a channel has no app credentials yet
 		"oauth":           httpx.M{"whatsapp": h.oauth.enabled("whatsapp") && h.whatsappSellers, "instagram": h.oauth.enabled("instagram")},
-		"whatsappChannel": h.whatsappSellers})
+		"whatsappChannel": h.whatsappSellers, "whatsappSignup": h.signup()})
+}
+
+// signup is what Settings needs to open Meta's Embedded Signup popup; nil
+// when it is not configured. solutionId is set only when "CartHedge pays" is.
+func (h *Handler) signup() httpx.M {
+	if !h.whatsappSellers || h.oauth.WAConfigID == "" || h.oauth.AppID == "" {
+		return nil
+	}
+	return httpx.M{"appId": h.oauth.AppID, "configId": h.oauth.WAConfigID, "version": h.oauth.Version,
+		"solutionId": h.oauth.WASolutionID}
+}
+
+// EmbeddedConnect finishes Embedded Signup. The popup hands back only a code,
+// so the number, its account and its state all come from Meta with that code.
+// billing is the seller's pick: "" their own Meta billing, "partner" CartHedge
+// pays through YCloud (plans with waManaged). One WhatsApp per seller; a new
+// signup replaces the old connection.
+func (h *Handler) EmbeddedConnect(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code    string `json:"code"`
+		Billing string `json:"billing"`
+	}
+	if !httpx.Bind(w, r, &in) {
+		return
+	}
+	ctx := r.Context()
+	if h.signup() == nil {
+		httpx.Err(w, http.StatusConflict, errWhatsAppClosed.Error())
+		return
+	}
+	partner := in.Billing == "partner"
+	if partner && (h.oauth.WASolutionID == "" || !middleware.HasFeature(ctx, "waManaged")) {
+		httpx.Err(w, http.StatusForbidden, "CartHedge-paid WhatsApp is not on your plan. Connect on your own Meta billing, or upgrade in Billing.")
+		return
+	}
+	if in.Code == "" {
+		httpx.Err(w, http.StatusBadRequest, "the WhatsApp signup did not finish — try again")
+		return
+	}
+	a, err := h.client.exchangeWhatsApp(ctx, h.oauth, in.Code, "")
+	billing := ""
+	switch {
+	case err != nil:
+	case partner:
+		billing = "partner"
+		err = h.client.bindPartner(ctx, a.WabaID, a.PhoneID, a.OnBizApp)
+	case !a.OnBizApp && !a.CloudAPI:
+		// a fresh number cannot send until it is on the Cloud API; a number
+		// kept on the Business app (coexistence) is registered already
+		err = h.client.registerNumber(ctx, a.Token, a.PhoneID)
+	}
+	if err == nil {
+		err = h.svc.ConnectChannel(ctx, middleware.BusinessID(ctx), "whatsapp", a.PhoneID, a.Token, a.Label, billing, a.Phone)
+	}
+	if errors.Is(err, errPartner) {
+		h.svc.log.Error("whatsapp partner onboarding failed", "businessId", middleware.BusinessID(ctx), "err", err)
+		err = errors.New("our WhatsApp partner did not accept the connection — try again in a minute")
+	}
+	if err != nil {
+		httpx.Err(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	httpx.OK(w, httpx.M{"ok": true})
 }
 
 // ConnectURL starts the OAuth handshake. The state is a short-lived signed
@@ -175,7 +238,7 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	externalID, token, name, err := h.client.ExchangeCode(r.Context(), h.oauth, channel, q.Get("code"))
 	if err == nil {
-		err = h.svc.ConnectChannel(r.Context(), bizID, channel, externalID, token, name)
+		err = h.svc.ConnectChannel(r.Context(), bizID, channel, externalID, token, name, "", "")
 	}
 	if err != nil {
 		http.Redirect(w, r, h.settingsURL("", err.Error()), http.StatusFound)
@@ -242,7 +305,7 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.ConnectChannel(r.Context(), middleware.BusinessID(r.Context()),
-		in.Channel, in.ExternalID, in.AccessToken, in.DisplayName); err != nil {
+		in.Channel, in.ExternalID, in.AccessToken, in.DisplayName, "", ""); err != nil {
 		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}

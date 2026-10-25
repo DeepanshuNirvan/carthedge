@@ -11,6 +11,7 @@ export const capabilityLabels: Record<Capability, { label: string; blurb: string
   courier: { label: 'Courier handoff', blurb: 'Push shipments to your courier and track them back' },
   waitlist: { label: 'Back-in-stock waitlist', blurb: 'Buyers leave their number on sold-out items' },
   recovery: { label: 'Abandoned checkout reminder', blurb: 'See who verified but did not order, and nudge them on WhatsApp' },
+  waManaged: { label: 'CartHedge-paid WhatsApp', blurb: 'Your own WhatsApp number with no card and no Meta bill; CartHedge pays Meta' },
 };
 
 export const capabilityLabel = (c: Capability) => capabilityLabels[c]?.label ?? c;

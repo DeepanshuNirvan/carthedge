@@ -298,7 +298,9 @@ func (s *Service) AssignPlan(ctx context.Context, bizID, planCode string, custom
 
 // Capabilities are the entitlements a plan can grant. The admin picks from this
 // list; the API gates every paid route against it.
-var Capabilities = []string{"ai", "aiReply", "broadcasts", "offers", "invoices", "courier", "waitlist", "recovery"}
+// waManaged: the seller's own WhatsApp number on CartHedge's Meta billing
+// (through the WhatsApp partner) instead of their own card.
+var Capabilities = []string{"ai", "aiReply", "broadcasts", "offers", "invoices", "courier", "waitlist", "recovery", "waManaged"}
 
 type PlanInput struct {
 	Code         string   `json:"code"`

@@ -2,11 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { del, get, post, put } from './http';
 import type { Channel, ConversationDetail, ConversationSummary } from './types';
 
+/** Meta's WhatsApp Embedded Signup; solutionId is empty unless "CartHedge pays" is offered. */
+export type WhatsAppSignup = { appId: string; configId: string; version: string; solutionId: string };
+
 type ChannelsResponse = {
   channels: Channel[];
   oauth: Record<'whatsapp' | 'instagram', boolean>;
   /** sellers can connect their own WhatsApp; false = assisted (they reply from the WhatsApp Business app) */
   whatsappChannel: boolean;
+  whatsappSignup: WhatsAppSignup | null;
 };
 
 export const useChannelsInfo = () =>
@@ -47,6 +51,12 @@ export function useChannelMutations() {
   return {
     connect: useMutation({
       mutationFn: (input: ConnectInput) => post<{ ok: boolean }>('/api/v1/channels', input),
+      onSuccess: invalidate,
+    }),
+    /** finishes Embedded Signup: the popup's code, and who pays Meta */
+    connectWhatsApp: useMutation({
+      mutationFn: (input: { code: string; billing: '' | 'partner' }) =>
+        post<{ ok: boolean }>('/api/v1/channels/whatsapp/embedded', input),
       onSuccess: invalidate,
     }),
     disconnect: useMutation({

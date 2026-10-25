@@ -231,6 +231,8 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/channels", d.Messaging.Connect, authed, active, aiFeature)
 	handle("DELETE /api/v1/channels/{channel}", d.Messaging.Disconnect, authed, active, aiFeature)
 	handle("GET /api/v1/channels/{channel}/connect-url", d.Messaging.ConnectURL, authed, active, aiFeature)
+	handle("POST /api/v1/channels/whatsapp/embedded", d.Messaging.EmbeddedConnect, authed, active, aiFeature,
+		byBusiness("waSignup", 10, time.Minute))
 	handle("GET /api/v1/conversations", d.Messaging.ListConversations, authed, active, aiFeature)
 	handle("GET /api/v1/conversations/{id}", d.Messaging.Conversation, authed, active, aiFeature)
 	handle("POST /api/v1/conversations/{id}/reply", d.Messaging.Reply, authed, active, aiFeature)

@@ -30,11 +30,9 @@ Meta reviewers open your URLs and your webhook. If any of these is missing, App 
 
 **Yes, you must become a Tech Provider.** Your app will serve Instagram accounts you do not own, and that needs **Advanced Access**. Advanced Access needs App Review, and App Review is only available to Tech Providers. It is free and needs no partner. The same click also opens the WhatsApp path.
 
-### 1.1 Become a Tech Provider (5 minutes)
+### 1.1 Become a Tech Provider (in review since Oct 2026)
 
-1. developers.facebook.com/apps → open **CartHedge** (`1701370170936187`).
-2. Left menu **Dashboard** → scroll to the bottom → **Become a Tech Provider** → read the terms → **Confirm**.
-   - This declares that the app serves other businesses. It does not cost anything and does not affect the business portfolio.
+Meta moved this step. It is no longer a button on the Dashboard: it is **Review → Verification → Access verification** ("Verify that your business is a Tech Provider"). On 11 Oct 2026 CartHedge's shows **In review** (Meta answers in about 5 business days and may email for documents). Business verification on the same page shows **Verified**. Nothing to click until Meta replies.
 3. Optional but it helps the reviewer: left menu **Use cases** → remove the use cases you don't need (Marketing API, Threads, Ads, Audience Network and the rest). Keep only **Instagram API**, **Connect with customers through WhatsApp** and **Facebook Login for Business**. Use the ⋯ menu on each card, then **Remove**.
 
 ### 1.2 App settings (10 minutes)
@@ -116,9 +114,18 @@ Before approval, only people with a role on the app can connect.
 
 ## Part 2: WhatsApp (the seller's own number, fully automatic)
 
-### 2.1 The method (cheapest and least work for the seller)
+### 2.1 The method: two ways to pay, one popup (built 11 Oct 2026)
 
-**Recommended: Tech Provider + Multi-Partner Solution with YCloud + Embedded Signup v4 with Coexistence.**
+Every seller keeps their **own number** and the WhatsApp Business app (Embedded Signup v4 with Coexistence). At **Connect WhatsApp** they pick who pays Meta:
+
+| Option | Seller | CartHedge | Needs |
+|---|---|---|---|
+| **Meta bills you** | Adds a card in Meta Business. First 1,000 replies a month free, then about ₹0.12 each | Pays nothing to Meta; sends through Meta's Cloud API with the seller's token | WhatsApp App Review + `META_WA_CONFIG_ID` |
+| **CartHedge pays Meta** | No card, no Meta bill | Pays Meta through YCloud's credit line; sends through YCloud | Also the YCloud partner solution (`META_WA_SOLUTION_ID` + `YCLOUD_API_KEY`) and a plan with capability **CartHedge-paid WhatsApp** (`waManaged`) |
+
+One WhatsApp per seller. Switching option = Disconnect, then Connect again (Meta never removes a credit line from an account, so "CartHedge pays" needs a fresh account in the popup). With only the first option configured, Settings skips the choice and opens Meta's popup straight away. Sellers who connect nothing stay on **assisted** WhatsApp (they reply from their app; codes and order updates come from CartHedge's number).
+
+The "CartHedge pays" route in detail (the cheapest way for CartHedge to carry Meta's bill):
 
 | What the seller does | What CartHedge does |
 |---|---|
@@ -132,7 +139,7 @@ Why this route and not the others (full comparison in GO-LIVE §3):
 |---|---|---|---|
 | **YCloud joint solution** | No card, keeps the app | ≈ ₹15 small / ₹650 busy (Meta's charges only) | **Do this** |
 | Gupshup joint solution | Same | ≈ ₹150 / ₹1,360 (about $0.001 per message on top) | Backup. Its API is in Meta's own format, so it needs the least code |
-| Tech Provider alone | Seller must add their own card in Meta | ₹0 | Rejected: sellers would pay twice, and adding a card is where they drop off |
+| Tech Provider alone | Seller adds their own card in Meta | ₹0 | Offered as the "Meta bills you" option, for sellers who prefer it |
 | Resell AiSensy, Interakt or Wati | Separate signup | ₹1,500+ | Rejected: costs more than the plan |
 
 **Covered by the new plans.**
@@ -191,6 +198,8 @@ All of this is in developers.facebook.com/apps → **CartHedge**.
 
 ### 2.4 Code (me, about 10 working days; can start now in parallel)
 
+Built 11 Oct 2026 (dormant until the env vars below are set): items 1 and 2 except the history sync, item 3's bind and send, item 4's echo pause, item 5's one message per turn, and the billing choice. Buyer messages for both options arrive on `/webhooks/meta` in Meta's format, because CartHedge's app subscribes to each seller's account at signup (confirm with YCloud that this works under "Only my partner"; if not, item 3 also needs YCloud's inbound webhook).
+
 | # | Build | Size |
 |---|---|---|
 | 1 | **Connect WhatsApp button** with Embedded Signup v4: Facebook JS SDK, `FB.login` with `config_id`, `solutionID` and `featureType: 'whatsapp_business_app_onboarding'`; read `waba_id` and `phone_number_id` from the popup; post them to a new `POST /api/v1/channels/whatsapp/embedded` | 1 day |
@@ -204,9 +213,13 @@ All of this is in developers.facebook.com/apps → **CartHedge**.
 
 Items 1 to 5 are enough for a **pilot** where the assistant only answers buyers who message first. That needs no templates.
 
-**Switch-on, once App Review is approved and the code is deployed:**
-1. Add `META_WA_CONFIG_ID`, `META_WA_SOLUTION_ID` and `YCLOUD_API_KEY` on Render, then set `WHATSAPP_SELLER_CHANNEL=on`.
-2. Settings shows **Connect WhatsApp** by itself, and the API accepts connections.
+**Switch-on, once WhatsApp App Review is approved** (the code is already in):
+1. Render: `WHATSAPP_SELLER_CHANNEL=on` and `META_WA_CONFIG_ID`. That alone turns on "Meta bills you".
+2. For "CartHedge pays" too: `META_WA_SOLUTION_ID` and `YCLOUD_API_KEY`, then Admin → Plans → tick **CartHedge-paid WhatsApp** on the plans that include it (the pricing plan says Pro, or a ₹299 add-on).
+3. Facebook Login for Business → Settings → Allowed domains for the JavaScript SDK must list `https://carthedge.in`, or the popup refuses to open.
+4. Settings shows **Connect WhatsApp** by itself.
+
+Still to build after the pilot: history and contact sync (`smb_app_data`, must run within 24 h of signup, so it waits until CartHedge can import what it returns), `account_update` alerts, the typing indicator, items 6 to 8.
 
 ### 2.5 What to tell sellers (put on the Connect screen)
 

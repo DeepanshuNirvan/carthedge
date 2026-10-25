@@ -79,6 +79,13 @@ type Config struct {
 	MetaIgAppID       string
 	MetaIgAppSecret   string
 	MetaOAuthRedirect string
+	// WhatsApp Embedded Signup (v4): the Facebook Login for Business
+	// configuration sellers connect through. The solution id and the partner's
+	// API key add the "CartHedge pays" option (Multi-Partner Solution with
+	// YCloud); without them sellers connect on their own Meta billing only.
+	MetaWAConfigID   string
+	MetaWASolutionID string
+	YCloudAPIKey     string
 
 	ShiprocketEmail    string
 	ShiprocketPassword string
@@ -146,6 +153,9 @@ func Load() (*Config, error) {
 		MetaIgAppSecret:  os.Getenv("META_IG_APP_SECRET"),
 		// must match the redirect registered on the Meta app
 		MetaOAuthRedirect: env("META_OAUTH_REDIRECT_URL", ""),
+		MetaWAConfigID:    os.Getenv("META_WA_CONFIG_ID"),
+		MetaWASolutionID:  os.Getenv("META_WA_SOLUTION_ID"),
+		YCloudAPIKey:      os.Getenv("YCLOUD_API_KEY"),
 
 		ShiprocketEmail:    os.Getenv("SHIPROCKET_EMAIL"),
 		ShiprocketPassword: os.Getenv("SHIPROCKET_PASSWORD"),
@@ -161,6 +171,9 @@ func Load() (*Config, error) {
 	}
 	if (c.WhatsAppPhoneID == "") != (c.WhatsAppToken == "") {
 		return nil, fmt.Errorf("WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_TOKEN go together")
+	}
+	if (c.MetaWASolutionID == "") != (c.YCloudAPIKey == "") {
+		return nil, fmt.Errorf("META_WA_SOLUTION_ID and YCLOUD_API_KEY go together")
 	}
 	if c.StorageDriver == "s3" && (c.S3Bucket == "" || c.S3Region == "") {
 		return nil, fmt.Errorf("S3_BUCKET and S3_REGION are required when STORAGE_DRIVER=s3")

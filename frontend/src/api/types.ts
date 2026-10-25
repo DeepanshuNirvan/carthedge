@@ -134,7 +134,7 @@ export const gstRates = [0, 3, 5, 12, 18, 28, 40] as const;
 
 // plans & subscription
 /** Entitlement keys the API gates paid routes on — mirrors admin.Capabilities in Go. */
-export type Capability = 'ai' | 'aiReply' | 'broadcasts' | 'offers' | 'invoices' | 'courier' | 'waitlist' | 'recovery';
+export type Capability = 'ai' | 'aiReply' | 'broadcasts' | 'offers' | 'invoices' | 'courier' | 'waitlist' | 'recovery' | 'waManaged';
 
 export type Plan = {
   id: string;
@@ -635,6 +635,8 @@ export type Channel = {
   displayName: string;
   status: string;
   connectedAt: string;
+  /** WhatsApp only: '' = the seller's own Meta billing, 'partner' = CartHedge pays */
+  billing?: string;
 };
 
 export type ConversationSummary = {

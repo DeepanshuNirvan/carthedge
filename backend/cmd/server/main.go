@@ -112,6 +112,7 @@ func main() {
 	aiClient := ai.NewClient(cfg, log)
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log, cfg.PublicBaseURL)
 	metaClient := messaging.NewClient(cfg.MetaGraphVersion, cfg.MetaAppSecret, cfg.MetaIgAppSecret)
+	metaClient.YCloudKey = cfg.YCloudAPIKey
 	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, alerts, planSvc.HasFeature, log)
 	messagingSvc.Start(ctx)
 	// orders placed from a DM chat are confirmed and tracked on that chat
@@ -155,6 +156,7 @@ func main() {
 				AppID: cfg.MetaAppID, AppSecret: cfg.MetaAppSecret,
 				IgAppID: cfg.MetaIgAppID, IgAppSecret: cfg.MetaIgAppSecret,
 				RedirectURL: cfg.MetaOAuthRedirect, Version: cfg.MetaGraphVersion,
+				WAConfigID: cfg.MetaWAConfigID, WASolutionID: cfg.MetaWASolutionID,
 			},
 		}),
 		PaySvc:    paySvc,

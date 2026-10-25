@@ -163,7 +163,9 @@ func (s *Service) refreshExpiring(ctx context.Context) {
 }
 
 // ConnectChannel stores (or refreshes) a seller's channel token, encrypted.
-func (s *Service) ConnectChannel(ctx context.Context, bizID, channel, externalID, token, displayName string) error {
+// billing and phone only apply to WhatsApp ("" and "" otherwise): see
+// migration 0018 for what billing means.
+func (s *Service) ConnectChannel(ctx context.Context, bizID, channel, externalID, token, displayName, billing, phone string) error {
 	if channel != "whatsapp" && channel != "instagram" {
 		return errors.New("channel must be whatsapp or instagram")
 	}
@@ -186,13 +188,13 @@ func (s *Service) ConnectChannel(ctx context.Context, bizID, channel, externalID
 	if channel == "instagram" {
 		expiresAt = time.Now().Add(instagramTokenTTL)
 	}
-	_, err = s.pool.Exec(ctx, `insert into channel_connections (business_id, channel, external_id, display_name, access_token, status, expires_at)
-		values ($1,$2,$3,$4,$5,'connected',$6)
+	_, err = s.pool.Exec(ctx, `insert into channel_connections (business_id, channel, external_id, display_name, access_token, status, expires_at, billing, phone)
+		values ($1,$2,$3,$4,$5,'connected',$6,$7,$8)
 		on conflict (business_id, channel) do update set
 		  external_id=excluded.external_id, display_name=excluded.display_name,
 		  access_token=excluded.access_token, status='connected',
-		  expires_at=excluded.expires_at, updated_at=now()`,
-		bizID, channel, externalID, displayName, enc, expiresAt)
+		  expires_at=excluded.expires_at, billing=excluded.billing, phone=excluded.phone, updated_at=now()`,
+		bizID, channel, externalID, displayName, enc, expiresAt, billing, phone)
 	if err != nil {
 		return errors.New("this account is already connected to another business")
 	}
@@ -226,19 +228,19 @@ func (s *Service) ForgetInstagram(ctx context.Context, igID string, purge bool) 
 
 func (s *Service) ListChannels(ctx context.Context, bizID string) ([]httpx.M, error) {
 	rows, err := s.pool.Query(ctx, `select channel, external_id, display_name, status,
-		to_char(connected_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from channel_connections where business_id=$1 order by channel`, bizID)
+		to_char(connected_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), billing from channel_connections where business_id=$1 order by channel`, bizID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []httpx.M{}
 	for rows.Next() {
-		var channel, externalID, name, status, connectedAt string
-		if err := rows.Scan(&channel, &externalID, &name, &status, &connectedAt); err != nil {
+		var channel, externalID, name, status, connectedAt, billing string
+		if err := rows.Scan(&channel, &externalID, &name, &status, &connectedAt, &billing); err != nil {
 			return nil, err
 		}
 		out = append(out, httpx.M{"channel": channel, "externalId": externalID, "displayName": name,
-			"status": status, "connectedAt": connectedAt})
+			"status": status, "connectedAt": connectedAt, "billing": billing})
 	}
 	return out, rows.Err()
 }

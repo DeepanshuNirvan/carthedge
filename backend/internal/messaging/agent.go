@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"carthedge/internal/ai"
@@ -165,7 +166,13 @@ func (s *Service) converse(ctx context.Context, c dueConv, autoOrder, nudge bool
 	if len(res.Messages) == 0 {
 		s.senderAction(ctx, c.id, "typing_off")
 	}
-	s.deliver(ctx, c.id, res.Messages)
+	msgs := res.Messages
+	if c.channel == "whatsapp" && len(msgs) > 1 {
+		// every WhatsApp message is billed once past Meta's free 1,000: one
+		// message per turn, the parts kept as paragraphs
+		msgs = []string{strings.Join(msgs, "\n\n")}
+	}
+	s.deliver(ctx, c.id, msgs)
 }
 
 // deliver sends a reply as the separate short messages a person types, with
@@ -203,6 +210,8 @@ func (s *Service) senderAction(ctx context.Context, convID, action string) {
 // chatChannel is how to reach the buyer of one conversation.
 type chatChannel struct {
 	bizID, channel, contactID, externalID, token string
+	// billing "partner" sends from phone through the Solution Partner
+	billing, phone string
 }
 
 func (s *Service) channelOf(ctx context.Context, convID string) (chatChannel, error) {
@@ -212,8 +221,8 @@ func (s *Service) channelOf(ctx context.Context, convID string) (chatChannel, er
 		return ch, err
 	}
 	var tokenEnc string
-	if err := s.pool.QueryRow(ctx, `select external_id, access_token from channel_connections
-		where business_id=$1 and channel=$2 and status='connected'`, ch.bizID, ch.channel).Scan(&ch.externalID, &tokenEnc); err != nil {
+	if err := s.pool.QueryRow(ctx, `select external_id, access_token, billing, phone from channel_connections
+		where business_id=$1 and channel=$2 and status='connected'`, ch.bizID, ch.channel).Scan(&ch.externalID, &tokenEnc, &ch.billing, &ch.phone); err != nil {
 		return ch, errNotConnected
 	}
 	token, err := s.cipher.Decrypt(tokenEnc)
@@ -310,7 +319,12 @@ func (s *Service) send(ctx context.Context, convID, author, text string) error {
 		values ($1,'out',$2,$3) returning id`, convID, text, author).Scan(&msgID); err != nil {
 		return err
 	}
-	metaID, err := s.client.Send(ctx, channel, ch.externalID, ch.token, ch.contactID, text)
+	var metaID string
+	if ch.billing == "partner" {
+		metaID, err = s.client.sendPartner(ctx, ch.phone, ch.contactID, text)
+	} else {
+		metaID, err = s.client.Send(ctx, channel, ch.externalID, ch.token, ch.contactID, text)
+	}
 	if err != nil {
 		// the raw error carries graph URLs and transport detail — logged, not shown
 		s.log.Error("channel send failed", "channel", channel, "businessId", bizID, "err", err)

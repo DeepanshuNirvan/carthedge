@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { Check, Instagram, Landmark, MessageCircle, ShieldCheck, Store } from 'lucide-react';
 import { useBusiness, useUpdateBusiness, useUpdatePayments } from '@/api/business';
 import { getChannelConnectUrl, useChannelsInfo, useChannelMutations } from '@/api/messaging';
+import { useCan } from '@/api/plans';
+import { loadFacebook, whatsappSignup } from '@/hooks/useWhatsAppSignup';
 import { uploadFile } from '@/api/uploads';
 import { toast } from '@/store/ui';
 import { pincodeSchema } from '@/lib/validators';
@@ -35,8 +37,12 @@ const channelMeta = {
 function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
   const { data } = useChannelsInfo();
   const { data: business } = useBusiness();
-  const { connect, disconnect } = useChannelMutations();
+  const { connect, connectWhatsApp, disconnect } = useChannelMutations();
   const existing = data?.channels?.find((c) => c.channel === channel);
+  // Meta's Embedded Signup popup; offers "CartHedge pays" only with a partner solution
+  const signup = channel === 'whatsapp' ? data?.whatsappSignup : null;
+  const managed = useCan('waManaged');
+  const [choosing, setChoosing] = useState(false);
   // a failed token refresh flips status to 'error'; DMs stop until reconnect
   const broken = !!existing && existing.status !== 'connected';
   const oauthReady = !!data?.oauth?.[channel];
@@ -60,6 +66,28 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
       toast('error', 'Could not start', e instanceof Error ? e.message : undefined);
     }
   };
+
+  useEffect(() => {
+    if (signup) loadFacebook(signup).catch(() => undefined); // retried on click
+  }, [signup]);
+
+  const startSignup = async (partner: boolean) => {
+    if (!signup) return;
+    setStarting(true);
+    try {
+      const code = await whatsappSignup(signup, partner);
+      await connectWhatsApp.mutateAsync({ code, billing: partner ? 'partner' : '' });
+      setChoosing(false);
+      toast('success', 'WhatsApp connected', 'The assistant answers your buyers from the next message.');
+    } catch (e) {
+      toast('error', 'Could not connect', e instanceof Error ? e.message : undefined);
+    } finally {
+      setStarting(false);
+    }
+  };
+  // one way to pay: straight to Meta's popup; two: let the seller pick first
+  const connectWa = () => (signup?.solutionId ? setChoosing((v) => !v) : startSignup(false));
+  const reconnect = signup ? () => startSignup(existing?.billing === 'partner') : startOauth;
 
   const doConnect = () => {
     if (!externalId.trim() || !accessToken.trim()) {
@@ -95,7 +123,9 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
                 ? 'Not connected'
                 : broken
                 ? 'Access expired, reconnect to keep capturing DMs'
-                : `Connected · ${existing.displayName || `id ${existing.externalId}`}`}
+                : `Connected · ${existing.displayName || `id ${existing.externalId}`}${
+                    channel === 'whatsapp' ? (existing.billing === 'partner' ? ' · CartHedge pays Meta' : ' · Meta bills you') : ''
+                  }`}
           </p>
         </div>
         {existing ? (
@@ -104,8 +134,8 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
               <Badge tone="jade">
                 <Check className="size-3" /> Connected
               </Badge>
-            ) : oauthReady ? (
-              <Button size="sm" loading={starting} onClick={startOauth}>
+            ) : oauthReady || signup ? (
+              <Button size="sm" loading={starting} onClick={reconnect}>
                 Reconnect
               </Button>
             ) : (
@@ -117,6 +147,10 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
           </>
         ) : assisted ? (
           <Badge tone="neutral">Auto-replies soon</Badge>
+        ) : signup ? (
+          <Button size="sm" variant={choosing ? 'ghost' : 'primary'} loading={starting && !choosing} onClick={connectWa}>
+            {choosing ? 'Cancel' : 'Connect WhatsApp'}
+          </Button>
         ) : oauthReady ? (
           <Button size="sm" loading={starting} onClick={startOauth}>
             Connect {meta.label}
@@ -139,7 +173,44 @@ function ChannelRow({ channel }: { channel: 'whatsapp' | 'instagram' }) {
           </Link>
         </p>
       )}
-      {!existing && oauthReady && (
+      {signup && !existing && !choosing && (
+        <p className="mt-3 text-xs leading-relaxed text-low">
+          You keep your number and the WhatsApp Business app on your phone.
+          {!signup.solutionId && ' Meta bills your WhatsApp account directly: the first 1,000 replies a month are free, then about ₹0.12 each.'}
+        </p>
+      )}
+      {signup && !existing && choosing && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={starting}
+            onClick={() => startSignup(false)}
+            className="rounded-xl bg-surface p-4 text-left shadow-soft transition-colors duration-std hover:bg-surface-2 disabled:opacity-50"
+          >
+            <span className="block text-sm font-medium text-hi">Meta bills you</span>
+            <span className="mt-1 block text-xs leading-relaxed text-low">
+              Add a card in Meta. The first 1,000 replies a month are free, then about ₹0.12 each.
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={starting || !managed.allowed}
+            onClick={() => startSignup(true)}
+            className="rounded-xl bg-surface p-4 text-left shadow-soft transition-colors duration-std hover:bg-surface-2 disabled:opacity-50"
+          >
+            <span className="block text-sm font-medium text-hi">CartHedge pays Meta</span>
+            <span className="mt-1 block text-xs leading-relaxed text-low">
+              {managed.allowed ? 'No card and no Meta bill. It is part of your plan.' : 'No card and no Meta bill. Not on your current plan.'}
+            </span>
+          </button>
+          {!managed.allowed && (
+            <Link to="/app/billing" className="text-xs font-medium text-jade-ink hover:underline sm:col-start-2">
+              See plans with CartHedge-paid WhatsApp
+            </Link>
+          )}
+        </div>
+      )}
+      {!existing && oauthReady && !signup && (
         <button
           onClick={() => setOpen((v) => !v)}
           className="mt-2 text-xs text-low underline underline-offset-2 transition-colors hover:text-mid"

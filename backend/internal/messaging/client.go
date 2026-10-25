@@ -23,6 +23,9 @@ type Client struct {
 	secrets []string
 	version string
 	hc      *http.Client
+	// YCloudKey is the Solution Partner's API key; set only when sellers can
+	// pick "CartHedge pays" for WhatsApp (ycloud.go)
+	YCloudKey string
 }
 
 // NewClient takes every app secret Meta may sign a webhook with: WhatsApp
@@ -293,6 +296,15 @@ func parseWebhook(body []byte) []Inbound {
 							} `json:"list_reply"`
 						} `json:"interactive"`
 					} `json:"messages"`
+					// coexistence: what the seller typed in the WhatsApp
+					// Business app on the same number (field smb_message_echoes)
+					MessageEchoes []struct {
+						To   string `json:"to"`
+						ID   string `json:"id"`
+						Text struct {
+							Body string `json:"body"`
+						} `json:"text"`
+					} `json:"message_echoes"`
 					// Instagram delivers messaging events under `changes` too,
 					// depending on which product the app was subscribed through:
 					// as a list, or (field "messages") as one bare event
@@ -354,6 +366,12 @@ func parseWebhook(body []byte) []Inbound {
 				}
 				out = append(out, Inbound{Channel: "whatsapp", ExternalID: v.Metadata.PhoneNumberID,
 					ContactID: m.From, Name: name, MessageID: m.ID, Text: text})
+			}
+			for _, m := range v.MessageEchoes {
+				if m.Text.Body != "" && m.To != "" {
+					out = append(out, Inbound{Channel: "whatsapp", ExternalID: v.Metadata.PhoneNumberID,
+						ContactID: m.To, MessageID: m.ID, Text: m.Text.Body, Echo: true})
+				}
 			}
 		}
 	}

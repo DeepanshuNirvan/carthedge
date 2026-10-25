@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"carthedge/internal/secure"
 )
 
 // OAuth turns "paste your access token" into a normal login. The seller
@@ -17,9 +19,11 @@ import (
 // discover the account id ourselves. Manual entry stays as the fallback for
 // sellers whose accounts predate the app review.
 //
-// WhatsApp uses the Facebook dialog (Embedded Signup): the granted token names
-// the WABA, and the WABA names the phone number the webhook routes on.
-// Instagram uses Instagram Business Login, a separate app id and token host.
+// WhatsApp connects through Embedded Signup (Meta's popup, handler
+// EmbeddedConnect) when it is configured, else this Facebook dialog: either
+// way the granted token names the WABA, and the WABA names the phone number
+// the webhook routes on. Instagram uses Instagram Business Login, a separate
+// app id and token host.
 
 type OAuthConfig struct {
 	AppID       string
@@ -28,6 +32,10 @@ type OAuthConfig struct {
 	IgAppSecret string
 	RedirectURL string // must match the value registered on the Meta app
 	Version     string
+	// Embedded Signup: the Facebook Login for Business configuration, and the
+	// partner solution that makes "CartHedge pays" possible (both optional)
+	WAConfigID   string
+	WASolutionID string
 }
 
 func (c OAuthConfig) enabled(channel string) bool {
@@ -69,6 +77,9 @@ func (c OAuthConfig) AuthorizeURL(channel, state string) (string, error) {
 	case "instagram":
 		q.Set("client_id", c.igID())
 		q.Set("scope", "instagram_business_basic,instagram_business_manage_messages")
+		// always show Instagram's login, so a seller reconnecting can pick a
+		// different account instead of silently getting the logged-in one
+		q.Set("force_reauth", "true")
 		return "https://www.instagram.com/oauth/authorize?" + q.Encode(), nil
 	}
 	return "", errors.New("channel must be whatsapp or instagram")
@@ -79,22 +90,35 @@ func (c *Client) ExchangeCode(ctx context.Context, cfg OAuthConfig, channel, cod
 	if channel == "instagram" {
 		return c.exchangeInstagram(ctx, cfg, code)
 	}
-	return c.exchangeWhatsApp(ctx, cfg, code)
+	a, err := c.exchangeWhatsApp(ctx, cfg, code, cfg.RedirectURL)
+	return a.PhoneID, a.Token, a.Label, err
 }
 
-func (c *Client) exchangeWhatsApp(ctx context.Context, cfg OAuthConfig, code string) (string, string, string, error) {
+// waAccount is the WhatsApp number a seller granted, and what onboarding needs
+// to know about it.
+type waAccount struct {
+	WabaID, PhoneID, Phone, Label, Token string
+	// OnBizApp: the number stays on the WhatsApp Business app (coexistence),
+	// so it is already registered; CloudAPI: registered for the API already
+	OnBizApp, CloudAPI bool
+}
+
+// exchangeWhatsApp turns a granted code into the seller's number. redirectURL
+// is the OAuth dialog's; Embedded Signup's popup codes are exchanged without one.
+func (c *Client) exchangeWhatsApp(ctx context.Context, cfg OAuthConfig, code, redirectURL string) (waAccount, error) {
+	var a waAccount
+	q := url.Values{"client_id": {cfg.AppID}, "client_secret": {cfg.AppSecret}, "code": {code}}
+	if redirectURL != "" {
+		q.Set("redirect_uri", redirectURL)
+	}
 	var tok struct {
 		AccessToken string `json:"access_token"`
 	}
-	err := c.getJSON(ctx, "https://graph.facebook.com/"+cfg.Version+"/oauth/access_token?"+url.Values{
-		"client_id": {cfg.AppID}, "client_secret": {cfg.AppSecret},
-		"redirect_uri": {cfg.RedirectURL}, "code": {code},
-	}.Encode(), &tok)
-	if err != nil {
-		return "", "", "", err
+	if err := c.getJSON(ctx, "https://graph.facebook.com/"+cfg.Version+"/oauth/access_token?"+q.Encode(), &tok); err != nil {
+		return a, err
 	}
 	if tok.AccessToken == "" {
-		return "", "", "", errors.New("Meta did not return an access token")
+		return a, errors.New("Meta did not return an access token")
 	}
 
 	// the WABA the seller just granted is named in the token's granular scopes
@@ -109,7 +133,7 @@ func (c *Client) exchangeWhatsApp(ctx context.Context, cfg OAuthConfig, code str
 	if err := c.getJSON(ctx, "https://graph.facebook.com/"+cfg.Version+"/debug_token?"+url.Values{
 		"input_token": {tok.AccessToken}, "access_token": {cfg.AppID + "|" + cfg.AppSecret},
 	}.Encode(), &debug); err != nil {
-		return "", "", "", err
+		return a, err
 	}
 	waba := ""
 	for _, s := range debug.Data.GranularScopes {
@@ -119,7 +143,7 @@ func (c *Client) exchangeWhatsApp(ctx context.Context, cfg OAuthConfig, code str
 		}
 	}
 	if waba == "" {
-		return "", "", "", errors.New("no WhatsApp Business account was granted")
+		return a, errors.New("no WhatsApp Business account was granted")
 	}
 
 	var numbers struct {
@@ -127,29 +151,41 @@ func (c *Client) exchangeWhatsApp(ctx context.Context, cfg OAuthConfig, code str
 			ID           string `json:"id"`
 			DisplayPhone string `json:"display_phone_number"`
 			Verified     string `json:"verified_name"`
+			OnBizApp     bool   `json:"is_on_biz_app"`
+			PlatformType string `json:"platform_type"`
 		} `json:"data"`
 	}
 	if err := c.getJSON(ctx, "https://graph.facebook.com/"+cfg.Version+"/"+waba+"/phone_numbers?"+url.Values{
-		"access_token": {tok.AccessToken},
+		"fields": {"id,display_phone_number,verified_name,is_on_biz_app,platform_type"}, "access_token": {tok.AccessToken},
 	}.Encode(), &numbers); err != nil {
-		return "", "", "", err
+		return a, err
 	}
 	if len(numbers.Data) == 0 {
-		return "", "", "", errors.New("that WhatsApp Business account has no phone number yet")
+		return a, errors.New("that WhatsApp Business account has no phone number yet")
 	}
 
 	// without this the WABA never delivers messages to our webhook
 	if err := c.postForm(ctx, "https://graph.facebook.com/"+cfg.Version+"/"+waba+"/subscribed_apps",
 		url.Values{"access_token": {tok.AccessToken}}); err != nil {
-		return "", "", "", fmt.Errorf("could not subscribe to message webhooks: %w", err)
+		return a, fmt.Errorf("could not subscribe to message webhooks: %w", err)
 	}
 
 	n := numbers.Data[0]
-	label := n.Verified
-	if label == "" {
-		label = n.DisplayPhone
+	a = waAccount{WabaID: waba, PhoneID: n.ID, Phone: e164(n.DisplayPhone), Label: n.Verified, Token: tok.AccessToken,
+		OnBizApp: n.OnBizApp, CloudAPI: n.PlatformType == "CLOUD_API"}
+	if a.Label == "" {
+		a.Label = n.DisplayPhone
 	}
-	return n.ID, tok.AccessToken, label, nil
+	return a, nil
+}
+
+// registerNumber puts a fresh number (not on the WhatsApp Business app) on the
+// Cloud API so it can send. The two-step PIN is set once and not kept: the
+// seller can reset it in WhatsApp Manager if they ever move the number.
+func (c *Client) registerNumber(ctx context.Context, token, phoneID string) error {
+	return c.postForm(ctx, "https://graph.facebook.com/"+c.version+"/"+phoneID+"/register", url.Values{
+		"messaging_product": {"whatsapp"}, "pin": {secure.Digits(6)}, "access_token": {token},
+	})
 }
 
 func (c *Client) exchangeInstagram(ctx context.Context, cfg OAuthConfig, code string) (string, string, string, error) {
