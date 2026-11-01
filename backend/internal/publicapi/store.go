@@ -30,6 +30,9 @@ type storeBusiness struct {
 	CodEnabled    bool   `json:"codEnabled"`
 	ShippingFee   int    `json:"shippingFee"`
 	OnlinePayment string `json:"onlinePayment"` // gateway | upi | none
+	// Verified: the seller's mobile passed OTP. It is all CartHedge checks, so
+	// it is all the store page may claim
+	Verified bool `json:"verified"`
 	// checkout levers the store page advertises ("free delivery above ₹999",
 	// "save ₹50 paying online"); the quote endpoint does the actual maths
 	FreeShippingAbove int           `json:"freeShippingAbove"`
@@ -46,10 +49,10 @@ func (h *Handler) storeBusiness(ctx context.Context, code string) (*storeBusines
 	var razorpayKeyID, upiID string
 	var pricing []byte
 	err := h.pool.QueryRow(ctx, `select id, code, name, logo_url, city, state, instagram, whatsapp,
-		cod_enabled, shipping_fee, razorpay_key_id, upi_id, free_shipping_above, checkout_rules
+		cod_enabled, shipping_fee, razorpay_key_id, upi_id, free_shipping_above, checkout_rules, phone_verified_at is not null
 		from businesses where code=$1 and status='active'`, code).Scan(
 		&b.ID, &b.Code, &b.Name, &b.LogoURL, &b.City, &b.State, &b.Instagram, &b.Whatsapp, &b.CodEnabled,
-		&b.ShippingFee, &razorpayKeyID, &upiID, &b.FreeShippingAbove, &pricing)
+		&b.ShippingFee, &razorpayKeyID, &upiID, &b.FreeShippingAbove, &pricing, &b.Verified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errors.New("store not found")
 	}

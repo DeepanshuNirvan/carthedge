@@ -44,10 +44,10 @@ func TestTokenRoleSeparation(t *testing.T) {
 	if got := status(Auth(secret, nil), adminTok); got != http.StatusUnauthorized {
 		t.Errorf("admin token on seller API: got %d, want 401", got)
 	}
-	if got := status(AdminAuth(secret), adminTok); got != http.StatusOK {
+	if got := status(AdminAuth(secret, nil), adminTok); got != http.StatusOK {
 		t.Errorf("admin token on admin API: got %d, want 200", got)
 	}
-	if got := status(AdminAuth(secret), seller); got != http.StatusUnauthorized {
+	if got := status(AdminAuth(secret, nil), seller); got != http.StatusUnauthorized {
 		t.Errorf("seller token on admin API: got %d, want 401", got)
 	}
 	if got := status(Auth(secret, nil), "not-a-token"); got != http.StatusUnauthorized {
@@ -101,5 +101,23 @@ func TestSupportSessionIsReadOnly(t *testing.T) {
 	Auth(secret, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("support PUT = %d, want 403", rec.Code)
+	}
+}
+
+// A token in the URL is accepted on the live event stream only: anywhere else
+// it would sit in browser history and proxy logs.
+func TestQueryTokenOnlyOnEventStream(t *testing.T) {
+	tok := sign(t, jwt.MapClaims{"sub": "biz-1", "biz": "demo-store"})
+	at := func(path string) int {
+		rec := httptest.NewRecorder()
+		Auth(secret, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
+			ServeHTTP(rec, httptest.NewRequest("GET", path+"?accessToken="+tok, nil))
+		return rec.Code
+	}
+	if got := at(SSEPath); got != http.StatusOK {
+		t.Errorf("query token on the event stream = %d, want 200", got)
+	}
+	if got := at("/api/v1/orders"); got != http.StatusUnauthorized {
+		t.Errorf("query token on another route = %d, want 401", got)
 	}
 }

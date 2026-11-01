@@ -253,7 +253,7 @@ export default function StorePage() {
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
               aria-label="Sort products"
-              className="h-10 w-auto shrink-0 rounded-full text-xs sm:text-xs"
+              className="h-10 w-auto shrink-0 rounded-full text-base sm:text-xs"
             >
               {sortOptions.map((o) => (
                 <option key={o.value} value={o.value}>

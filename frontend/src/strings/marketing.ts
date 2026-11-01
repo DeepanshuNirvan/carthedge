@@ -456,10 +456,8 @@ export const footer = {
   },
   company: {
     title: 'Company',
-    links: [
-      { label: 'Contact', href: '/contact' },
-      { label: 'Admin', href: '/admin/login' },
-    ],
+    // the staff console is not advertised to every visitor; staff use /admin/login directly
+    links: [{ label: 'Contact', href: '/contact' }],
   },
   legal: {
     title: 'Legal',

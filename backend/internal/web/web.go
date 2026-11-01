@@ -16,9 +16,9 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -65,6 +65,8 @@ type meta struct {
 	NoIndex     bool
 	NotFound    bool // serve the shell, but with a 404 so crawlers do not index it
 	JSONLD      any
+	// Fallback is trusted HTML shown only without JavaScript (<noscript>)
+	Fallback string
 }
 
 func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +97,11 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 	if m.NotFound {
 		w.WriteHeader(http.StatusNotFound)
 	}
-	w.Write([]byte(strings.Replace(h.index, "</head>", h.head(m, clean)+"</head>", 1)))
+	page := strings.Replace(h.index, "</head>", h.head(m, clean)+"</head>", 1)
+	if m.Fallback != "" {
+		page = strings.Replace(page, `<div id="root">`, "<noscript>"+m.Fallback+`</noscript><div id="root">`, 1)
+	}
+	w.Write([]byte(page))
 }
 
 // spaRoutes are the paths react-router actually renders; anything else is a 404
@@ -123,9 +129,10 @@ func knownRoute(seg []string) bool {
 }
 
 const (
-	siteName       = "CartHedge"
-	defaultTitle   = "CartHedge — The AI order desk for Instagram & WhatsApp sellers"
-	defaultDesc    = "AI reads the DM and drafts the order, you share one branded link, and the COD confirmation flow cuts RTO losses. Built for Instagram and WhatsApp sellers in India."
+	siteName = "CartHedge"
+	// what people search for comes first: auto-reply, the DM, the order
+	defaultTitle   = "CartHedge — AI DM Auto-Reply & Order Desk for Instagram Sellers"
+	defaultDesc    = "CartHedge replies to your Instagram DMs in the buyer's own language, closes the order in the chat, and runs your store link, UPI and COD checkout and WhatsApp order updates. 30 days free."
 	descLimit      = 200
 	sitemapMaxURLs = 5000
 )
@@ -174,11 +181,114 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 	if !knownRoute(seg) {
 		return meta{Title: "Page not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
 	}
-	return meta{Title: defaultTitle, Description: defaultDesc, JSONLD: map[string]any{
-		"@context": "https://schema.org", "@type": "Organization", "name": siteName,
+	if path == "/" {
+		return h.homeMeta(ctx)
+	}
+	return meta{Title: defaultTitle, Description: defaultDesc}
+}
+
+// homeMeta is the marketing page as search engines and AI crawlers read it:
+// who CartHedge is, what it costs and what sellers ask. Most of those
+// crawlers run no JavaScript, so the page's gist also rides in a <noscript>.
+func (h *Handler) homeMeta(ctx context.Context) meta {
+	org := map[string]any{"@type": "Organization", "@id": h.baseURL + "/#org", "name": siteName, "url": h.baseURL,
 		// raster: Google's Organization logo wants a real bitmap, not the SVG icon
-		"url": h.baseURL, "logo": h.baseURL + "/icon-512.png", "description": defaultDesc,
-	}}
+		"logo": h.baseURL + "/icon-512.png", "description": defaultDesc, "areaServed": "IN"}
+	app := map[string]any{"@type": "SoftwareApplication", "name": siteName, "url": h.baseURL,
+		"applicationCategory": "BusinessApplication", "operatingSystem": "Web, Android, iOS",
+		"description": defaultDesc, "inLanguage": "en-IN", "publisher": map[string]any{"@id": h.baseURL + "/#org"}}
+	graph := []any{org, map[string]any{"@type": "WebSite", "@id": h.baseURL + "/#website", "name": siteName,
+		"url": h.baseURL, "inLanguage": "en-IN", "publisher": map[string]any{"@id": h.baseURL + "/#org"}}, app}
+	var faqs []siteFAQ
+	if h.pool != nil {
+		var low, high, n int
+		if h.pool.QueryRow(ctx, `select coalesce(min(price_monthly), 0), coalesce(max(price_monthly), 0), count(*)
+			from plans where active and not is_custom and price_monthly > 0`).Scan(&low, &high, &n) == nil && n > 0 {
+			app["offers"] = map[string]any{"@type": "AggregateOffer", "priceCurrency": "INR", "offerCount": n,
+				"lowPrice": strconv.Itoa(low / 100), "highPrice": strconv.Itoa(high / 100)}
+		}
+		var social map[string]string
+		var contact struct{ Email, Phone string }
+		if rows, err := h.pool.Query(ctx, `select key, value from site_settings where key in ('social','contact','faqs')`); err == nil {
+			for rows.Next() {
+				var key string
+				var raw []byte
+				if rows.Scan(&key, &raw) != nil {
+					continue
+				}
+				switch key {
+				case "social":
+					json.Unmarshal(raw, &social)
+				case "contact":
+					json.Unmarshal(raw, &contact)
+				case "faqs":
+					json.Unmarshal(raw, &faqs)
+				}
+			}
+			rows.Close()
+		}
+		var sameAs []string
+		for _, u := range social {
+			if strings.HasPrefix(u, "https://") {
+				sameAs = append(sameAs, u)
+			}
+		}
+		if len(sameAs) > 0 {
+			sort.Strings(sameAs)
+			org["sameAs"] = sameAs
+		}
+		if contact.Email != "" {
+			point := map[string]any{"@type": "ContactPoint", "contactType": "customer support", "email": contact.Email,
+				"areaServed": "IN", "availableLanguage": []string{"English", "Hindi"}}
+			if contact.Phone != "" {
+				point["telephone"] = "+91" + strings.TrimPrefix(contact.Phone, "+91")
+			}
+			org["contactPoint"] = point
+		}
+	}
+	if len(faqs) > 0 {
+		// the same questions the page renders from site content, word for word
+		var qa []any
+		for _, f := range faqs {
+			qa = append(qa, map[string]any{"@type": "Question", "name": f.Q,
+				"acceptedAnswer": map[string]any{"@type": "Answer", "text": f.A}})
+		}
+		graph = append(graph, map[string]any{"@type": "FAQPage", "@id": h.baseURL + "/#faq", "mainEntity": qa})
+	}
+	return meta{Title: defaultTitle, Description: defaultDesc, Fallback: homeFallback(faqs),
+		JSONLD: map[string]any{"@context": "https://schema.org", "@graph": graph}}
+}
+
+type siteFAQ struct {
+	Q string `json:"q"`
+	A string `json:"a"`
+}
+
+// homeFallback is the landing page in plain HTML for readers that run no
+// JavaScript. The words mirror frontend/src/strings/marketing.ts: change one,
+// change the other.
+func homeFallback(faqs []siteFAQ) string {
+	var b strings.Builder
+	b.WriteString(`<main><h1>Every DM answered. Every order closed in the chat.</h1>` +
+		`<p>CartHedge replies to buyers in their language from your real catalog, collects the order and confirms it. You approve with a tap.</p>` +
+		`<h2>What it does for Instagram and WhatsApp sellers</h2><ul>` +
+		`<li>Auto-reply: answers every Instagram DM in seconds, day and night, in Hinglish, Hindi, English and regional scripts. Prices, sizes and stock come from your catalog, never invented.</li>` +
+		`<li>Order capture and auto-confirm: the buyer says haan to the exact order summary and the order is placed, or waits for your one-tap approval.</li>` +
+		`<li>One board for every order, from DM to doorstep, with status updates sent to the buyer on WhatsApp.</li>` +
+		`<li>A storefront and checkout links in your name: phone OTP, UPI, card or cash on delivery, no app and no account.</li>` +
+		`<li>COD confirmation before dispatch, with an optional small UPI token, to cut refused deliveries.</li>` +
+		`<li>Returns, refunds, GST invoices, reports, and handover to you for complaints, refunds and bargaining.</li>` +
+		`<li>Money settles in your own Razorpay account or UPI. CartHedge never holds it and takes no cut.</li></ul>`)
+	if len(faqs) > 0 {
+		b.WriteString(`<h2>Questions sellers ask</h2><dl>`)
+		for _, f := range faqs {
+			b.WriteString("<dt>" + html.EscapeString(f.Q) + "</dt><dd>" + html.EscapeString(f.A) + "</dd>")
+		}
+		b.WriteString(`</dl>`)
+	}
+	b.WriteString(`<p><a href="/app/register">Start the 30-day free trial</a> · <a href="/contact">Contact</a> · ` +
+		`<a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p></main>`)
+	return b.String()
 }
 
 func (h *Handler) storeMeta(ctx context.Context, code string) meta {
@@ -300,6 +410,9 @@ func (h *Handler) head(m meta, path string) string {
 	tag(`<link rel="canonical" href="%s"/>`, url)
 	if m.NoIndex {
 		b.WriteString(`<meta name="robots" content="noindex,nofollow"/>`)
+	} else {
+		// full-size image previews and snippets in search and Discover
+		b.WriteString(`<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1"/>`)
 	}
 	tag(`<meta property="og:type" content="%s"/>`, kind)
 	tag(`<meta property="og:site_name" content="%s"/>`, siteName)
@@ -329,46 +442,49 @@ func (h *Handler) robots(w http.ResponseWriter, r *http.Request) {
 		"Sitemap: " + h.baseURL + "/sitemap.xml\n"))
 }
 
-// sitemap lists the marketing pages plus every active storefront and its
-// products — the pages that are meant to rank.
+// sitemap lists the marketing pages plus every live storefront that has
+// something to sell, and its products — the pages that are meant to rank.
+// lastmod is the real last change: a date that always says "today" teaches
+// search engines to ignore it.
 func (h *Handler) sitemap(w http.ResponseWriter, r *http.Request) {
 	type entry struct {
-		loc      string
-		priority string
+		loc, priority, lastmod string
 	}
-	entries := []entry{{h.baseURL + "/", "1.0"}, {h.baseURL + "/contact", "0.5"}}
+	entries := []entry{{h.baseURL + "/", "1.0", ""}, {h.baseURL + "/contact", "0.5", ""},
+		{h.baseURL + "/privacy", "0.2", ""}, {h.baseURL + "/terms", "0.2", ""}}
 
-	rows, err := h.pool.Query(r.Context(), `select b.code, p.id from businesses b
-		left join products p on p.business_id = b.id and p.active
+	// an empty store is a thin page: listed once it has a product
+	rows, err := h.pool.Query(r.Context(), `select b.code, p.id::text, to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD')
+		from businesses b join products p on p.business_id = b.id and p.active
 		where b.status='active' and exists (select 1 from subscriptions s
 			where s.business_id = b.id and s.status in ('trial','active','cancelled') and s.ends_at > now())
-		order by b.code limit $1`, sitemapMaxURLs)
+		order by b.code, p.updated_at desc limit $1`, sitemapMaxURLs)
 	if err == nil {
 		defer rows.Close()
 		seen := map[string]bool{}
 		for rows.Next() {
-			var code string
-			var productID *string
-			if rows.Scan(&code, &productID) != nil {
+			var code, productID, changed string
+			if rows.Scan(&code, &productID, &changed) != nil {
 				continue
 			}
 			if !seen[code] {
+				// newest product first, so this is the store's last change
 				seen[code] = true
-				entries = append(entries, entry{h.baseURL + "/s/" + code, "0.8"})
+				entries = append(entries, entry{h.baseURL + "/s/" + code, "0.8", changed})
 			}
-			if productID != nil {
-				entries = append(entries, entry{h.baseURL + "/s/" + code + "/p/" + *productID, "0.6"})
-			}
+			entries = append(entries, entry{h.baseURL + "/s/" + code + "/p/" + productID, "0.6", changed})
 		}
 	}
 
-	today := time.Now().Format("2006-01-02")
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
 	b.WriteString(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
 	for _, e := range entries {
-		b.WriteString("<url><loc>" + html.EscapeString(e.loc) + "</loc><lastmod>" + today +
-			"</lastmod><priority>" + e.priority + "</priority></url>\n")
+		b.WriteString("<url><loc>" + html.EscapeString(e.loc) + "</loc>")
+		if e.lastmod != "" {
+			b.WriteString("<lastmod>" + e.lastmod + "</lastmod>")
+		}
+		b.WriteString("<priority>" + e.priority + "</priority></url>\n")
 	}
 	b.WriteString("</urlset>\n")
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")

@@ -137,9 +137,12 @@ export function StoreProfile({ business }: { business: StoreBusiness }) {
         <div className="min-w-0">
           <h1 className="truncate text-[1.5rem] font-semibold leading-tight tracking-[-0.025em] text-hi">{business.name}</h1>
           {place && <p className="truncate text-sm text-low">{place}</p>}
-          <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-jade-ink">
-            <ShieldCheck className="size-3.5" aria-hidden /> Verified seller
-          </p>
+          {/* only what CartHedge actually checks: a badge every store gets is a scammer's badge too */}
+          {business.verified && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-jade-ink">
+              <ShieldCheck className="size-3.5" aria-hidden /> Mobile verified
+            </p>
+          )}
         </div>
       </div>
       <p className="mt-3 text-[13px] text-mid">

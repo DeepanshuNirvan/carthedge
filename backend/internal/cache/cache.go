@@ -34,3 +34,22 @@ return n`)
 func Count(ctx context.Context, rdb *redis.Client, key string, window time.Duration) (int64, error) {
 	return countScript.Run(ctx, rdb, []string{key}, window.Milliseconds()).Int64()
 }
+
+// Login failures per account: a password guesser rotating IPs gets past the
+// per-IP limit but still hits the same email, so after LoginFails wrong
+// passwords in LoginFailWindow that account waits.
+const (
+	LoginFails      = 10
+	LoginFailWindow = 15 * time.Minute
+)
+
+// LoginLocked reports whether key has used up its wrong passwords.
+func LoginLocked(ctx context.Context, rdb *redis.Client, key string) bool {
+	n, err := rdb.Get(ctx, key).Int()
+	return err == nil && n >= LoginFails
+}
+
+// LoginFailed counts one wrong password against key.
+func LoginFailed(ctx context.Context, rdb *redis.Client, key string) {
+	Count(ctx, rdb, key, LoginFailWindow)
+}

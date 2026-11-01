@@ -117,6 +117,24 @@ PASS = verified working · FIXED = was broken, fixed, re-verified · OWNER ACTIO
 | BUG-064 | P1 | Security / OTP (pre-existing, OPS-1) | In production without a WhatsApp provider, every one-time code (buyer checkout and seller signup) was written in plain text to the server log, and the API answered "sent" although nothing was delivered. Fixed: production never logs codes; with no number configured the API says so (503) unless the buyer gave an email, which then gets the code. | FIXED (unit tests `notify`, `otp`) |
 | BUG-063 | P1 | Broadcasts / compliance (pre-existing) | Broadcasts went to every customer in a segment with no consent check and no way to stop them — against WhatsApp's opt-in policy and the DPDP Act. Fixed: WhatsApp-offers consent (unticked box at checkout, order page, START/STOP on WhatsApp, a one-tap stop link in every offer, seller stop on request), each change logged with wording, source, IP and browser; broadcasts reach only buyers who said yes; the seller accepts the broadcast rules once (recorded). | FIXED (p7, p5 updated to the new rules) |
 
+### Pre-launch pass, 25 Oct 2026 (go-live checklist: [GO-LIVE.md](../GO-LIVE.md))
+
+BUG-001, BUG-002 and BUG-007 re-checked read-only on the live DB: all three still open (seed admin + demo passwords work; three "QA Plan v3" plans on the public pricing page). Production now refuses the two seed passwords (BUG-068), but the owner must still change them.
+
+| ID | Sev | Area | Summary | Status |
+|----|-----|------|---------|--------|
+| BUG-065 | P1 | DM assistant | "Is the rose chikankari kurti available?" 22 days after an old bargaining message was handed to the owner as a price request: chats had no session boundary, so the whole old thread and a stale cart were read | FIXED — 72 h of quiet starts a fresh conversation (cutoff, empty cart; drafts/handoffs keep state); handoff judged on the newest messages; `"none"` handoff ignored. Eval 18/18 on gpt-4.1-mini, E2E p9 8/8 |
+| BUG-066 | P2 | DM assistant | After an order, "order kab tak aayega?" re-added the ordered item to a new cart and asked its size | FIXED — a status question never changes the cart (unit test) |
+| BUG-067 | P2 | DM assistant | Writer told a buyer "confirm kar diya hai" while details were still missing | FIXED — hard rule: only the order system says an order is confirmed |
+| BUG-068 | P0 | Security | Seed admin/demo passwords accepted in production | FIXED (guard) — refused in production with a clear message; owner action still required |
+| BUG-069 | P1 | Security / scam | Every store showed "Verified seller" (hard-coded) — a fraudulent store got CartHedge's trust badge | FIXED — "Mobile verified", only when the seller's mobile passed OTP |
+| BUG-070 | P1 | Security | Production without SMTP logged email bodies, i.e. password-reset links | FIXED — refused, never logged; subjects sanitised against header injection |
+| BUG-071 | P1 | Security | No per-account login limit; admin password change left old admin sessions valid | FIXED — 10 wrong passwords / 15 min per email (seller + admin); admin sessions revoked on change |
+| BUG-072 | P1 | Dependencies | govulncheck: 17 reachable vulns (pgx GO-2026-5004 SQL injection, jwt, go-redis, x/text, AWS SDK, EOL Go 1.23 stdlib) | FIXED — modules upgraded; Dockerfile on Go 1.27 / Node 22 / Alpine 3.22, non-root |
+| BUG-073 | P2 | Security | Login token accepted in the URL on every API route | FIXED — event stream only |
+| BUG-074 | P2 | Buyer UI | Storefront sort select 12 px on phones (iOS zoom); policy contact links 24 px tall | FIXED — 16 px; 48 px tap targets |
+| BUG-075 | P3 | Seller UI | RTO meter drew a full red "your rate" bar while still "Measuring" | FIXED — empty track until 5 settled COD orders |
+
 ## Product gaps noticed (not built — need an owner call)
 
 - COD confirm page shows only the order code, not the item/total/address summary the product spec describes.

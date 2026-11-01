@@ -24,8 +24,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, err := h.svc.Login(r.Context(), in.Email, in.Password)
-	if errors.Is(err, ErrBadLogin) {
+	switch {
+	case errors.Is(err, ErrBadLogin):
 		httpx.Err(w, http.StatusUnauthorized, err.Error())
+		return
+	case errors.Is(err, ErrLoginLocked):
+		httpx.Err(w, http.StatusTooManyRequests, err.Error())
+		return
+	case errors.Is(err, ErrDefaultPassword):
+		httpx.Err(w, http.StatusForbidden, err.Error())
 		return
 	}
 	if err != nil {
@@ -43,11 +50,12 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Bind(w, r, &in) {
 		return
 	}
-	if err := h.svc.ChangePassword(r.Context(), middleware.AdminID(r.Context()), in.CurrentPassword, in.NewPassword); err != nil {
+	token, err := h.svc.ChangePassword(r.Context(), middleware.AdminID(r.Context()), in.CurrentPassword, in.NewPassword)
+	if err != nil {
 		httpx.Err(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	httpx.OK(w, httpx.M{"ok": true})
+	httpx.OK(w, httpx.M{"ok": true, "accessToken": token})
 }
 
 func (h *Handler) Overview(w http.ResponseWriter, r *http.Request) {

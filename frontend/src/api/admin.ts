@@ -22,8 +22,12 @@ export async function adminLogin(email: string, password: string) {
   return session;
 }
 
-export const adminChangePassword = (currentPassword: string, newPassword: string) =>
-  put<{ ok: boolean }>('/api/v1/admin/password', { currentPassword, newPassword }, 'admin');
+// a new password signs out every other admin session; this one keeps going on the fresh token
+export async function adminChangePassword(currentPassword: string, newPassword: string) {
+  const res = await put<{ ok: boolean; accessToken?: string }>('/api/v1/admin/password', { currentPassword, newPassword }, 'admin');
+  if (res.accessToken) useAdminAuth.setState({ accessToken: res.accessToken });
+  return res;
+}
 
 export const useAdminOverview = () =>
   useQuery({

@@ -81,6 +81,9 @@ func RequireFeature(feature string) Middleware {
 
 type Middleware func(http.Handler) http.Handler
 
+// SSEPath is the live event stream, the one route that reads its token from the URL.
+const SSEPath = "/api/v1/events"
+
 func Chain(h http.Handler, mws ...Middleware) http.Handler {
 	for i := len(mws) - 1; i >= 0; i-- {
 		h = mws[i](h)
@@ -91,7 +94,12 @@ func Chain(h http.Handler, mws ...Middleware) http.Handler {
 func parseToken(r *http.Request, secret string) (jwt.MapClaims, error) {
 	raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok {
-		// EventSource cannot set headers, so the SSE stream passes it as a query param
+		// EventSource cannot set headers, so the SSE stream passes it as a query
+		// param — that one route only: a token in any other URL ends up in
+		// browser history and proxy logs
+		if r.URL.Path != SSEPath {
+			return nil, errors.New("missing bearer token")
+		}
 		if raw = r.URL.Query().Get("accessToken"); raw == "" {
 			return nil, errors.New("missing bearer token")
 		}
@@ -148,8 +156,9 @@ func Auth(secret string, rdb *redis.Client) Middleware {
 	}
 }
 
-// AdminAuth validates a platform-admin Bearer JWT (role=admin claim).
-func AdminAuth(secret string) Middleware {
+// AdminAuth validates a platform-admin Bearer JWT (role=admin claim). rdb may
+// be nil (tests): a password change then does not end older sessions.
+func AdminAuth(secret string, rdb *redis.Client) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, err := parseToken(r, secret)
@@ -162,6 +171,12 @@ func AdminAuth(secret string) Middleware {
 			if adminID == "" || role != "admin" {
 				httpx.Err(w, http.StatusUnauthorized, "admin access required")
 				return
+			}
+			if iat, ok := claims["iat"].(float64); ok && rdb != nil {
+				if revoked, err := rdb.Get(r.Context(), RevokedKey("admin:"+adminID)).Int64(); err == nil && int64(iat)*1000+999 < revoked {
+					httpx.Err(w, http.StatusUnauthorized, "this session was signed out — log in again")
+					return
+				}
 			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), adminIDKey, adminID)))
 		})

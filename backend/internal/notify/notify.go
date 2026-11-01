@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -29,13 +30,22 @@ func New(cfg *config.Config, log *slog.Logger) *Notifier {
 	return &Notifier{cfg: cfg, log: log, hc: &http.Client{Timeout: 10 * time.Second}, graph: cfg.MetaGraphURL}
 }
 
+// ErrEmailOff: production has no SMTP server configured.
+var ErrEmailOff = errors.New("email is not set up yet")
+
 func (n *Notifier) Email(to, subject, body string) error {
 	if n.cfg.SMTPHost == "" {
+		if n.cfg.Env == "production" {
+			// bodies carry password-reset links: never into production logs
+			return ErrEmailOff
+		}
 		n.log.Info("email (dev log)", "to", to, "subject", subject, "body", body)
 		return nil
 	}
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s",
-		n.cfg.SMTPFrom, to, subject, body)
+	// subjects carry seller-typed names: a line break there would add headers
+	subject = strings.NewReplacer("\r", " ", "\n", " ").Replace(subject)
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s",
+		n.cfg.SMTPFrom, to, subject, time.Now().Format(time.RFC1123Z), body)
 	auth := smtp.PlainAuth("", n.cfg.SMTPUser, n.cfg.SMTPPass, n.cfg.SMTPHost)
 	return smtp.SendMail(n.cfg.SMTPHost+":"+n.cfg.SMTPPort, auth, n.cfg.SMTPFrom, []string{to}, []byte(msg))
 }

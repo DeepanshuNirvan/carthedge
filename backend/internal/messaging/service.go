@@ -26,6 +26,10 @@ import (
 // reads like a person and costs one turn instead of five.
 const lull = 6 * time.Second
 
+// chatSession is how long a chat may sit quiet and still be the same
+// conversation; past it the buyer's next message starts fresh.
+const chatSession = 72 * time.Hour
+
 // tokenSweep is how often connections are checked for an approaching expiry,
 // and tokenRenewLead how far ahead of it a token is renewed. The lead is wide
 // so a few sweeps can fail before a seller actually loses their DM capture.
@@ -271,6 +275,14 @@ func (s *Service) Receive(ctx context.Context, body []byte) {
 		if in.Channel == "whatsapp" {
 			optIn, keyword = customer.Keyword(in.Text)
 		}
+		// a buyer back after days of quiet is starting a new conversation: the
+		// assistant reads only from here, with an empty cart. Without this a
+		// "is the kurti available?" weeks later was read with the old chat's
+		// bargaining and cart, and handed to the owner as a discount request.
+		// A chat waiting on the seller (draft, handoff) keeps its state.
+		s.pool.Exec(ctx, `update conversations set cutoff_at=now(), stage='open', cart='{}'::jsonb, summary_hash=''
+			where business_id=$1 and channel=$2 and contact_id=$3 and stage in ('open','confirming')
+			and last_message_at < now() - make_interval(secs => $4)`, bizID, in.Channel, in.ContactID, chatSession.Seconds())
 		var convID, name string
 		err = s.pool.QueryRow(ctx, `insert into conversations
 			(business_id, channel, contact_id, contact_name, last_message_at, last_inbound_at, unread, parse_pending)

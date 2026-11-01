@@ -64,7 +64,7 @@ func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
 	authed := middleware.Auth(d.Cfg.JWTSecret, d.Rdb)
-	adminAuthed := middleware.AdminAuth(d.Cfg.JWTSecret)
+	adminAuthed := middleware.AdminAuth(d.Cfg.JWTSecret, d.Rdb)
 	active := middleware.Middleware(d.PlanSvc.RequireActive)
 	byIP := func(name string, limit int, window time.Duration) middleware.Middleware {
 		return middleware.RateLimit(d.Rdb, name, limit, window, middleware.ClientIP)
@@ -178,7 +178,7 @@ func New(d Deps) http.Handler {
 	handle("POST /api/v1/refunds/{id}/cancel", d.AfterSale.HandleCancelRefund, authed, active)
 
 	// live order board (SSE; EventSource passes the JWT as ?accessToken=)
-	handle("GET /api/v1/events", func(w http.ResponseWriter, r *http.Request) {
+	handle("GET "+middleware.SSEPath, func(w http.ResponseWriter, r *http.Request) {
 		d.Events.Stream(w, r, middleware.BusinessID(r.Context()))
 	}, authed, active)
 

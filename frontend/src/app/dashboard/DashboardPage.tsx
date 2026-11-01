@@ -70,16 +70,21 @@ function RtoMeter() {
         <div>
           <div className="flex justify-between text-xs text-mid">
             <span>Yours this month</span>
-            <span className={cn('tnum', improved ? 'text-jade-ink' : 'text-danger-ink')}>
+            <span className={cn('tnum', !enoughData ? 'text-low' : improved ? 'text-jade-ink' : 'text-danger-ink')}>
               {enoughData ? `${actual}%` : 'Measuring'}
             </span>
           </div>
-          <motion.div
-            className={cn('mt-1.5 h-1.5 rounded-full', improved ? 'bg-jade-500' : 'bg-danger')}
-            initial={{ width: 0 }}
-            animate={{ width: `${baseline > 0 ? Math.max(3, Math.min((actual / baseline) * 100, 100)) : 0}%` }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-          />
+          {/* an empty track until the rate means something: one refused parcel is not a 100% bar */}
+          <div className="mt-1.5 h-1.5 rounded-full bg-field/9">
+            {enoughData && (
+              <motion.div
+                className={cn('h-full rounded-full', improved ? 'bg-jade-500' : 'bg-danger')}
+                initial={{ width: 0 }}
+                animate={{ width: `${baseline > 0 ? Math.max(3, Math.min((actual / baseline) * 100, 100)) : 0}%` }}
+                transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+              />
+            )}
+          </div>
         </div>
       </div>
       <p className="mt-4 text-xs leading-relaxed text-low">

@@ -57,6 +57,8 @@ func (h *Handler) closed(channel string) bool {
 func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if q.Get("hub.mode") == "subscribe" && h.verifyToken != "" && q.Get("hub.verify_token") == h.verifyToken {
+		// echoed back as text: never let a browser sniff it into a page
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(q.Get("hub.challenge")))
 		return
 	}

@@ -33,6 +33,7 @@ type scenario struct {
 	autoOrder    bool
 	returning    *Cart
 	orders       []OrderFact
+	history      []ChatLine // earlier lines of the same chat, before the bursts
 	bursts       []burst
 	check        func(t *testing.T, log []step)
 }
@@ -169,6 +170,17 @@ func TestAgentEval(t *testing.T) {
 				t.Errorf("bargaining should go to the owner, got %s", l[len(l)-1].action)
 			}
 		}},
+		// replays a real chat (25 Oct 2026): an availability question after an
+		// old, already-answered bargain was handed to the owner as a price request
+		{name: "old bargain, new question", history: []ChatLine{
+			{Who: "buyer", Text: "Ha kardo yehi, price kam nahi ho sakta?"},
+			{Who: "shop", Text: "Hum owner se price check karke batate hain, woh yahin reply karenge."},
+			{Who: "buyer", Text: "Nahi rehne do"},
+		}, bursts: []burst{{"hi is the rose chikankari kurti available?"}}, check: func(t *testing.T, l []step) {
+			if l[0].action == ActHandoff {
+				t.Errorf("an availability question must not go to the owner because of an old bargain")
+			}
+		}},
 	}
 
 	for _, sc := range scenarios {
@@ -177,7 +189,7 @@ func TestAgentEval(t *testing.T) {
 			if sc.vagueCatalog {
 				st.Products[0].Description = "Hand-embroidered lucknowi chikankari on soft cotton."
 			}
-			var transcriptLines []ChatLine
+			transcriptLines := append([]ChatLine(nil), sc.history...)
 			var cart Cart
 			stage, hash := "open", ""
 			orders := sc.orders

@@ -25,15 +25,21 @@ import (
 )
 
 var (
-	ErrEmailTaken = errors.New("email already registered")
-	ErrBadLogin   = errors.New("invalid email or password")
-	ErrSuspended  = errors.New("account suspended, contact support")
-	ErrBadRefresh = errors.New("invalid refresh token")
-	ErrBadReset   = errors.New("invalid or expired reset token")
-	ErrTaken      = errors.New("already registered") // wrapped with the field name
-	ErrUnverified = errors.New("verify your mobile number first")
-	ErrTrialLimit = errors.New("too many trials started from this network today — contact sales")
+	ErrEmailTaken  = errors.New("email already registered")
+	ErrBadLogin    = errors.New("invalid email or password")
+	ErrSuspended   = errors.New("account suspended, contact support")
+	ErrBadRefresh  = errors.New("invalid refresh token")
+	ErrBadReset    = errors.New("invalid or expired reset token")
+	ErrTaken       = errors.New("already registered") // wrapped with the field name
+	ErrUnverified  = errors.New("verify your mobile number first")
+	ErrTrialLimit  = errors.New("too many trials started from this network today — contact sales")
+	ErrLoginLocked = errors.New("too many wrong passwords for this email — wait 15 minutes or reset your password")
+	// ErrDefaultPassword: the seeded demo login, refused in production until changed
+	ErrDefaultPassword = errors.New("this account still has its default password — reset it with Forgot password")
 )
+
+// the demo seller from migration 0005, whose password is public
+const seedSellerEmail, seedSellerPassword = "demo@carthedge.in", "Demo@123"
 
 // signupScope namespaces the seller signup OTP away from the per-store buyer
 // OTPs, which are keyed by business code.
@@ -201,17 +207,27 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, clientIP strin
 
 func (s *Service) Login(ctx context.Context, email, password string) (*Session, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
+	failKey := "auth:fails:" + email
+	if cache.LoginLocked(ctx, s.rdb, failKey) {
+		return nil, ErrLoginLocked
+	}
 	var bizID, code, name, hash, status string
 	err := s.pool.QueryRow(ctx, `select id, code, name, password_hash, status from businesses where email = $1`,
 		email).Scan(&bizID, &code, &name, &hash, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
+		cache.LoginFailed(ctx, s.rdb, failKey)
 		return nil, ErrBadLogin
 	}
 	if err != nil {
 		return nil, err
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		cache.LoginFailed(ctx, s.rdb, failKey)
 		return nil, ErrBadLogin
+	}
+	if s.cfg.Env == "production" && email == seedSellerEmail && password == seedSellerPassword {
+		// the demo login is printed in the repo and its migration
+		return nil, ErrDefaultPassword
 	}
 	// a deleted account may still sign in during its grace period, to restore it
 	if status == "suspended" {
@@ -264,6 +280,11 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	if err != nil {
 		return err
 	}
+	// one reset email a minute per address: the per-IP limit alone let anyone
+	// with a few IPs flood a seller's inbox (and our sender reputation)
+	if ok, err := s.rdb.SetNX(ctx, "auth:resetSent:"+email, "1", time.Minute).Result(); err == nil && !ok {
+		return nil
+	}
 	token := secure.Hex(24)
 	if err := s.rdb.Set(ctx, "auth:reset:"+token, email, 30*time.Minute).Err(); err != nil {
 		return err
@@ -294,7 +315,8 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	if err != nil {
 		return err
 	}
-	s.rdb.Del(ctx, "auth:reset:"+token)
+	// a seller locked out by wrong guesses gets straight back in with the new one
+	s.rdb.Del(ctx, "auth:reset:"+token, "auth:fails:"+email)
 	// whoever held the old password may also hold a live session
 	s.rdb.Set(ctx, middleware.RevokedKey(bizID), time.Now().UnixMilli(), s.cfg.RefreshTTL)
 	return nil

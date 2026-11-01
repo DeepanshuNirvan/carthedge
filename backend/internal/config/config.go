@@ -178,6 +178,20 @@ func Load() (*Config, error) {
 	if c.StorageDriver == "s3" && (c.S3Bucket == "" || c.S3Region == "") {
 		return nil, fmt.Errorf("S3_BUCKET and S3_REGION are required when STORAGE_DRIVER=s3")
 	}
+	if c.Env == "production" {
+		// a short JWT secret can be brute-forced offline from any one token,
+		// and then every seller and admin session can be forged
+		if len(c.JWTSecret) < 32 {
+			return nil, fmt.Errorf("JWT_SECRET must be at least 32 characters in production")
+		}
+		if c.RazorpayKeyID != "" && c.RazorpayWebhookSecret == "" {
+			return nil, fmt.Errorf("RAZORPAY_WEBHOOK_SECRET is required with RAZORPAY_KEY_ID: it is how missed subscription payments and autopay renewals arrive")
+		}
+		// the SPA is served from this origin; no other site needs to read the API
+		if len(c.CORSOrigins) == 1 && c.CORSOrigins[0] == "*" {
+			c.CORSOrigins = []string{c.PublicBaseURL}
+		}
+	}
 	return c, nil
 }
 

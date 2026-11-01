@@ -200,17 +200,17 @@ export default function StorePoliciesPage() {
               {data.hours && <p>Open {data.hours}</p>}
               <p className="flex flex-wrap gap-x-4 gap-y-1">
                 {(p.supportPhone || b.whatsapp) && (
-                  <a href={whatsappHref(p.supportPhone || b.whatsapp)} target="_blank" rel="noreferrer" className="text-jade-ink hover:underline">
+                  <a href={whatsappHref(p.supportPhone || b.whatsapp)} target="_blank" rel="noreferrer" className="-my-3 py-3 text-jade-ink hover:underline">
                     WhatsApp {p.supportPhone || b.whatsapp}
                   </a>
                 )}
                 {p.supportEmail && (
-                  <a href={`mailto:${p.supportEmail}`} className="text-jade-ink hover:underline">
+                  <a href={`mailto:${p.supportEmail}`} className="-my-3 py-3 text-jade-ink hover:underline">
                     {p.supportEmail}
                   </a>
                 )}
                 {b.instagram && (
-                  <a href={`https://instagram.com/${b.instagram.replace('@', '')}`} target="_blank" rel="noreferrer" className="text-jade-ink hover:underline">
+                  <a href={`https://instagram.com/${b.instagram.replace('@', '')}`} target="_blank" rel="noreferrer" className="-my-3 py-3 text-jade-ink hover:underline">
                     Instagram @{b.instagram.replace('@', '')}
                   </a>
                 )}

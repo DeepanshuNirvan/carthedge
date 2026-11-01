@@ -40,12 +40,3 @@ export function Seo({ title, description, path = '/', image, noIndex, jsonLd }: 
     </Helmet>
   );
 }
-
-export const organizationJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: siteName,
-  url: siteUrl,
-  logo: `${siteUrl}/icon-512.png`,
-  description: 'AI order desk for Instagram and WhatsApp sellers in India.',
-};

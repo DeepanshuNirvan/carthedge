@@ -157,8 +157,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, ErrBadLogin):
 			httpx.Err(w, http.StatusUnauthorized, ErrBadLogin.Error())
-		case errors.Is(err, ErrSuspended):
-			httpx.Err(w, http.StatusForbidden, ErrSuspended.Error())
+		case errors.Is(err, ErrSuspended), errors.Is(err, ErrDefaultPassword):
+			httpx.Err(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, ErrLoginLocked):
+			httpx.Err(w, http.StatusTooManyRequests, err.Error())
 		default:
 			slog.Error("login failed", "err", err)
 			httpx.Err(w, http.StatusInternalServerError, "could not sign you in, try again in a moment")

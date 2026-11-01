@@ -145,6 +145,10 @@ func TestMergeKeepsWhatTheBuyerAlreadySaid(t *testing.T) {
 	if got := merge(prev, Cart{}, "decline"); len(got.Items) != 0 {
 		t.Errorf("a decline may clear the items: %+v", got)
 	}
+	// "order kab aayega?" after an order: the model re-adds that order's items
+	if got := merge(Cart{}, Cart{Items: []CartItem{{ProductID: "kurti", Qty: 1}}}, "status"); len(got.Items) != 0 {
+		t.Errorf("a status question must not start a cart: %+v", got)
+	}
 }
 
 func TestGroundedRefusesInventedAmountsAndLinks(t *testing.T) {

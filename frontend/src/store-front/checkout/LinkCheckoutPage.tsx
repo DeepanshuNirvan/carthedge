@@ -48,7 +48,7 @@ function LinkShowcase({ link, products }: { link: ResolvedLink; products: Produc
   const shown = products.slice(0, 4);
   const pay = paymentLine(b);
   const facts: { icon: typeof ShieldCheck; text: string }[] = [
-    ...(b.verified ? [{ icon: ShieldCheck, text: 'Verified seller on CartHedge' }] : []),
+    ...(b.verified ? [{ icon: ShieldCheck, text: 'Seller’s mobile verified by CartHedge' }] : []),
     ...(pay ? [{ icon: Wallet, text: pay }] : []),
     ...(b.codEnabled ? [{ icon: Banknote, text: 'Cash on delivery available' }] : []),
     { icon: Truck, text: b.shippingFee > 0 ? `Shipping ${formatPaise(b.shippingFee)}` : 'Free shipping' },
@@ -225,7 +225,7 @@ export default function LinkCheckoutPage() {
             <p className="truncate text-[15px] font-semibold tracking-snug text-hi">{link.business.name}</p>
             {link.business.verified && (
               <span className="flex items-center gap-1 text-xs text-jade-ink">
-                <ShieldCheck className="size-3.5" /> Verified seller
+                <ShieldCheck className="size-3.5" /> Mobile verified
               </span>
             )}
           </div>

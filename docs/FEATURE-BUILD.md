@@ -5,7 +5,7 @@ Owner request (2026-10-03): build the gap list from [FEATURE-GAPS.md](FEATURE-GA
 ## Rules that bind this build (read before touching code)
 
 - **Migrations are append-only once applied.** The UAT Neon DB is shared with the deployed Render app and `Migrate` runs at boot, so the first local server start applies a new file for good. Never edit an applied migration — fix forward with the next number. Every change must be additive (old deployed code keeps working on the new schema).
-- **Go 1.23 APIs only** (Dockerfile builds with `golang:1.23-alpine`, local toolchain is newer). `go vet ./...` runs the `stdversion` check. HKDF comes from the already-vendored `golang.org/x/crypto/hkdf`.
+- **Go 1.25 APIs at most** (`go.mod` says 1.25.0 since the 25 Oct dependency security upgrade; the Dockerfile builds with `golang:1.27-alpine` so the standard library gets its security fixes). `go vet ./...` runs the `stdversion` check. HKDF comes from the already-vendored `golang.org/x/crypto/hkdf`.
 - Money is paise ints; prices are GST-inclusive (invoices extract tax, totals never change).
 - One pricing path: `shop.Pricing.Totals` is used by order creation, the buyer quote endpoint and the DM assistant's summary — the UI never does money maths.
 - Line endings don't matter for the repo: `core.autocrlf=true` and the index is LF for every file. Tokens only (no raw hex / arbitrary values), jade single accent, verify both themes + 390px.

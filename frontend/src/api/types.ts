@@ -836,6 +836,8 @@ export type StoreBusiness = {
   codEnabled: boolean;
   shippingFee: number;
   onlinePayment: OnlinePayment;
+  /** the seller's mobile passed OTP; the only thing CartHedge verifies */
+  verified: boolean;
   freeShippingAbove: number;
   codFee: CheckoutRules['codFee'];
   prepaidDiscount: CheckoutRules['prepaidDiscount'];

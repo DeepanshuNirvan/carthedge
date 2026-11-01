@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"carthedge/internal/cache"
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
 	"carthedge/internal/invoice"
+	"carthedge/internal/middleware"
 	"carthedge/internal/notify"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -48,39 +50,69 @@ type Session struct {
 	Email       string `json:"email"`
 }
 
+var (
+	ErrLoginLocked = errors.New("too many wrong passwords for this email — wait 15 minutes")
+	// ErrDefaultPassword: the seeded admin login (0006_admin.sql) is public, so
+	// production refuses it until it is changed
+	ErrDefaultPassword = errors.New("the default admin password is disabled in production — set a new one first (docs/GO-LIVE.md, step 1)")
+)
+
+const seedAdminEmail, seedAdminPassword = "admin@carthedge.in", "Admin@123"
+
 func (s *Service) Login(ctx context.Context, email, password string) (*Session, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	failKey := "auth:adminFails:" + email
+	if cache.LoginLocked(ctx, s.rdb, failKey) {
+		return nil, ErrLoginLocked
+	}
 	var id, name, hash string
-	err := s.pool.QueryRow(ctx, `select id, name, password_hash from admins where email=$1`, email).Scan(&id, &name, &hash)
+	err := s.pool.QueryRow(ctx, `select id, name, password_hash from admins where lower(email)=$1`, email).Scan(&id, &name, &hash)
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		cache.LoginFailed(ctx, s.rdb, failKey)
 		return nil, ErrBadLogin
 	}
-	now := time.Now()
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": id, "role": "admin", "iat": now.Unix(), "exp": now.Add(s.cfg.AccessTTL).Unix(),
-	}).SignedString([]byte(s.cfg.JWTSecret))
+	if s.cfg.Env == "production" && email == seedAdminEmail && password == seedAdminPassword {
+		return nil, ErrDefaultPassword
+	}
+	token, err := s.adminToken(id)
 	if err != nil {
 		return nil, err
 	}
 	return &Session{AccessToken: token, Name: name, Email: email}, nil
 }
 
-func (s *Service) ChangePassword(ctx context.Context, adminID, current, next string) error {
+func (s *Service) adminToken(id string) (string, error) {
+	now := time.Now()
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": id, "role": "admin", "iat": now.Unix(), "exp": now.Add(s.cfg.AccessTTL).Unix(),
+	}).SignedString([]byte(s.cfg.JWTSecret))
+}
+
+// ChangePassword sets a new admin password and signs out every other session
+// of that admin; the token returned keeps this one signed in.
+func (s *Service) ChangePassword(ctx context.Context, adminID, current, next string) (string, error) {
 	var hash string
 	if err := s.pool.QueryRow(ctx, `select password_hash from admins where id=$1`, adminID).Scan(&hash); err != nil {
-		return errors.New("admin not found")
+		return "", errors.New("admin not found")
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(current)) != nil {
-		return errors.New("current password is incorrect")
+		return "", errors.New("current password is incorrect")
 	}
 	if len(next) < 8 || len(next) > 72 {
-		return errors.New("new password must be 8 to 72 characters")
+		return "", errors.New("new password must be 8 to 72 characters")
+	}
+	if next == seedAdminPassword {
+		return "", errors.New("choose a password other than the default one")
 	}
 	newHash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return "", err
 	}
-	_, err = s.pool.Exec(ctx, `update admins set password_hash=$2 where id=$1`, adminID, string(newHash))
-	return err
+	if _, err = s.pool.Exec(ctx, `update admins set password_hash=$2 where id=$1`, adminID, string(newHash)); err != nil {
+		return "", err
+	}
+	s.rdb.Set(ctx, middleware.RevokedKey("admin:"+adminID), time.Now().UnixMilli(), s.cfg.AccessTTL)
+	return s.adminToken(adminID)
 }
 
 // Overview aggregates the platform health numbers for the admin dashboard.

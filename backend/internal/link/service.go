@@ -48,7 +48,7 @@ type Resolved struct {
 		WhatsApp    string `json:"whatsapp"`
 		CodEnabled  bool   `json:"codEnabled"`
 		ShippingFee int    `json:"shippingFee"`
-		Verified    bool   `json:"verified"` // trust strip
+		Verified    bool   `json:"verified"` // the seller's mobile passed OTP: all CartHedge vouches for
 		// gateway | upi | none — which prepaid rail the checkout may offer
 		OnlinePayment string `json:"onlinePayment"`
 	} `json:"business"`
@@ -173,13 +173,13 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 	var linkBizID, razorpayKeyID, upiID string
 	var items []byte
 	err := s.pool.QueryRow(ctx, `select l.id, l.kind, l.title, l.items, l.amount, b.id, b.code, b.name,
-		b.logo_url, b.whatsapp, b.cod_enabled, b.shipping_fee, b.razorpay_key_id, b.upi_id
+		b.logo_url, b.whatsapp, b.cod_enabled, b.shipping_fee, b.razorpay_key_id, b.upi_id, b.phone_verified_at is not null
 		from order_links l join businesses b on b.id = l.business_id
 		where b.code = $1 and l.token = $2 and l.active and b.status = 'active'
 		and (l.expires_at is null or l.expires_at > now())`, bizCode, token).Scan(
 		&res.LinkID, &res.Kind, &res.Title, &items, &res.Amount, &linkBizID, &res.Business.Code, &res.Business.Name,
 		&res.Business.LogoURL, &res.Business.WhatsApp, &res.Business.CodEnabled, &res.Business.ShippingFee,
-		&razorpayKeyID, &upiID)
+		&razorpayKeyID, &upiID, &res.Business.Verified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -187,7 +187,6 @@ func (s *Service) Resolve(ctx context.Context, bizCode, token string) (*Resolved
 		return nil, err
 	}
 	res.Business.ID = linkBizID
-	res.Business.Verified = true
 	res.Business.OnlinePayment = OnlinePaymentMode(razorpayKeyID, upiID)
 	json.Unmarshal(items, &res.Refs)
 
