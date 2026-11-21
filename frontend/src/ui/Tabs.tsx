@@ -23,6 +23,8 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: Tab
         return (
           <button
             key={t.value}
+            // a segment inside a form picks a value; it must never submit the form
+            type="button"
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.value)}

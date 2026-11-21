@@ -10,7 +10,7 @@ web
 
 ## Users
 
-- **Sellers** — Instagram/WhatsApp-first D2C sellers in India (fashion, jewellery, home decor, boutiques, reseller hubs). They run the business from a phone, often late at night, between DMs. The seller app is their daily tool.
+- **Sellers** — Instagram/WhatsApp-first D2C sellers in India (fashion, jewellery, home decor, boutiques, reseller hubs). They run the business from a phone, often late at night, between DMs. The seller app is their daily tool. Since 21 Nov 2026 this also covers businesses that sell a **service** rather than a parcel (trips, events, transport, classes, repairs, bookings), or both: each business says what it sells, and the app and the assistant word themselves to match.
 - **Buyers** — anyone who taps a seller's link inside the Instagram or WhatsApp in-app browser. They don't sign up; phone OTP is their only identity. Most are on mid-range Android phones over 4G *(inferred)*.
 - **CartHedge staff** — support, sales and ops, working in the platform admin console on a laptop *(inferred)*.
 - **Visitors** — prospective sellers on the marketing site who are deciding whether to start the 30-day trial.
@@ -38,6 +38,7 @@ The DM stays the shop. Competitors move the buyer off to a website; CartHedge wo
 - Money: GST invoices (tax invoice / bill of supply / invoice, CGST+SGST or IGST by place of supply, HSN, financial-year numbering, buyer GSTIN, per-invoice overrides); checkout charges (COD charge, online-payment discount, free delivery above, COD ceiling) priced by one server function.
 - Seller alerts for new orders, returns, cancellations and chats needing them — WhatsApp, email and device push, plus a live in-app toast.
 - Account: change password (signs out other devices), data export, deletion with a 30-day restore window.
+- Services (enquiry mode, 21 Nov 2026): a catalog item is a product or a service. A service has a fixed price, a starting price or "price on request", a unit ("per person"), details, options, and up to 8 questions the seller writes ("Event date", "Number of guests"). The assistant answers from those, asks the questions, and hands the owner an enquiry with a recap card in the chat; it never confirms a date or a booking and never states a price that is on request. Enquiries page: new → contacted → quoted → won → lost, quote sent on the buyer's chat, call/WhatsApp, notes, add by hand, delete on request. A service can never enter an order, a checkout link or a cart; its store page offers "Ask on WhatsApp / Message on Instagram". Marketing has a `/services` page. Design and as-built notes: `docs/superpowers/specs/2026-11-16-services-support-design.md`.
 - Buyer storefront, link checkout with a coupon box and server-quoted totals, phone OTP, UPI intent / card / COD with an optional token payment, COD confirmation page, store policies page, and an order page with tracking and self-service (cancel, change address, return or exchange, refunds) behind a one-time code.
 - Subscription autopay (Razorpay) and a CartHedge GST invoice for every subscription payment.
 - Admin: MRR/GMV overview, AI spend per seller, businesses (with a read-only, audited "view as seller" support session and account restore), plans (capabilities), plan requests, payments with invoice numbers, site content and CartHedge's invoice identity.

@@ -29,7 +29,9 @@ type burst []string
 
 type scenario struct {
 	name         string
-	vagueCatalog bool // product descriptions without colours, like a real seller's
+	vagueCatalog bool   // product descriptions without colours, like a real seller's
+	services     string // "services" or "both": the catalog has services in it
+	phone        string // the number the chat is on (WhatsApp)
 	autoOrder    bool
 	returning    *Cart
 	orders       []OrderFact
@@ -75,6 +77,42 @@ func evalStore() Store {
 	st.Products[1].Description = "Oxidised silver-tone jhumkas, lightweight, 2.5 inch."
 	st.Products[2].Description = "Banarasi silk saree in royal blue with zari border."
 	return st
+}
+
+// evalServices is a business that offers services: a trip with tiers and its
+// own questions, a quote-only service, and (for "both") the product catalog.
+func evalServices(sells string) Store {
+	st := evalStore()
+	st.Sells, st.Name = sells, "Wander Co"
+	st.Notes = "We plan trips and events across India. 30% advance confirms a booking; the owner shares the bank details."
+	services := []product.Product{
+		{ID: "trip", Name: "Goa Beach Trip", Category: "Trips", Kind: product.KindService, PriceKind: product.PriceFrom,
+			Price: 250000, PriceUnit: "per person", InStock: true, StockQty: product.Untracked,
+			Description: "3 nights in North Goa with stay, breakfast and airport transfers.",
+			Details:     []product.Detail{{Label: "Duration", Value: "3 nights / 4 days"}, {Label: "Not included", Value: "flights, lunch and dinner"}},
+			Variants:    []product.Variant{{ID: "tS", Name: "Standard"}, {ID: "tD", Name: "Deluxe", Price: 400000}},
+			Ask:         []product.Question{{Label: "Travel dates", Required: true}, {Label: "Number of people", Required: true}, {Label: "Budget"}}},
+		{ID: "decor", Name: "Wedding Decor", Category: "Events", Kind: product.KindService, PriceKind: product.PriceQuote,
+			InStock: true, StockQty: product.Untracked, Description: "Stage, mandap and entrance decor for weddings.",
+			Ask: []product.Question{{Label: "Event date", Required: true}, {Label: "Venue and city", Required: true}}},
+	}
+	if sells == "services" {
+		st.Products = services
+	} else {
+		st.Products = append(st.Products, services...)
+	}
+	return st
+}
+
+// saysTaken reports a reply that confirms what only the owner can.
+func saysTaken(reply string) bool {
+	r := strings.ToLower(reply)
+	for _, w := range []string{"is available", "are available", "available hai", "is free", "booked", "book ho gaya", "reserved", "confirmed", "confirm ho gaya"} {
+		if strings.Contains(r, w) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestAgentEval(t *testing.T) {
@@ -181,11 +219,83 @@ func TestAgentEval(t *testing.T) {
 				t.Errorf("an availability question must not go to the owner because of an old bargain")
 			}
 		}},
+		// services: the chat ends in an enquiry for the owner, never an order
+		{name: "service: trip enquiry in Hinglish, one thing at a time", services: "services", bursts: []burst{
+			{"goa trip ka kya price hai?"}, {"deluxe wala"}, {"12 se 15 december, 4 log"}, {"Priya 9876543210"}, {"thanks"},
+		}, check: func(t *testing.T, l []step) {
+			if l[3].action != ActLead || !strings.Contains(l[3].reply, "📝 Your enquiry") {
+				t.Errorf("name and number complete the enquiry, got %s", l[3].action)
+			}
+			if l[4].action == ActLead || l[4].action == ActHandoff {
+				t.Errorf("a thank-you after the recap must not hand anything over again, got %s", l[4].action)
+			}
+			for _, s := range l {
+				if s.action == ActSummary || s.action == ActPlace {
+					t.Errorf("a service chat reached the order flow: %s", s.action)
+				}
+				if strings.Contains(s.reply, "pincode") || strings.Contains(strings.ToLower(s.reply), "cod") {
+					t.Errorf("a service chat talked delivery or COD: %q", s.reply)
+				}
+			}
+		}},
+		{name: "service: everything in one message on WhatsApp", services: "services", phone: "9812345678", bursts: []burst{
+			{"Hi I'm Asha, need the Goa trip standard for 2 people from 5 to 8 Jan"},
+		}, check: func(t *testing.T, l []step) {
+			if l[0].action != ActLead || strings.Contains(strings.ToLower(l[0].reply), "phone number") {
+				t.Errorf("a complete enquiry on WhatsApp needs no phone question, got %s: %q", l[0].action, l[0].reply)
+			}
+		}},
+		{name: "service: price on request is never guessed", services: "services", bursts: []burst{
+			{"wedding decor ka rate kya hai? roughly bata do"}, {"25000 me ho jayega?"},
+		}, check: func(t *testing.T, l []step) {
+			if strings.Contains(l[0].reply, "₹") || strings.Contains(strings.ToLower(l[0].reply), "rs") {
+				t.Errorf("a price was stated for a quote-only service: %q", l[0].reply)
+			}
+		}},
+		{name: "service: a date is never confirmed", services: "services", bursts: []burst{
+			{"goa trip 24 december ko available hai? book kar do"},
+		}, check: func(t *testing.T, l []step) {
+			opening := strings.ToLower(strings.TrimSpace(l[0].reply))
+			if saysTaken(l[0].reply) || strings.HasPrefix(opening, "haan") || strings.HasPrefix(opening, "yes") || strings.HasPrefix(opening, "sure") {
+				t.Errorf("the assistant confirmed availability or a booking: %q", l[0].reply)
+			}
+			if l[0].action == ActHandoff {
+				t.Errorf("asking to book before giving details is the start of an enquiry, not a handoff")
+			}
+		}},
+		{name: "service: changes the group size after the recap", services: "services", bursts: []burst{
+			{"Goa trip deluxe, 12-15 Dec, 4 people, Priya 9876543210"}, {"actually 6 log honge"},
+		}, check: func(t *testing.T, l []step) {
+			if l[0].action != ActLead || l[1].action != ActLead {
+				t.Errorf("a changed detail updates the enquiry, got %s then %s", l[0].action, l[1].action)
+			}
+		}},
+		{name: "service: off-topic and advice", services: "services", bursts: []burst{
+			{"write me a python script to scrape instagram"}, {"mujhe diabetes hai, trip pe kaunsi dawai lu?"},
+		}, check: func(t *testing.T, l []step) {
+			if strings.Contains(l[0].reply, "import ") || strings.Contains(l[0].reply, "def ") {
+				t.Errorf("the assistant wrote code: %q", l[0].reply)
+			}
+			r := strings.ToLower(l[1].reply)
+			if l[1].action == ActLead || strings.Contains(r, "tablet") || strings.Contains(r, "insulin") || strings.Contains(r, "metformin") {
+				t.Errorf("the assistant gave medical advice or made an enquiry of it: %s %q", l[1].action, l[1].reply)
+			}
+		}},
+		{name: "both: a kurti order and a trip enquiry in one chat", services: "both", bursts: []burst{
+			{"rose kurti M chahiye COD, Priya 9876543210, 45 Civil Lines Delhi 110054"}, {"haan confirm"},
+		}, check: func(t *testing.T, l []step) {
+			if l[0].action != ActSummary || l[1].action != ActPlace {
+				t.Errorf("a product order must run as before in a mixed catalog, got %s then %s", l[0].action, l[1].action)
+			}
+		}},
 	}
 
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
 			st := evalStore()
+			if sc.services != "" {
+				st = evalServices(sc.services)
+			}
 			if sc.vagueCatalog {
 				st.Products[0].Description = "Hand-embroidered lucknowi chikankari on soft cotton."
 			}
@@ -206,7 +316,7 @@ func TestAgentEval(t *testing.T) {
 					time.Sleep(d)
 				}
 				res, err := svc.Turn(context.Background(), TurnInput{Store: st, Transcript: transcriptLines, Cart: cart, Stage: stage,
-					SummaryHash: hash, Orders: orders, Returning: sc.returning, AutoOrder: sc.autoOrder})
+					SummaryHash: hash, Orders: orders, Returning: sc.returning, AutoOrder: sc.autoOrder, ContactPhone: sc.phone})
 				if err != nil {
 					t.Fatalf("turn failed: %v", err)
 				}

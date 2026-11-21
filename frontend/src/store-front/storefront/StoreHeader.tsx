@@ -146,8 +146,14 @@ export function StoreProfile({ business }: { business: StoreBusiness }) {
         </div>
       </div>
       <p className="mt-3 text-[13px] text-mid">
-        {trustLine(business)}
-        {business.codEnabled && business.onlinePayment !== 'none' ? ', cash on delivery available' : ''}. No signup needed.
+        {business.sells === 'services' ? (
+          'Ask about anything here on WhatsApp or Instagram. No signup needed.'
+        ) : (
+          <>
+            {trustLine(business)}
+            {business.codEnabled && business.onlinePayment !== 'none' ? ', cash on delivery available' : ''}. No signup needed.
+          </>
+        )}
       </p>
       {(business.instagram || business.whatsapp) && (
         <div className="mt-3 flex gap-2">

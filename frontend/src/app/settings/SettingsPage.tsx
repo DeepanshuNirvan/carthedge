@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SellsPicker } from '../shell/SellsPicker';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -339,6 +340,17 @@ function ProfileSection() {
             Change logo
             <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onLogo(e.target.files[0])} />
           </label>
+        </div>
+        <div className="sm:col-span-2">
+          <SellsPicker
+            value={business.sells ?? 'products'}
+            onChange={(sells) =>
+              update.mutate(
+                { sells },
+                { onSuccess: () => toast('success', 'Saved', 'Your menu and your assistant now match.'), onError: (e) => toast('error', 'Save failed', e.message) },
+              )
+            }
+          />
         </div>
         <Field label="Business name" error={errors.name?.message}>
           <Input {...register('name')} />

@@ -23,6 +23,7 @@ import (
 	"carthedge/internal/courier"
 	"carthedge/internal/customer"
 	"carthedge/internal/database"
+	"carthedge/internal/enquiry"
 	"carthedge/internal/events"
 	"carthedge/internal/invoice"
 	"carthedge/internal/jobs"
@@ -113,8 +114,11 @@ func main() {
 	aiSvc := ai.NewService(pool, aiClient, orderSvc, productSvc, log, cfg.PublicBaseURL)
 	metaClient := messaging.NewClient(cfg.MetaGraphVersion, cfg.MetaAppSecret, cfg.MetaIgAppSecret)
 	metaClient.YCloudKey = cfg.YCloudAPIKey
-	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, alerts, planSvc.HasFeature, log)
+	enquirySvc := enquiry.NewService(pool)
+	messagingSvc := messaging.NewService(pool, metaClient, aiSvc, bus, cipher, alerts, enquirySvc, planSvc.HasFeature, log)
 	messagingSvc.Start(ctx)
+	// a quoted price reaches the buyer on the chat their enquiry came from
+	enquirySvc.SetMessenger(messagingSvc.SendToConversation)
 	// orders placed from a DM chat are confirmed and tracked on that chat
 	orderSvc.SetDirectMessenger(messagingSvc.SendToConversation)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL, jobs.Extra{
@@ -140,6 +144,7 @@ func main() {
 		Links:      link.NewHandler(linkSvc),
 		Orders:     order.NewHandler(orderSvc),
 		Customers:  customer.NewHandler(customerSvc),
+		Enquiries:  enquiry.NewHandler(enquirySvc),
 		Analytics:  analytics.NewHandler(pool, rdb),
 		Broadcasts: broadcast.NewHandler(broadcastSvc),
 		Invoices:   invoice.NewHandler(pool),

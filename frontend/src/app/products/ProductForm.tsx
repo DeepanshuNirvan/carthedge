@@ -3,7 +3,7 @@ import { useFieldArray, useForm, type FieldNamesMarkedBoolean } from 'react-hook
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Building2, ImagePlus, Plus, Trash2, X } from 'lucide-react';
-import { gstRates, type Product, type ProductInput } from '@/api/types';
+import { gstRates, type ItemKind, type PriceKind, type Product, type ProductInput } from '@/api/types';
 import { useProductMutations } from '@/api/products';
 import { useBusiness } from '@/api/business';
 import { uploadFile } from '@/api/uploads';
@@ -13,6 +13,7 @@ import { Modal } from '@/ui/Modal';
 import { Field, Input, Select, Textarea } from '@/ui/Input';
 import { Button, IconButton } from '@/ui/Button';
 import { Switch } from '@/ui/Switch';
+import { Tabs } from '@/ui/Tabs';
 import { FileDropzone } from '@/ui/FileDropzone';
 import { checkOptions, emptyOptions, optionsFrom, optionsInput, OptionsEditor, type OptionsState } from './OptionsEditor';
 
@@ -28,10 +29,14 @@ const qtyText = (n: number | undefined) => (n === undefined || n < 0 ? '' : Stri
 
 const productSchema = z
   .object({
-    name: z.string().min(2, 'Product name is required'),
+    kind: z.enum(['product', 'service']),
+    priceKind: z.enum(['fixed', 'from', 'quote']),
+    priceUnit: z.string().trim().max(30, 'Keep it short, like "per person"'),
+    ask: z.array(z.object({ label: z.string().trim().max(60, 'Keep each question under 60 characters'), required: z.boolean() })),
+    name: z.string().min(2, 'A name is required'),
     description: z.string(),
     category: z.string().trim().max(60, 'Keep the category short'),
-    price: rupees('Enter a valid price').refine((s) => s !== '', 'Price is required'),
+    price: rupees('Enter a valid price'),
     resellerPrice: rupees('Enter a valid price'),
     comparePrice: rupees('Enter a valid price'),
     sku: z.string(),
@@ -47,8 +52,17 @@ const productSchema = z
     originCountry: z.string().trim().max(60, 'Keep it under 60 characters'),
     manufacturer: z.string().trim().max(300, 'Keep it under 300 characters'),
   })
+  // a price "on request" is shared by the owner per enquiry; everything else needs one
+  .refine((v) => (v.kind === 'service' && v.priceKind === 'quote') || (rupeesToPaise(v.price) ?? 0) > 0, {
+    path: ['price'],
+    message: 'Price is required',
+  })
+  .refine((v) => v.kind !== 'service' || new Set(v.ask.map((q) => q.label.toLowerCase())).size === v.ask.length || v.ask.some((q) => !q.label), {
+    path: ['ask'],
+    message: 'Two questions are the same',
+  })
   // selling above the printed maximum retail price is not allowed
-  .refine((v) => !v.mrp || (rupeesToPaise(v.price) ?? 0) <= (rupeesToPaise(v.mrp) ?? 0), {
+  .refine((v) => v.kind === 'service' || !v.mrp || (rupeesToPaise(v.price) ?? 0) <= (rupeesToPaise(v.mrp) ?? 0), {
     path: ['mrp'],
     message: "The price can't be more than the MRP",
   });
@@ -60,10 +74,15 @@ type Dirty = Partial<Readonly<FieldNamesMarkedBoolean<ProductFormValues>>>;
  * while the form is open, and resending the old number would undo those sales.
  */
 const toInput = (v: ProductFormValues, dirty: Dirty | null, options: OptionsState, editing: Product | null): ProductInput => ({
+  kind: v.kind,
+  // only a service can start "from" a price or be quoted per enquiry
+  priceKind: v.kind === 'service' ? v.priceKind : 'fixed',
+  priceUnit: v.kind === 'service' ? v.priceUnit : '',
+  ask: v.kind === 'service' ? v.ask.filter((q) => q.label) : [],
   name: v.name,
   description: v.description,
   category: v.category,
-  price: rupeesToPaise(v.price) ?? 0,
+  price: v.kind === 'service' && v.priceKind === 'quote' ? 0 : (rupeesToPaise(v.price) ?? 0),
   resellerPrice: v.resellerPrice ? (rupeesToPaise(v.resellerPrice) ?? 0) : 0,
   comparePrice: v.comparePrice ? (rupeesToPaise(v.comparePrice) ?? 0) : 0,
   sku: v.sku,
@@ -81,6 +100,21 @@ const toInput = (v: ProductFormValues, dirty: Dirty | null, options: OptionsStat
   manufacturer: v.manufacturer,
 });
 
+/** Starter questions a seller can tap in and then edit; nothing in the backend knows these trades. */
+const askPresets: { name: string; labels: string[] }[] = [
+  { name: 'Trip', labels: ['Travel dates', 'Number of people', 'Starting city'] },
+  { name: 'Event', labels: ['Event date', 'Venue and city', 'Number of guests'] },
+  { name: 'Transport', labels: ['Pickup location', 'Drop location', 'Date and time'] },
+  { name: 'Appointment', labels: ['Preferred date and time', 'What you need done'] },
+];
+const MAX_QUESTIONS = 8;
+
+const priceKinds: { value: PriceKind; label: string }[] = [
+  { value: 'fixed', label: 'Fixed price' },
+  { value: 'from', label: 'Starting from' },
+  { value: 'quote', label: 'On request' },
+];
+
 const countries = ['India', 'China', 'Bangladesh', 'Vietnam', 'Sri Lanka', 'Nepal', 'Thailand', 'Indonesia', 'Turkey', 'Italy'];
 
 export function ProductForm({ open, onClose, editing }: { open: boolean; onClose: () => void; editing: Product | null }) {
@@ -97,10 +131,14 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
     resolver: zodResolver(productSchema),
     values: editing
       ? {
+          kind: editing.kind ?? 'product',
+          priceKind: editing.priceKind ?? 'fixed',
+          priceUnit: editing.priceUnit ?? '',
+          ask: editing.ask ?? [],
           name: editing.name,
           description: editing.description,
           category: editing.category,
-          price: paiseToRupees(editing.price),
+          price: editing.priceKind === 'quote' ? '' : paiseToRupees(editing.price),
           resellerPrice: editing.resellerPrice ? paiseToRupees(editing.resellerPrice) : '',
           comparePrice: editing.comparePrice ? paiseToRupees(editing.comparePrice) : '',
           sku: editing.sku,
@@ -117,6 +155,11 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
           manufacturer: editing.manufacturer ?? '',
         }
       : {
+          // a business that only offers services starts every new item as one
+          kind: business?.sells === 'services' ? 'service' : 'product',
+          priceKind: 'fixed',
+          priceUnit: '',
+          ask: [],
           name: '',
           description: '',
           category: '',
@@ -138,6 +181,11 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
         },
   });
   const details = useFieldArray({ control, name: 'details' });
+  const ask = useFieldArray({ control, name: 'ask' });
+  const kind = watch('kind');
+  const priceKind = watch('priceKind');
+  const isService = kind === 'service';
+  const noun = isService ? 'service' : 'product';
   const images = watch('images');
   const inStock = watch('inStock');
   const trending = watch('trending');
@@ -172,7 +220,7 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
   };
 
   const onSubmit = (values: ProductFormValues) => {
-    const optionsProblem = checkOptions(options, values.mrp ? rupeesToPaise(values.mrp) : null);
+    const optionsProblem = checkOptions(options, !isService && values.mrp ? rupeesToPaise(values.mrp) : null);
     setOptionsError(optionsProblem);
     if (optionsProblem) return;
     const input = toInput(values, editing ? dirtyFields : null, options, editing);
@@ -181,19 +229,38 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
     // both mutations share success/error handling
     (mutation.mutate as (p: unknown, o: object) => void)(payload, {
       onSuccess: () => {
-        toast('success', editing ? 'Product updated' : 'Product added');
+        toast('success', `${isService ? 'Service' : 'Product'} ${editing ? 'updated' : 'added'}`);
         onClose();
       },
-      onError: (e: Error) => toast('error', 'Could not save product', e.message),
+      onError: (e: Error) => toast('error', `Could not save the ${noun}`, e.message),
     });
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit product' : 'Add product'} wide>
+    <Modal open={open} onClose={onClose} title={`${editing ? 'Edit' : 'Add'} ${noun}`} wide>
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2" noValidate>
+        {/* the choice only exists for a business that sells both, or to fix an item listed as the wrong kind */}
+        {(business?.sells === 'both' || (editing && (editing.kind === 'service') !== (business?.sells === 'services'))) && (
+          <div className="sm:col-span-2">
+            <Tabs<ItemKind>
+              className="w-fit"
+              value={kind}
+              onChange={(k) => setValue('kind', k, { shouldDirty: true })}
+              tabs={[
+                { value: 'product', label: 'Product' },
+                { value: 'service', label: 'Service' },
+              ]}
+            />
+            <p className="mt-1.5 text-xs text-low">
+              {isService
+                ? 'Something you do: a trip, an event, a repair, a class. Buyers enquire, and you follow up.'
+                : 'Something you pack and send. Buyers order and pay at checkout.'}
+            </p>
+          </div>
+        )}
         <div className="sm:col-span-2">
           <Field label="Name" error={errors.name?.message}>
-            <Input placeholder="Rose Pink Chikankari Kurti" {...register('name')} />
+            <Input placeholder={isService ? 'Goa Beach Trip, 3 nights' : 'Rose Pink Chikankari Kurti'} {...register('name')} />
           </Field>
         </div>
         <div className="sm:col-span-2">
@@ -202,22 +269,55 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
           </Field>
         </div>
         <Field label="Category" optional hint="Helps buyers filter your store" error={errors.category?.message}>
-          <Input placeholder="Kurtis" {...register('category')} />
+          <Input placeholder={isService ? 'Trips' : 'Kurtis'} {...register('category')} />
         </Field>
-        <Field label="SKU" optional>
-          <Input {...register('sku')} />
-        </Field>
-        <Field label="Price (₹)" error={errors.price?.message}>
-          <Input inputMode="decimal" placeholder="1499" {...register('price')} />
-        </Field>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Reseller ₹" optional error={errors.resellerPrice?.message}>
-            <Input inputMode="decimal" {...register('resellerPrice')} />
+        {isService ? (
+          <Field label="How is it priced?">
+            <Select {...register('priceKind')}>
+              {priceKinds.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </Select>
           </Field>
-          <Field label="Compare-at ₹" optional error={errors.comparePrice?.message}>
-            <Input inputMode="decimal" {...register('comparePrice')} />
+        ) : (
+          <Field label="SKU" optional>
+            <Input {...register('sku')} />
           </Field>
-        </div>
+        )}
+        {isService && priceKind === 'quote' ? (
+          <p className="rounded-xl bg-[rgb(var(--field)/0.04)] p-3.5 text-[13px] leading-relaxed text-mid hairline sm:col-span-2">
+            No price is shown. The assistant tells buyers you will share it, takes their details, and you send your quote from Enquiries.
+          </p>
+        ) : (
+          <>
+            <Field label={isService && priceKind === 'from' ? 'Starting price (₹)' : 'Price (₹)'} error={errors.price?.message}>
+              <Input inputMode="decimal" placeholder={isService ? '2500' : '1499'} {...register('price')} />
+            </Field>
+            {isService ? (
+              <div>
+                <Field label="Per" optional hint="Shown next to the price" error={errors.priceUnit?.message}>
+                  <Input list="price-units" maxLength={30} placeholder="per person" {...register('priceUnit')} />
+                </Field>
+                <datalist id="price-units">
+                  {['per person', 'per day', 'per hour', 'per night', 'per session', 'per km', 'per event'].map((u) => (
+                    <option key={u} value={u} />
+                  ))}
+                </datalist>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Reseller ₹" optional error={errors.resellerPrice?.message}>
+                  <Input inputMode="decimal" {...register('resellerPrice')} />
+                </Field>
+                <Field label="Compare-at ₹" optional error={errors.comparePrice?.message}>
+                  <Input inputMode="decimal" {...register('comparePrice')} />
+                </Field>
+              </div>
+            )}
+          </>
+        )}
 
         <div className="sm:col-span-2">
           <p className="mb-1.5 text-sm font-medium text-hi">Images</p>
@@ -240,23 +340,81 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
         <div className="grid gap-4 sm:col-span-2 sm:grid-cols-[auto_1fr] sm:items-end">
           <div className="flex items-center gap-6 sm:pb-2.5">
             <span className="flex items-center gap-2.5 text-sm text-hi">
-              <Switch checked={inStock} onChange={(v) => setValue('inStock', v, { shouldDirty: true })} label="In stock" />
-              In stock
+              <Switch
+                checked={inStock}
+                onChange={(v) => setValue('inStock', v, { shouldDirty: true })}
+                label={isService ? 'Taking bookings' : 'In stock'}
+              />
+              {isService ? 'Taking bookings' : 'In stock'}
             </span>
             <span className="flex items-center gap-2.5 text-sm text-hi">
               <Switch checked={trending} onChange={(v) => setValue('trending', v, { shouldDirty: true })} label="Trending" />
               Trending
             </span>
           </div>
-          <Field
-            label="Pieces in stock"
-            optional
-            error={errors.stockQty?.message}
-            hint="Orders reduce it and it shows sold out at 0. Leave empty to manage with the switch."
-          >
-            <Input inputMode="numeric" placeholder="Not counted" className="sm:max-w-48" {...register('stockQty')} />
-          </Field>
+          {!isService && (
+            <Field
+              label="Pieces in stock"
+              optional
+              error={errors.stockQty?.message}
+              hint="Orders reduce it and it shows sold out at 0. Leave empty to manage with the switch."
+            >
+              <Input inputMode="numeric" placeholder="Not counted" className="sm:max-w-48" {...register('stockQty')} />
+            </Field>
+          )}
         </div>
+
+        {/* what the assistant finds out before it hands you the enquiry */}
+        {isService && (
+          <div className="sm:col-span-2">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-hi">Ask before handing over</p>
+              {ask.fields.length < MAX_QUESTIONS && (
+                <Button type="button" variant="ghost" size="sm" icon={<Plus className="size-4" />} onClick={() => ask.append({ label: '', required: true })}>
+                  Add question
+                </Button>
+              )}
+            </div>
+            <p className="text-xs leading-relaxed text-low">
+              The assistant collects these in the chat, then their name and number, and sends you the enquiry. Turn off "must ask" for a detail it should note only if the buyer mentions it.
+            </p>
+            {ask.fields.length === 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-mid">Start with:</span>
+                {askPresets.map((p) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => ask.replace(p.labels.map((label) => ({ label, required: true })))}
+                    className="inline-flex min-h-10 items-center rounded-full px-3.5 text-xs font-medium text-mid neu transition-colors duration-micro hover:text-hi sm:min-h-8"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2">
+                {ask.fields.map((f, i) => (
+                  <div key={f.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                    <Input placeholder="Event date" aria-label={`Question ${i + 1}`} maxLength={60} {...register(`ask.${i}.label`)} />
+                    <span className="flex items-center gap-2 text-xs text-mid">
+                      <Switch
+                        checked={watch(`ask.${i}.required`)}
+                        onChange={(v) => setValue(`ask.${i}.required`, v, { shouldDirty: true })}
+                        label={`Must ask question ${i + 1}`}
+                      />
+                      <span className="max-sm:sr-only">Must ask</span>
+                    </span>
+                    <IconButton label="Remove question" onClick={() => ask.remove(i)}>
+                      <Trash2 className="size-4" />
+                    </IconButton>
+                  </div>
+                ))}
+              </div>
+            )}
+            {errors.ask?.root?.message && <p className="mt-1.5 text-xs text-danger-ink">{errors.ask.root.message}</p>}
+          </div>
+        )}
 
         {/* what buyers ask before they buy; the assistant quotes these too */}
         <div className="sm:col-span-2">
@@ -269,13 +427,22 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
             )}
           </div>
           {details.fields.length === 0 ? (
-            <p className="text-xs text-low">Fabric, fit, length, care, what is in the box. Buyers see them on the product page.</p>
+            <p className="text-xs text-low">
+              {isService
+                ? 'Duration, what is included, what is not, where it happens. Buyers see them on the page and the assistant answers from them.'
+                : 'Fabric, fit, length, care, what is in the box. Buyers see them on the product page.'}
+            </p>
           ) : (
             <div className="flex flex-col gap-2">
               {details.fields.map((f, i) => (
                 <div key={f.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-2">
-                  <Input placeholder="Fabric" aria-label="Detail label" maxLength={40} {...register(`details.${i}.label`)} />
-                  <Input placeholder="Pure cotton, hand block print" aria-label="Detail value" maxLength={300} {...register(`details.${i}.value`)} />
+                  <Input placeholder={isService ? 'Included' : 'Fabric'} aria-label="Detail label" maxLength={40} {...register(`details.${i}.label`)} />
+                  <Input
+                    placeholder={isService ? 'Stay, breakfast, airport transfers' : 'Pure cotton, hand block print'}
+                    aria-label="Detail value"
+                    maxLength={300}
+                    {...register(`details.${i}.value`)}
+                  />
                   <IconButton label="Remove detail" onClick={() => details.remove(i)}>
                     <Trash2 className="size-4" />
                   </IconButton>
@@ -285,6 +452,8 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
           )}
         </div>
 
+        {!isService && (
+        <>
         <div className="flex flex-col gap-1.5 sm:col-span-2">
           <p className="text-sm font-medium text-hi">Size chart</p>
           {sizeChart ? (
@@ -333,9 +502,11 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
             </Button>
           )}
         </div>
+        </>
+        )}
 
-        <Field label="HSN code" optional error={errors.hsn?.message} hint="Printed on GST invoices">
-          <Input inputMode="numeric" maxLength={8} placeholder="6204" {...register('hsn')} />
+        <Field label={isService ? 'SAC code' : 'HSN code'} optional error={errors.hsn?.message} hint="Printed on GST invoices">
+          <Input inputMode="numeric" maxLength={8} placeholder={isService ? '998555' : '6204'} {...register('hsn')} />
         </Field>
         <Field label="GST rate" hint="Store default comes from Settings → GST">
           <Select {...register('gstRate')}>
@@ -350,7 +521,7 @@ export function ProductForm({ open, onClose, editing }: { open: boolean; onClose
 
         <div className="flex gap-3 sm:col-span-2">
           <Button type="submit" loading={create.isPending || update.isPending}>
-            {editing ? 'Save changes' : 'Add product'}
+            {editing ? 'Save changes' : `Add ${noun}`}
           </Button>
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel

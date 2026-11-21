@@ -66,7 +66,7 @@ Offers never leave from CartHedge's number: that would break Meta's opt-in rule 
 
 **Owner steps in Meta (about an hour, then template review: minutes to a day).** No App Review is needed for CartHedge's own number; standard access covers your own business.
 
-1. WhatsApp Manager (business.facebook.com/wa/manage) in CartHedge's business portfolio → **Phone numbers → Add phone number**: a number not on any WhatsApp app (a new SIM or a virtual number). Display name **CartHedge**. Verify by SMS or call.
+1. business.facebook.com → **Settings → Accounts → WhatsApp accounts → + Add → Create a new WhatsApp account** (Meta's Nov 2026 layout: a *WhatsApp account* holds the number, a *Messaging account* holds templates and billing). Display name **CartHedge**, category, time zone Asia/Kolkata, website `https://carthedge.in`; then the number (not on any WhatsApp app: new SIM, eSIM or landline), verify by SMS or **Phone call** (landline); then create a new Messaging account, not the Test one.
 2. **Billing**: add CartHedge's card in WhatsApp Manager → Payment settings (Billing Hub). Without it Meta stops delivery after the free allowance.
 3. **Message templates → Create**, three times, language **English** (code `en`, not "English (US)"), names exactly as below:
    - `carthedge_code`: category **Authentication**, code delivery **Copy code**, tick "Add security recommendation", expiry **5 minutes**. Meta writes the text itself.
@@ -81,17 +81,24 @@ Offers never leave from CartHedge's number: that would break Meta's opt-in rule 
      Samples: {{1}} `Rangrez Studio`, {{2}} `Your order CH-AB12 is on the way! Courier: Delhivery, tracking id 1234567. Track: https://carthedge.in/o/CH-AB12`
    - `seller_alert`: category **Utility**. Body:
      ```
-     CartHedge alert: {{1}}
+     Your CartHedge seller account has a new update: {{1}}
 
-     {{2}}
+     Details: {{2}}
 
-     Open it here: {{3}}
+     Please review it in your CartHedge seller dashboard: {{3}}
 
-     You get these because WhatsApp alerts are on in your CartHedge settings.
+     You receive these account notifications because WhatsApp alerts are on in your CartHedge settings.
      ```
-     Samples: {{1}} `New order CH-AB12 · ₹1,499`, {{2}} `Priya ordered 2 items from your storefront, cash on delivery.`, {{3}} `https://carthedge.in/app/orders`
-4. Business settings → **Users → System users → Add** (admin) → **Assign assets**: the Meta app and the WhatsApp account, full control → **Generate token**, expiry **Never**, permissions `whatsapp_business_messaging` and `whatsapp_business_management`.
-5. Copy the **phone number ID** (WhatsApp Manager → Phone numbers, or App dashboard → WhatsApp → API Setup).
+     Samples: {{1}} `New order CH-AB12 for ₹1,499`, {{2}} `Order CH-AB12 was placed on your store for 2 items. Payment: cash on delivery.`, {{3}} `https://carthedge.in/app/orders`
+     (The first wording, "CartHedge alert: {{1}} / {{2}} / Open it here: {{3}}", was flagged by Meta as marketing on 11 Nov 2026: too little fixed text around the variables. The code only needs the name and three placeholders in this order.)
+4. Business settings → **Users → System users → Add** (admin) → **Assign assets**: the Meta app, the WhatsApp account and the Messaging account, full control → **Generate token**, expiry **Never**, permissions `whatsapp_business_messaging` and `whatsapp_business_management`.
+5. Copy the **phone number ID** (WhatsApp Manager → Phone numbers, or App dashboard → WhatsApp → API Setup), then **register** it with Cloud API. Meta allows this only through the API, and an unregistered number sends nothing:
+   ```bash
+   curl -X POST "https://graph.facebook.com/v25.0/PHONE_NUMBER_ID/register" \
+     -H "Authorization: Bearer SYSTEM_USER_TOKEN" -H "Content-Type: application/json" \
+     -d '{"messaging_product":"whatsapp","pin":"123456"}'
+   ```
+   Pick your own 6-digit PIN: it becomes the number's two-step PIN (needed again to move or delete the number). `{"success":true}` means done. Max 10 tries per number per 72 h.
 6. Render → Environment: set `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_TOKEN`; **delete** the old `WHATSAPP_API_URL` and `WHATSAPP_API_TOKEN`; leave `WHATSAPP_SELLER_CHANNEL` unset. Redeploy.
 7. Check: sign up a test seller with your own mobile. The code arrives on WhatsApp from "CartHedge" with a Copy code button. Render logs show a `notify failed` line naming the template and Meta's error code if a template is missing or not approved yet.
 

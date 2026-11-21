@@ -85,6 +85,22 @@ Things automation could not do (real Meta accounts, real phones, third-party pay
 - [ ] **Label details on a real listing:** a lawyer confirms which of MRP, country of origin and maker/packer/importer apply to fashion and handmade sellers, and the product page wording ("MRP ₹X, inclusive of all taxes", "Made or packed by") is acceptable.
 - [ ] **Consent wording:** a lawyer reviews "Send me offers and new arrivals from <store> on WhatsApp. I can stop them any time." and the Broadcasts section of the terms.
 
+## 10. Services and enquiries (21 Nov build)
+
+Code checked on the isolated stack: 48 API checks, the practice chat on the real model, and the screens on desktop and phone. These need a real account or a real phone.
+
+- [ ] **Deploy:** after the deploy, Render logs show migration `19` applied; an existing seller's Products page, orders and storefront look exactly as before, and Settings shows "What do you sell?" set to Products.
+- [ ] **A real Instagram enquiry:** set a test business to Services, add a service with two must-ask questions, connect Instagram, and from a buyer account ask about it in Hinglish. The assistant asks the questions, then name and number, then sends the "📝 Your enquiry" card. An alert arrives (push/WhatsApp/email) and the enquiry is on the Enquiries page with the answers.
+- [ ] **Changed detail:** the buyer then changes the number of people → the same enquiry updates (no second alert, no second row).
+- [ ] **Quote:** from the enquiry, send a price with a note → it arrives in the buyer's Instagram chat as "💬 Quote from …"; the enquiry moves to Quoted. The buyer replies "ok done" → the chat is handed to you.
+- [ ] **Quote after 24 hours:** on an enquiry whose buyer last wrote more than a day ago, the button reads "Save price" and nothing is sent.
+- [ ] **Price on request:** a buyer asks "roughly kitna lagega?" about a quote-only service → no rupee amount in the reply.
+- [ ] **Booking a date:** "24 Dec free hai? book kar do" → the assistant notes the date and says you will confirm; it never says booked or available.
+- [ ] **Auto-reply off:** turn auto-reply off, have the buyer give all the details → the enquiry still appears (no reply is sent).
+- [ ] **Storefront on a phone, inside Instagram's in-app browser:** a service shows its price wording and "Ask on WhatsApp"; tapping it opens WhatsApp with the message typed. A quote-only service shows "Price on request".
+- [ ] **Search preview:** share `https://carthedge.in/services` in WhatsApp → the preview shows the services title and description. Google's Rich Results test on `/services` finds the FAQ.
+- [ ] **Delete on request:** delete an enquiry → gone from the list; the chat itself stays on the AI desk.
+
 ## 9. Assisted WhatsApp (4 Oct build, after the owner's Meta steps)
 
 Do these once `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_TOKEN` are on Render (`docs/WHATSAPP-INSTAGRAM-GO-LIVE.md`, "Phase 1").

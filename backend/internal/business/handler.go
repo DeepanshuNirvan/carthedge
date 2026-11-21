@@ -51,6 +51,8 @@ type Profile struct {
 	AiAutoReply        bool   `json:"aiAutoReply"`
 	AiAutoOrder        bool   `json:"aiAutoOrder"`
 	AiNotes            string `json:"aiNotes"`
+	// Sells is what the business offers: products | services | both
+	Sells string `json:"sells"`
 	// settings documents (see internal/shop)
 	Policies  shop.Policies  `json:"policies"`
 	AIProfile shop.AIProfile `json:"aiProfile"`
@@ -68,12 +70,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	err := h.pool.QueryRow(r.Context(), `select id, code, name, owner_name, email, phone, whatsapp, instagram,
 		address, city, state, pincode, gstin, upi_id, logo_url, shipping_fee, free_shipping_above,
 		cod_enabled, cod_token_amount, baseline_rto_percent, razorpay_key_id, razorpay_key_secret,
-		ai_auto_reply, ai_auto_order, ai_notes
+		ai_auto_reply, ai_auto_order, ai_notes, sells
 		from businesses where id = $1`, bizID).Scan(
 		&p.ID, &p.Code, &p.Name, &p.OwnerName, &p.Email, &p.Phone, &p.WhatsApp, &p.Instagram,
 		&p.Address, &p.City, &p.State, &p.Pincode, &p.Gstin, &p.UpiID, &p.LogoURL, &p.ShippingFee,
 		&p.FreeShippingAbove, &p.CodEnabled, &p.CodTokenAmount, &p.BaselineRtoPercent, &p.RazorpayKeyID, &secretEnc,
-		&p.AiAutoReply, &p.AiAutoOrder, &p.AiNotes)
+		&p.AiAutoReply, &p.AiAutoOrder, &p.AiNotes, &p.Sells)
 	if err != nil {
 		httpx.Err(w, http.StatusNotFound, "business not found")
 		return
@@ -109,6 +111,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		CodEnabled         *bool   `json:"codEnabled"`
 		CodTokenAmount     *int    `json:"codTokenAmount"`
 		BaselineRtoPercent *int    `json:"baselineRtoPercent"`
+		Sells              *string `json:"sells"`
 	}
 	if !httpx.Bind(w, r, &in) {
 		return
@@ -163,6 +166,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if in.Sells != nil && !shop.ValidSells(*in.Sells) {
+		httpx.Err(w, http.StatusBadRequest, "sells must be products, services or both")
+		return
+	}
 	if p := in.BaselineRtoPercent; p != nil && (*p < 0 || *p > 100) {
 		httpx.Err(w, http.StatusBadRequest, "baseline RTO must be between 0 and 100 percent")
 		return
@@ -177,11 +184,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		cod_enabled=coalesce($14, cod_enabled),
 		cod_token_amount=coalesce($15, cod_token_amount),
 		baseline_rto_percent=coalesce($16, baseline_rto_percent),
+		sells=coalesce($17, sells),
 		updated_at=now()
 		where id=$1`,
 		bizID, in.Name, in.OwnerName, in.WhatsApp, in.Instagram, in.Address, in.City, in.State,
 		in.Pincode, in.Gstin, in.LogoURL, in.ShippingFee, in.FreeShippingAbove, in.CodEnabled,
-		in.CodTokenAmount, in.BaselineRtoPercent)
+		in.CodTokenAmount, in.BaselineRtoPercent, in.Sells)
 	if err != nil {
 		// the same WhatsApp / Instagram cannot sit on two businesses
 		if field, dup := httpx.DuplicateField(err); dup {

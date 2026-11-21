@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 
+	"carthedge/internal/product"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -108,7 +110,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 // no matter how well-formed it looks.
 func knownRoute(seg []string) bool {
 	switch {
-	case len(seg) == 1 && (seg[0] == "" || seg[0] == "contact" || seg[0] == "reset-password" || seg[0] == "track"):
+	case len(seg) == 1 && (seg[0] == "" || seg[0] == "contact" || seg[0] == "services" || seg[0] == "reset-password" || seg[0] == "track"):
 		return true
 	// legal pages: Meta's crawler checks these before publishing the app, and a
 	// 404 status fails that check even though the shell still renders
@@ -161,6 +163,9 @@ func (h *Handler) metaFor(ctx context.Context, path string) meta {
 
 	case seg[0] == "s" && len(seg) == 3 && seg[2] == "policies":
 		return h.policiesMeta(ctx, seg[1])
+
+	case path == "/services":
+		return h.servicesMeta()
 
 	case path == "/contact":
 		return meta{Title: "Contact CartHedge — Talk to a human",
@@ -259,6 +264,60 @@ func (h *Handler) homeMeta(ctx context.Context) meta {
 		JSONLD: map[string]any{"@context": "https://schema.org", "@graph": graph}}
 }
 
+// servicesFAQs are the questions on /services, word for word as the page
+// renders them (frontend/src/strings/marketing.ts, services.faqs): change one,
+// change the other.
+var servicesFAQs = []siteFAQ{
+	{"I do not sell products. Is CartHedge still for me?", `Yes. Choose "Services" when you sign up. You list what you do, the assistant answers enquiries about it on Instagram and WhatsApp, and each one reaches you with the details already collected. There is no cart, stock or delivery to set up.`},
+	{"My price depends on the job. What does the assistant say?", `Set the service to "price on request". The assistant never guesses a number. It tells the buyer you will share the price, collects what you need to work it out, and you send your quote from the app.`},
+	{"Will it confirm a booking or a date on its own?", "No. It notes the date the buyer wants and says you will confirm. Availability, the final price and payment are always yours."},
+	{"What kind of business can use it?", "Any business that takes enquiries in chat. You write the questions the assistant should ask, so the same setup works for a trip planner, a decorator, a tutor or a transporter."},
+	{"I sell products and services. Do I need two accounts?", `No. Choose "Both". Products are ordered and paid for as usual, services become enquiries, and both sit in the same app.`},
+	{"What if the buyer asks something I never wrote down?", "The assistant says the business will check and get back, and hands the chat to you when it needs a person. It answers only from what you entered."},
+}
+
+const (
+	servicesTitle = "CartHedge for Services: AI Replies to Instagram & WhatsApp Enquiries"
+	servicesDesc  = "Sell a service, not a parcel? CartHedge answers every Instagram and WhatsApp enquiry from your own details, collects what you need to quote, and hands you the enquiry. For trips, events, bookings, transport, classes and more."
+)
+
+// servicesMeta is the page for businesses that sell a service, as crawlers
+// read it: its own title and description, the FAQ as structured data, and the
+// gist in plain HTML for readers that run no JavaScript.
+func (h *Handler) servicesMeta() meta {
+	var qa []any
+	var b strings.Builder
+	b.WriteString(`<main><h1>Every enquiry answered. Every detail collected before you pick up the phone.</h1>` +
+		`<p>For businesses that sell a service, not a parcel. CartHedge replies in the buyer's language from your own details, asks what you need to know, and hands you the enquiry ready to quote.</p>` +
+		`<h2>How it works for service businesses</h2><ol>` +
+		`<li>List what you do: each service with its details, at a fixed price, a starting price, or price on request.</li>` +
+		`<li>Choose what to ask: the date, the place, how many people. Your questions, in your words.</li>` +
+		`<li>Connect Instagram: the assistant answers enquiries from what you wrote, in Hinglish, Hindi, English and regional scripts.</li>` +
+		`<li>Quote and close: each enquiry arrives with the answers. Send your price from the app and it goes out on the same chat.</li></ol>` +
+		`<h2>What it will not do</h2><ul>` +
+		`<li>Confirm a date or a slot: it notes the date and says you will confirm.</li>` +
+		`<li>Make up a price: it says the price you set, and for a service priced on request it says you will share it.</li>` +
+		`<li>Give medical, legal or money advice, or answer anything unrelated to your business.</li>` +
+		`<li>Close a booking without you: payment and the final yes stay with you.</li></ul>` +
+		`<p>For travel and trip planners, event and wedding decorators, photographers, makeup artists, salons, tutors and coaching, movers and transport, caterers, rentals, repairs and home services. Sell products too? Orders and enquiries run side by side in one app.</p>` +
+		`<h2>Questions service businesses ask</h2><dl>`)
+	for _, f := range servicesFAQs {
+		qa = append(qa, map[string]any{"@type": "Question", "name": f.Q,
+			"acceptedAnswer": map[string]any{"@type": "Answer", "text": f.A}})
+		b.WriteString("<dt>" + html.EscapeString(f.Q) + "</dt><dd>" + html.EscapeString(f.A) + "</dd>")
+	}
+	b.WriteString(`</dl><p><a href="/app/register?sells=services">Start the 30-day free trial</a> · <a href="/">CartHedge for product sellers</a> · <a href="/contact">Contact</a></p></main>`)
+	page := h.baseURL + "/services"
+	return meta{Title: servicesTitle, Description: servicesDesc, Fallback: b.String(),
+		JSONLD: map[string]any{"@context": "https://schema.org", "@graph": []any{
+			map[string]any{"@type": "WebPage", "@id": page, "url": page, "name": servicesTitle, "description": servicesDesc,
+				"inLanguage": "en-IN", "isPartOf": map[string]any{"@id": h.baseURL + "/#website"}},
+			map[string]any{"@type": "Service", "name": "AI enquiry replies for service businesses", "serviceType": "Customer enquiry automation",
+				"description": servicesDesc, "areaServed": "IN", "provider": map[string]any{"@id": h.baseURL + "/#org"}, "url": page},
+			map[string]any{"@type": "FAQPage", "@id": page + "#faq", "mainEntity": qa},
+		}}}
+}
+
 type siteFAQ struct {
 	Q string `json:"q"`
 	A string `json:"a"`
@@ -278,7 +337,8 @@ func homeFallback(faqs []siteFAQ) string {
 		`<li>A storefront and checkout links in your name: phone OTP, UPI, card or cash on delivery, no app and no account.</li>` +
 		`<li>COD confirmation before dispatch, with an optional small UPI token, to cut refused deliveries.</li>` +
 		`<li>Returns, refunds, GST invoices, reports, and handover to you for complaints, refunds and bargaining.</li>` +
-		`<li>Money settles in your own Razorpay account or UPI. CartHedge never holds it and takes no cut.</li></ul>`)
+		`<li>Money settles in your own Razorpay account or UPI. CartHedge never holds it and takes no cut.</li>` +
+		`<li>Sell a service, not a parcel? The same assistant answers enquiries, collects the details you need and hands them to you ready to quote. <a href="/services">CartHedge for service businesses</a>.</li></ul>`)
 	if len(faqs) > 0 {
 		b.WriteString(`<h2>Questions sellers ask</h2><dl>`)
 		for _, f := range faqs {
@@ -292,13 +352,29 @@ func homeFallback(faqs []siteFAQ) string {
 }
 
 func (h *Handler) storeMeta(ctx context.Context, code string) meta {
-	var name, logo, city, state string
-	err := h.pool.QueryRow(ctx, `select name, logo_url, city, state from businesses
-		where code=$1 and status='active'`, code).Scan(&name, &logo, &city, &state)
+	var name, logo, city, state, sells string
+	err := h.pool.QueryRow(ctx, `select name, logo_url, city, state, sells from businesses
+		where code=$1 and status='active'`, code).Scan(&name, &logo, &city, &state, &sells)
 	if err != nil {
 		return meta{Title: "Store not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
 	}
 	where := strings.TrimSpace(strings.Trim(city+", "+state, ", "))
+	if sells == "services" {
+		// nothing is ordered or delivered here: the page lists what the business does
+		desc := "See what " + name + " offers"
+		if where != "" {
+			desc += " in " + where
+		}
+		desc += ". Ask on WhatsApp or Instagram — no app, no signup."
+		return meta{
+			Title: name + " — Services and enquiries", Description: desc, Image: h.abs(logo), Type: "website",
+			JSONLD: map[string]any{
+				"@context": "https://schema.org", "@type": "LocalBusiness", "name": name,
+				"url": h.baseURL + "/s/" + code, "image": h.abs(logo),
+				"address": map[string]any{"@type": "PostalAddress", "addressLocality": city, "addressRegion": state, "addressCountry": "IN"},
+			},
+		}
+	}
 	desc := "Shop the full " + name + " collection"
 	if where != "" {
 		desc += " from " + where
@@ -330,10 +406,11 @@ func (h *Handler) productMeta(ctx context.Context, code, productID string) meta 
 	var price int
 	var inStock bool
 	var images []byte
-	err := h.pool.QueryRow(ctx, `select b.name, p.name, p.description, p.price, p.in_stock, p.images
+	var item product.Product
+	err := h.pool.QueryRow(ctx, `select b.name, p.name, p.description, p.price, p.in_stock, p.images, p.kind, p.price_kind, p.price_unit
 		from products p join businesses b on b.id = p.business_id
 		where b.code=$1 and p.id=$2 and p.active and b.status='active'`, code, productID).Scan(
-		&bizName, &name, &description, &price, &inStock, &images)
+		&bizName, &name, &description, &price, &inStock, &images, &item.Kind, &item.PriceKind, &item.PriceUnit)
 	if err != nil {
 		return meta{Title: "Product not found — " + siteName, Description: defaultDesc, NoIndex: true, NotFound: true}
 	}
@@ -342,6 +419,9 @@ func (h *Handler) productMeta(ctx context.Context, code, productID string) meta 
 	image := ""
 	if len(urls) > 0 {
 		image = h.abs(urls[0])
+	}
+	if item.IsService() {
+		return serviceMeta(item, bizName, name, description, image, price, inStock, h.baseURL+"/s/"+code+"/p/"+productID)
 	}
 	rupees := strconv.Itoa(price / 100)
 	desc := clamp(description, descLimit)
@@ -363,6 +443,34 @@ func (h *Handler) productMeta(ctx context.Context, code, productID string) meta 
 			},
 		},
 	}
+}
+
+// serviceMeta is the page of something a business does: a Service, offered by
+// the business, with a price only when the seller states one. A price "on
+// request" is left out entirely rather than shown as zero.
+func serviceMeta(item product.Product, bizName, name, description, image string, price int, offered bool, url string) meta {
+	item.Price = price
+	title, quoted := name+" · "+bizName, item.PriceKind == product.PriceQuote
+	if !quoted {
+		title = name + " — " + item.PriceLabel() + " · " + bizName
+	}
+	desc := clamp(description, descLimit)
+	if desc == "" {
+		desc = name + " by " + bizName + ". Ask on WhatsApp or Instagram, no signup needed."
+	}
+	ld := map[string]any{
+		"@context": "https://schema.org", "@type": "Service", "name": name, "description": desc, "image": image,
+		"provider": map[string]any{"@type": "LocalBusiness", "name": bizName}, "url": url,
+	}
+	if !quoted {
+		availability := "https://schema.org/InStock"
+		if !offered {
+			availability = "https://schema.org/OutOfStock"
+		}
+		ld["offers"] = map[string]any{"@type": "Offer", "priceCurrency": "INR",
+			"price": strconv.FormatFloat(float64(price)/100, 'f', 2, 64), "availability": availability, "url": url}
+	}
+	return meta{Title: title, Description: desc, Image: image, Type: "website", JSONLD: ld}
 }
 
 func (h *Handler) linkMeta(ctx context.Context, code, token string) meta {
@@ -450,7 +558,7 @@ func (h *Handler) sitemap(w http.ResponseWriter, r *http.Request) {
 	type entry struct {
 		loc, priority, lastmod string
 	}
-	entries := []entry{{h.baseURL + "/", "1.0", ""}, {h.baseURL + "/contact", "0.5", ""},
+	entries := []entry{{h.baseURL + "/", "1.0", ""}, {h.baseURL + "/services", "0.9", ""}, {h.baseURL + "/contact", "0.5", ""},
 		{h.baseURL + "/privacy", "0.2", ""}, {h.baseURL + "/terms", "0.2", ""}}
 
 	// an empty store is a thin page: listed once it has a product

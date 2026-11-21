@@ -53,6 +53,9 @@ const statusTones: Record<string, Tone> = {
   failed: 'danger',
   open: 'gold',
   contacted: 'gold',
+  quoted: 'gold', // a price is out, waiting on the buyer
+  won: 'jade',
+  lost: 'neutral',
   closed: 'neutral',
   draft: 'neutral',
   sent: 'jade',

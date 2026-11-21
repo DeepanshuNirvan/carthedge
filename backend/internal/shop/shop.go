@@ -19,6 +19,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// ValidSells reports whether s names what a business offers (businesses.sells).
+func ValidSells(s string) bool { return s == "products" || s == "services" || s == "both" }
+
 // Return reasons a buyer can pick; Policies.Returns.Reasons narrows them.
 var ReturnReasons = []string{"size", "damaged", "wrong_item", "quality", "not_as_described", "changed_mind", "other"}
 

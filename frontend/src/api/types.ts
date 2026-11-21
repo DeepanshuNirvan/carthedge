@@ -28,7 +28,11 @@ export type RegisterInput = {
   pincode?: string;
   gstin?: string;
   upiId?: string;
+  sells?: Sells;
 };
+
+/** What a business offers. It words the app and the assistant; the catalog decides the rest. */
+export type Sells = 'products' | 'services' | 'both';
 
 /** GET /auth/store-code — advisory; Register re-validates server-side. */
 export type StoreCodeStatus = {
@@ -68,6 +72,7 @@ export type BusinessProfile = {
   aiAutoOrder: boolean;
   /** facts the assistant may quote: delivery time, exchange policy, sizing */
   aiNotes: string;
+  sells: Sells;
   freeShippingAbove: number;
   policies: StorePolicies;
   aiProfile: AiProfile;
@@ -198,6 +203,14 @@ export type Variant = {
   stockQty?: number;
 };
 export type ProductDetail = { label: string; value: string };
+/** A product is shipped and counted; a service is something the business does, booked by enquiry. */
+export type ItemKind = 'product' | 'service';
+/** fixed = the price · from = where it starts · quote = shared by the owner per enquiry (price is 0) */
+export type PriceKind = 'fixed' | 'from' | 'quote';
+/** What the assistant finds out before it hands an enquiry to the owner. */
+export type ServiceQuestion = { label: string; required: boolean };
+/** How an item's price reads to a buyer; shared by the seller's and the buyer's product shapes. */
+export type Pricing = { kind: ItemKind; priceKind: PriceKind; priceUnit: string };
 /** What India's e-commerce and packaged-goods rules ask a listing to state. */
 export type ProductLegal = {
   /** paise, inclusive of all taxes; 0 = not stated */
@@ -228,8 +241,10 @@ export type Product = {
   hsn: string;
   /** percent; -1 = the store default */
   gstRate: number;
+  ask: ServiceQuestion[];
   createdAt: string;
-} & ProductLegal;
+} & ProductLegal &
+  Pricing;
 /** Omitted optional fields keep what is stored, so a stock-sheet re-import never wipes photos or options. */
 export type ProductInput = {
   name: string;
@@ -250,7 +265,9 @@ export type ProductInput = {
   sizeChart?: string;
   hsn?: string;
   gstRate?: number;
-} & Partial<ProductLegal>;
+  ask?: ServiceQuestion[];
+} & Partial<ProductLegal> &
+  Partial<Pricing>;
 export type Offer = {
   id: string;
   code: string;
@@ -605,7 +622,7 @@ export type PracticeTurn = {
   cart: ChatCart;
   stage: ChatStage;
   summaryHash: string;
-  action: 'silent' | 'reply' | 'summary' | 'place' | 'handoff';
+  action: 'silent' | 'reply' | 'summary' | 'place' | 'handoff' | 'lead';
   note: string;
 };
 export type DraftData = {
@@ -673,7 +690,36 @@ export type ChatCart = {
   phone: string;
   address: { line: string; city: string; state: string; pincode: string };
   payment: string;
+  /** details a service asked for, and the pin of the enquiry already handed over */
+  answers?: EnquiryAnswer[];
+  sent?: string;
 };
+
+// enquiries: what a chat about a service ends in
+export const enquiryStatuses = ['new', 'contacted', 'quoted', 'won', 'lost'] as const;
+export type EnquiryStatus = (typeof enquiryStatuses)[number];
+export type EnquiryAnswer = { label: string; value: string };
+export type EnquiryItem = { productId?: string; name: string; option?: string; qty: number };
+export type Enquiry = {
+  id: string;
+  conversationId?: string;
+  items: EnquiryItem[];
+  answers: EnquiryAnswer[];
+  name: string;
+  phone: string;
+  status: EnquiryStatus;
+  /** paise; 0 = not quoted yet */
+  quotedAmount: number;
+  quoteNote: string;
+  sellerNotes: string;
+  source: 'instagram' | 'whatsapp' | 'manual';
+  contactName?: string;
+  /** a message can still be sent on the chat it came from (Meta's 24-hour window) */
+  chatOpen: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type EnquiryInput = { name: string; phone: string; about: string; details: string };
 
 export type ConversationDetail = {
   id: string;
@@ -833,6 +879,7 @@ export type StoreBusiness = {
   state: string;
   instagram: string;
   whatsapp: string;
+  sells: Sells;
   codEnabled: boolean;
   shippingFee: number;
   onlinePayment: OnlinePayment;
@@ -857,7 +904,8 @@ export type PublicProduct = {
   variants: PublicVariant[];
   details: ProductDetail[];
   sizeChart?: string;
-} & ProductLegal;
+} & ProductLegal &
+  Pricing;
 export type StoreHome = {
   business: StoreBusiness;
   categories: string[];

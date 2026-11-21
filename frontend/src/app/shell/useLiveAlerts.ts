@@ -102,6 +102,16 @@ export function useLiveAlerts() {
           chime();
           bump();
           break;
+        case 'enquiryReady': {
+          qc.invalidateQueries({ queryKey: ['enquiries'] });
+          // a buyer adding a detail updates the enquiry quietly; only a new one rings
+          if (ev.data.created) {
+            toast('success', 'New enquiry', 'Someone asked about a service. Their details are on your Enquiries page.');
+            chime();
+            bump();
+          }
+          break;
+        }
         case 'orderStatusChanged':
         case 'orderUpdated':
         case 'orderPaid':

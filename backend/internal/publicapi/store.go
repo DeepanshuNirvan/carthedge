@@ -27,6 +27,7 @@ type storeBusiness struct {
 	State         string `json:"state"`
 	Instagram     string `json:"instagram"`
 	Whatsapp      string `json:"whatsapp"`
+	Sells         string `json:"sells"` // products | services | both
 	CodEnabled    bool   `json:"codEnabled"`
 	ShippingFee   int    `json:"shippingFee"`
 	OnlinePayment string `json:"onlinePayment"` // gateway | upi | none
@@ -49,10 +50,10 @@ func (h *Handler) storeBusiness(ctx context.Context, code string) (*storeBusines
 	var razorpayKeyID, upiID string
 	var pricing []byte
 	err := h.pool.QueryRow(ctx, `select id, code, name, logo_url, city, state, instagram, whatsapp,
-		cod_enabled, shipping_fee, razorpay_key_id, upi_id, free_shipping_above, checkout_rules, phone_verified_at is not null
+		cod_enabled, shipping_fee, razorpay_key_id, upi_id, free_shipping_above, checkout_rules, phone_verified_at is not null, sells
 		from businesses where code=$1 and status='active'`, code).Scan(
 		&b.ID, &b.Code, &b.Name, &b.LogoURL, &b.City, &b.State, &b.Instagram, &b.Whatsapp, &b.CodEnabled,
-		&b.ShippingFee, &razorpayKeyID, &upiID, &b.FreeShippingAbove, &pricing, &b.Verified)
+		&b.ShippingFee, &razorpayKeyID, &upiID, &b.FreeShippingAbove, &pricing, &b.Verified, &b.Sells)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errors.New("store not found")
 	}

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BellRing, Check, Minus, PackageX, Plus, Ruler, ShieldCheck, Store, Truck } from 'lucide-react';
+import { ArrowLeft, BellRing, Check, Instagram, MessageCircle, Minus, PackageX, Plus, Ruler, ShieldCheck, Store, Truck } from 'lucide-react';
 import type { ProductDetail, ProductLegal } from '@/api/types';
 import { joinWaitlist, useStore, useStoreProduct } from '@/api/storefront';
 import { Seo } from '@/lib/seo';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn';
 import { useCart } from '@/store/cart';
 import { toast } from '@/store/ui';
 import { phoneSchema } from '@/lib/validators';
+import { chatLinks, priceParts } from '@/lib/catalog';
 import { galleryFor, isPlainList, missingGroup, settledPicks, variantFor, type Picks } from '@/lib/options';
 import { OptionPicker } from './OptionPicker';
 import { StoreHeader, trustLine } from '../storefront/StoreHeader';
@@ -210,6 +211,11 @@ export default function ProductPage() {
   const photos = galleryFor(product.images, product.options, picks);
   const activePrice = variant && variant.price > 0 ? variant.price : product.price;
   const available = needsVariant ? (variant ? variant.inStock : product.inStock) : product.inStock;
+  // a service is not bought here: the buyer asks about it on the chat, where the
+  // business (or its assistant) takes it from there
+  const isService = product.kind === 'service';
+  const price = priceParts({ ...product, price: activePrice });
+  const chat = chatLinks(store.business, `Hi! I'd like to know about ${product.name}${variant ? ` (${variant.name})` : ''}.`);
   // the MRP is the legal reference price; a compare-at price shows only without one
   const listPrice = product.mrp > 0 ? product.mrp : product.comparePrice;
   const discount = listPrice > activePrice ? Math.round(((listPrice - activePrice) / listPrice) * 100) : 0;
@@ -252,22 +258,33 @@ export default function ProductPage() {
     <div className="min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <Seo
         title={`${product.name} | ${store.business.name}`}
-        description={product.description || `Buy ${product.name} from ${store.business.name}. Secure checkout, no signup.`}
+        description={
+          product.description ||
+          (isService
+            ? `${product.name} by ${store.business.name}. Ask on WhatsApp or Instagram, no signup.`
+            : `Buy ${product.name} from ${store.business.name}. Secure checkout, no signup.`)
+        }
         path={`/s/${businessCode}/p/${product.id}`}
         image={product.images[0]}
         jsonLd={{
           '@context': 'https://schema.org',
-          '@type': 'Product',
+          '@type': isService ? 'Service' : 'Product',
           name: product.name,
           image: product.images,
           description: product.description,
+          ...(isService ? { provider: { '@type': 'LocalBusiness', name: store.business.name } } : {}),
           ...(product.originCountry ? { countryOfOrigin: product.originCountry } : {}),
-          offers: {
-            '@type': 'Offer',
-            priceCurrency: 'INR',
-            price: (activePrice / 100).toFixed(2),
-            availability: available ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-          },
+          // a price shared only on request is not an offer a search engine may quote
+          ...(product.priceKind === 'quote'
+            ? {}
+            : {
+                offers: {
+                  '@type': 'Offer',
+                  priceCurrency: 'INR',
+                  price: (activePrice / 100).toFixed(2),
+                  availability: available ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                },
+              }),
         }}
       />
       <LaneGround strand={false} />
@@ -291,8 +308,14 @@ export default function ProductPage() {
             {product.category && <p className="text-[13px] font-medium text-low">{product.category}</p>}
             <h1 className="mt-1 text-[1.65rem] font-semibold leading-tight tracking-[-0.025em] text-hi sm:text-[2rem]">{product.name}</h1>
             <p className="mt-3 flex flex-wrap items-baseline gap-2.5">
-              <MoneyText paise={activePrice} className="text-2xl font-semibold text-hi" />
-              {discount > 0 && (
+              {isService ? (
+                <span className="text-2xl font-semibold text-hi">
+                  {price.prefix} <span className="tnum">{price.amount}</span> <span className="text-sm font-normal text-low">{price.unit}</span>
+                </span>
+              ) : (
+                <MoneyText paise={activePrice} className="text-2xl font-semibold text-hi" />
+              )}
+              {!isService && discount > 0 && (
                 <>
                   <span className="text-sm text-low">
                     {product.mrp > 0 && 'MRP '}
@@ -302,7 +325,10 @@ export default function ProductPage() {
                 </>
               )}
             </p>
-            {product.mrp > 0 && (
+            {isService && product.priceKind === 'quote' && (
+              <p className="mt-1 text-xs text-low">{store.business.name} shares the price once they know what you need.</p>
+            )}
+            {!isService && product.mrp > 0 && (
               <p className="mt-1 text-xs text-low">
                 {discount > 0 ? (
                   'Inclusive of all taxes'
@@ -337,7 +363,7 @@ export default function ProductPage() {
               name={product.name}
             />
 
-            {available && (
+            {available && !isService && (
               <div className="mt-5 flex items-center gap-3">
                 <span className="text-sm font-medium text-hi">Quantity</span>
                 <div className="flex items-center rounded-full neu">
@@ -362,8 +388,14 @@ export default function ProductPage() {
 
             <ul className="mt-6 flex flex-col gap-2.5 border-t pt-5 text-[13px] text-mid">
               <li className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-jade-ink" aria-hidden /> {trustLine(store.business)}, no signup needed
+                <ShieldCheck className="size-4 text-jade-ink" aria-hidden /> {isService ? 'No signup needed' : `${trustLine(store.business)}, no signup needed`}
               </li>
+              {isService && (
+                <li className="flex items-center gap-2">
+                  <MessageCircle className="size-4 text-jade-ink" aria-hidden /> You talk to {store.business.name} directly. Nothing is charged here.
+                </li>
+              )}
+              {!isService && (
               <li className="flex items-center gap-2">
                 <Truck className="size-4 text-jade-ink" aria-hidden />
                 {store.business.shippingFee > 0 ? (
@@ -381,7 +413,8 @@ export default function ProductPage() {
                   'Free shipping on this store'
                 )}
               </li>
-              {store.business.codEnabled && (
+              )}
+              {!isService && store.business.codEnabled && (
                 <li className="flex items-center gap-2">
                   <Check className="size-4 text-jade-ink" aria-hidden /> Cash on delivery available
                 </li>
@@ -396,9 +429,29 @@ export default function ProductPage() {
         <div className="glass-nav sheen flex items-center gap-3 rounded-full p-1.5 pl-5 shadow-float">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11.5px] text-low">{variant?.name ?? product.name}</p>
-            <MoneyText paise={activePrice * qty} className="text-[17px] font-semibold text-hi" />
+            {isService ? (
+              <p className="truncate text-[15px] font-semibold text-hi">
+                {price.prefix} <span className="tnum">{price.amount}</span> <span className="text-xs font-normal text-low">{price.unit}</span>
+              </p>
+            ) : (
+              <MoneyText paise={activePrice * qty} className="text-[17px] font-semibold text-hi" />
+            )}
           </div>
-          {available ? (
+          {isService ? (
+            !available ? (
+              <span className="flex h-[3.25rem] flex-1 items-center justify-center px-3 text-center text-[13px] font-medium text-mid">Not taking bookings right now</span>
+            ) : chat.whatsapp ? (
+              <a href={chat.whatsapp} target="_blank" rel="noreferrer" className={cn(buttonLink('primary', 'lg'), 'flex-1')}>
+                <MessageCircle className="size-4" aria-hidden /> Ask on WhatsApp
+              </a>
+            ) : chat.instagram ? (
+              <a href={chat.instagram} target="_blank" rel="noreferrer" className={cn(buttonLink('primary', 'lg'), 'flex-1')}>
+                <Instagram className="size-4" aria-hidden /> Message on Instagram
+              </a>
+            ) : (
+              <span className="flex h-[3.25rem] flex-1 items-center justify-center px-3 text-center text-[13px] font-medium text-mid">Message {store.business.name} to enquire</span>
+            )
+          ) : available ? (
             <Button size="lg" className="flex-1" onClick={addToCart}>
               Add to cart
             </Button>

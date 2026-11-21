@@ -16,10 +16,12 @@ import { Field, Input, PasswordInput } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 import { Stepper } from '@/ui/Stepper';
 import { SuccessMark } from '@/ui/SuccessMark';
+import { SellsPicker } from '../shell/SellsPicker';
 import { Spinner } from '@/ui/Spinner';
 
 const registerSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
+  sells: z.enum(['products', 'services', 'both']),
   storeCode: storeCodeSchema,
   ownerName: z.string().min(2, 'Your name is required'),
   email: emailSchema,
@@ -33,6 +35,11 @@ const registerSchema = z.object({
   upiId: upiSchema.optional(),
 });
 type RegisterForm = z.infer<typeof registerSchema>;
+
+const sellsFromUrl = (): RegisterForm['sells'] => {
+  const s = new URLSearchParams(window.location.search).get('sells');
+  return s === 'services' || s === 'both' ? s : 'products';
+};
 
 // Verify sits between details and the rest because the trial is issued against
 // a mobile number that answered an OTP — an unverified signup gets no trial.
@@ -164,7 +171,8 @@ export default function RegisterPage() {
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     mode: 'onTouched',
-    defaultValues: { storeCode: '' },
+    // a link from the services page lands here already set to services
+    defaultValues: { storeCode: '', sells: sellsFromUrl() },
   });
 
   const storeCode = watch('storeCode');
@@ -283,6 +291,7 @@ export default function RegisterPage() {
               <Field label="Business name" error={errors.businessName?.message}>
                 <Input placeholder="Ritika's Closet" {...register('businessName')} />
               </Field>
+              <SellsPicker value={watch('sells')} onChange={(v) => setValue('sells', v)} />
               <StoreLinkField
                 value={storeCode ?? ''}
                 error={errors.storeCode?.message}

@@ -13,6 +13,7 @@ import (
 	"carthedge/internal/ai"
 	"carthedge/internal/alert"
 	"carthedge/internal/customer"
+	"carthedge/internal/enquiry"
 	"carthedge/internal/events"
 	"carthedge/internal/httpx"
 	"carthedge/internal/secure"
@@ -47,7 +48,9 @@ type Service struct {
 	bus    *events.Bus
 	cipher *secure.Cipher
 	alerts *alert.Service
-	log    *slog.Logger
+	// enquiries is where a chat about a service ends up
+	enquiries *enquiry.Service
+	log       *slog.Logger
 	// can answers plan entitlements (plan.Service.HasFeature): drafts need
 	// "ai", automatic replies need "aiReply"
 	can func(ctx context.Context, bizID, feature string) bool
@@ -58,8 +61,8 @@ type Service struct {
 }
 
 func NewService(pool *pgxpool.Pool, client *Client, aiSvc *ai.Service, bus *events.Bus, cipher *secure.Cipher,
-	alerts *alert.Service, can func(ctx context.Context, bizID, feature string) bool, log *slog.Logger) *Service {
-	return &Service{pool: pool, client: client, ai: aiSvc, bus: bus, cipher: cipher, alerts: alerts, can: can, log: log}
+	alerts *alert.Service, enquiries *enquiry.Service, can func(ctx context.Context, bizID, feature string) bool, log *slog.Logger) *Service {
+	return &Service{pool: pool, client: client, ai: aiSvc, bus: bus, cipher: cipher, alerts: alerts, enquiries: enquiries, can: can, log: log}
 }
 
 // Start runs the debounce loop: quiet conversations with new messages get one
@@ -396,8 +399,16 @@ func (s *Service) ingestDue(ctx context.Context) {
 type dueConv struct{ id, biz, channel string }
 
 // draftOnly is the original behaviour: read the chat since the last order and
-// leave a draft card for the seller.
-func (s *Service) draftOnly(ctx context.Context, c dueConv) {
+// leave a draft card for the seller. A business that offers services also has
+// the chat read for an enquiry, and one that offers nothing else gets no order
+// draft at all: there is no order in a chat about a service.
+func (s *Service) draftOnly(ctx context.Context, c dueConv, sells string) {
+	if sells != "products" {
+		s.listen(ctx, c)
+		if sells == "services" {
+			return
+		}
+	}
 	thread, err := s.thread(ctx, c.id)
 	if err != nil || thread == "" {
 		return

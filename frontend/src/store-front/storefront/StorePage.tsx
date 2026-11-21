@@ -124,25 +124,35 @@ export default function StorePage() {
     );
   }
 
+  const servicesOnly = store.business.sells === 'services';
   const productJsonLd = visible.slice(0, 10).map((p) => ({
     '@context': 'https://schema.org',
-    '@type': 'Product',
+    '@type': p.kind === 'service' ? 'Service' : 'Product',
     name: p.name,
     image: p.images[0],
     description: p.description,
-    offers: {
-      '@type': 'Offer',
-      priceCurrency: 'INR',
-      price: (p.price / 100).toFixed(2),
-      availability: p.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-    },
+    // a price shared only on request is not an offer a search engine may quote
+    ...(p.priceKind === 'quote'
+      ? {}
+      : {
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'INR',
+            price: (p.price / 100).toFixed(2),
+            availability: p.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          },
+        }),
   }));
 
   return (
     <div className="grain min-h-dvh">
       <Seo
-        title={`${store.business.name} | Shop online`}
-        description={`Shop ${store.business.name}${store.business.city ? ` from ${store.business.city}` : ''}. Secure checkout with UPI, cards${store.business.codEnabled ? ' and cash on delivery' : ''}. No signup needed.`}
+        title={`${store.business.name} | ${servicesOnly ? 'Services and enquiries' : 'Shop online'}`}
+        description={
+          servicesOnly
+            ? `See what ${store.business.name}${store.business.city ? ` in ${store.business.city}` : ''} offers and ask on WhatsApp or Instagram. No signup needed.`
+            : `Shop ${store.business.name}${store.business.city ? ` from ${store.business.city}` : ''}. Secure checkout with UPI, cards${store.business.codEnabled ? ' and cash on delivery' : ''}. No signup needed.`
+        }
         path={`/s/${businessCode}`}
         jsonLd={productJsonLd}
       />
@@ -182,7 +192,7 @@ export default function StorePage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="rounded-full pl-10"
-              aria-label="Search products"
+              aria-label={servicesOnly ? 'Search services' : 'Search products'}
             />
           </div>
           <Button
@@ -247,7 +257,7 @@ export default function StorePage() {
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-snug text-hi">
-              {category || (search ? 'Results' : 'All products')}
+              {category || (search ? 'Results' : servicesOnly ? 'All services' : store.business.sells === 'both' ? 'Everything' : 'All products')}
             </h2>
             <Select
               value={sort}
@@ -285,7 +295,7 @@ export default function StorePage() {
               message={
                 search || activeFilters
                   ? 'Try a different search or clear your filters.'
-                  : 'This seller is still adding products, check back soon.'
+                  : `${store.business.name} is still setting this page up, check back soon.`
               }
               action={
                 (search || activeFilters) && (

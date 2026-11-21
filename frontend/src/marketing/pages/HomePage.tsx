@@ -12,6 +12,7 @@ import { Voice } from '../sections/Voice';
 import { Languages } from '../sections/Languages';
 import { OrderJourney } from '../sections/OrderJourney';
 import { StorefrontPreview } from '../sections/StorefrontPreview';
+import { ServicesTeaser } from '../sections/ServiceChat';
 import { FeaturesBento } from '../sections/FeaturesBento';
 import { RtoCalculator } from '../sections/RtoCalculator';
 import { Pricing } from '../sections/Pricing';
@@ -46,6 +47,7 @@ export default function HomePage() {
         <Languages />
         <OrderJourney />
         <StorefrontPreview />
+        <ServicesTeaser />
         <FeaturesBento />
         <RtoCalculator />
         <Pricing />

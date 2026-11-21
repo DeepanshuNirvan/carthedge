@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   BarChart3,
   Bot,
+  ClipboardList,
   ExternalLink,
   FileText,
   KanbanSquare,
@@ -24,7 +25,8 @@ import { useSupport } from '@/store/support';
 import { toast, useUi } from '@/store/ui';
 import { useSubscription } from '@/api/plans';
 import { useBusiness } from '@/api/business';
-import type { Capability } from '@/api/types';
+import type { Capability, Sells } from '@/api/types';
+import { catalogWords } from '@/lib/catalog';
 import { logout, restoreAccount } from '@/api/auth';
 import { daysLeft, formatDate, formatDateTime } from '@/lib/date';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,13 +43,24 @@ import { Modal, Sheet } from '@/ui/Modal';
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; cap?: Capability };
 
-const groups: { title: string; items: NavItem[] }[] = [
+const orders: NavItem = { to: '/app/orders', label: 'Orders', icon: KanbanSquare };
+const enquiries: NavItem = { to: '/app/enquiries', label: 'Enquiries', icon: ClipboardList };
+
+/**
+ * The workspace menu, worded for what the business sells. A product seller sees
+ * exactly the menu they always had. A services business gets Enquiries where
+ * Orders was (orders still exist for custom payment links, lower down), and one
+ * that sells both gets both.
+ */
+function navFor(sells: Sells | undefined) {
+  const catalog: NavItem = { to: '/app/products', label: catalogWords(sells).title, icon: Package };
+  const work = sells === 'services' ? [enquiries, catalog, orders] : sells === 'both' ? [orders, enquiries, catalog] : [orders, catalog];
+  const groups: { title: string; items: NavItem[] }[] = [
   {
     title: 'Sell',
     items: [
       { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/app/orders', label: 'Orders', icon: KanbanSquare },
-      { to: '/app/products', label: 'Products', icon: Package },
+      ...work,
       { to: '/app/links', label: 'Links', icon: Link2 },
       { to: '/app/customers', label: 'Customers', icon: Users },
     ],
@@ -69,12 +82,21 @@ const groups: { title: string; items: NavItem[] }[] = [
       { to: '/app/settings', label: 'Settings', icon: Settings },
     ],
   },
-];
-const navItems = groups.flatMap((g) => g.items);
+  ];
+  const navItems = groups.flatMap((g) => g.items);
+  // the four daily destinations get a native-style tab bar; the rest live behind "More".
+  // Only a services-only business swaps Orders for Enquiries: a product seller
+  // who adds a first service (which makes them "both") keeps the bar they know.
+  const daily = ['/app', sells === 'services' ? '/app/enquiries' : '/app/orders', '/app/products', '/app/ai'];
+  const tabItems = navItems.filter((i) => daily.includes(i.to));
+  return { groups, tabItems, moreItems: navItems.filter((i) => !tabItems.includes(i)) };
+}
 
-// the four daily destinations get a native-style tab bar; the rest live behind "More"
-const tabItems = navItems.filter((i) => ['/app', '/app/orders', '/app/products', '/app/ai'].includes(i.to));
-const moreItems = navItems.filter((i) => !tabItems.includes(i));
+/** The menu for the signed-in business; the product menu until its profile has loaded. */
+function useNav() {
+  const { data: business } = useBusiness();
+  return navFor(business?.sells);
+}
 
 function useLocked() {
   const { data: sub } = useSubscription();
@@ -84,6 +106,7 @@ function useLocked() {
 /** iOS-style floating tab bar: a glass capsule with one pill that slides to the current tab. */
 function BottomTabs({ onMore }: { onMore: () => void }) {
   const { pathname } = useLocation();
+  const { tabItems, moreItems } = useNav();
   const moreActive = moreItems.some((i) => pathname.startsWith(i.to));
   return (
     <nav
@@ -134,6 +157,7 @@ function BottomTabs({ onMore }: { onMore: () => void }) {
 
 function SideNav() {
   const locked = useLocked();
+  const { groups } = useNav();
   return (
     <nav aria-label="Workspace" className="flex flex-1 flex-col gap-5 overflow-y-auto px-2.5 py-4">
       {groups.map((g) => (
@@ -319,6 +343,7 @@ function RestoreGate({ when, onSignOut }: { when?: string; onSignOut: () => void
 
 function MoreSheet({ open, onClose, onSignOut }: { open: boolean; onClose: () => void; onSignOut: () => void }) {
   const locked = useLocked();
+  const { moreItems } = useNav();
   return (
     <Sheet open={open} onClose={onClose} title="More" side="bottom">
       <div className="grid grid-cols-3 gap-2.5">

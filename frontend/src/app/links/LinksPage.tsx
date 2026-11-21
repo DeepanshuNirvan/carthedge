@@ -91,7 +91,7 @@ function LinkRow({ link }: { link: ShareLink }) {
 
 export default function LinksPage() {
   const { data: links, isLoading } = useLinks();
-  const { data: products } = useProducts();
+  const { data: products } = useProducts({ kind: 'product' });
   const { create } = useLinkMutations();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<ShareLink['kind']>('product');

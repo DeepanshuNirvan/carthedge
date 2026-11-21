@@ -176,6 +176,7 @@ func (s *Service) purge(ctx context.Context, bizID, phone string) error {
 		`delete from terms_acceptances where business_id=$1`,
 		`delete from orders where business_id=$1`,
 		`delete from customers where business_id=$1`,
+		`delete from enquiries where business_id=$1`,
 		`delete from products where business_id=$1`,
 		`delete from order_links where business_id=$1`,
 		`delete from offers where business_id=$1`,
@@ -210,7 +211,7 @@ var exportTables = []struct {
 }{
 	{"business", `select id, code, name, owner_name, email, phone, whatsapp, instagram, address, city, state, pincode, gstin,
 		upi_id, logo_url, shipping_fee, free_shipping_above, cod_enabled, cod_token_amount, ai_auto_reply, ai_auto_order,
-		ai_notes, policies, ai_profile, checkout_rules, gst_profile, created_at from businesses where id=$1`, true},
+		ai_notes, policies, ai_profile, checkout_rules, gst_profile, sells, created_at from businesses where id=$1`, true},
 	{"subscription", `select p.code as plan, s.status, s.starts_at, s.ends_at from subscriptions s join plans p on p.id = s.plan_id where s.business_id=$1`, true},
 	{"products", `select p.*, (select coalesce(json_agg(v), '[]') from product_variants v where v.product_id = p.id) as variants
 		from products p where p.business_id=$1 order by p.created_at`, false},
@@ -222,6 +223,7 @@ var exportTables = []struct {
 	{"invoices", `select * from invoices where business_id=$1 order by created_at`, false},
 	{"creditNotes", `select * from credit_notes where business_id=$1 order by created_at`, false},
 	{"offers", `select * from offers where business_id=$1 order by created_at`, false},
+	{"enquiries", `select * from enquiries where business_id=$1 order by created_at`, false},
 	{"links", `select * from order_links where business_id=$1 order by created_at`, false},
 	{"broadcasts", `select * from broadcasts where business_id=$1 order by created_at`, false},
 	// the proof behind every buyer who gets offers, and the rules the seller accepted

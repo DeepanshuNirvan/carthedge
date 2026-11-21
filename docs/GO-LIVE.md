@@ -9,6 +9,17 @@ This file has two halves:
 
 Tick the boxes as you go. Items marked **🔴 today** are live problems on `carthedge.in` right now, not launch prep.
 
+### Status on 8 Nov 2026 (after Meta approval)
+
+Checked on the Meta dashboard, the live site and the production database (read-only):
+
+- **Instagram: ready for any seller.** App is Published; `instagram_business_basic` and `instagram_business_manage_messages` have Advanced access (the dashboard labels them "Ready to publish" and offers "Reduce access"); the Instagram-login webhook points at `https://carthedge.in/webhooks/meta` with `messages` subscribed; business login, deauthorize and data-deletion are set (steps 1–5 green). The code asks for exactly those two scopes. Any Instagram **professional** (Business/Creator) account can connect — not only testers. Two conditions on the seller's side: their plan must include `ai` (Growth: drafts only) or `aiReply` (Pro and the trial: auto-replies) — **Starter has neither, so Starter sellers cannot connect Instagram**; and if DMs do not arrive, the seller turns on Instagram → Settings → Messages and story replies → Message controls → Connected tools → **Allow access to messages**. Meta now calls "Instagram login" a legacy setup (still supported); moving to Unified login is a later job, not a launch blocker.
+- **WhatsApp: approved, but CartHedge has no sending number.** WhatsApp Manager has only Meta's *Test WhatsApp Business Account* (+1 555-202-3884), and production has no `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` (the env still carries the old, unused `WHATSAPP_API_URL`/`WHATSAPP_API_TOKEN`). Result: **no new seller can sign up and buyers cannot check out (no codes)** — A3 is now the top blocker.
+- This repo version is deployed (migration 0018 ran on 8 Nov). So production now refuses `Admin@123` and `Demo@123` — and both are **still the stored passwords**: set new ones with the SQL in A0 (you cannot log in to change them).
+- Still on the live site: three "QA Plan v3" plans on pricing, 184 QA URLs in the sitemap, no `www`. A0 covers all three.
+- Production env corrections: `CORS_ORIGINS` still names `carthedge-app.onrender.com` (set `https://carthedge.in`); delete `WHATSAPP_API_URL`/`WHATSAPP_API_TOKEN`; `SMTP_FROM` is a Mailtrap **demo** domain, which delivers only to the Mailtrap account owner (welcome, reset and reminder emails do not reach sellers — A7); `STORAGE_DRIVER=local` (A6); Razorpay keys are test keys (A2); the Gemini key is free tier (A5).
+- The full production env was pasted into a chat on 8 Nov: **rotate every secret in it** (A0), including `ENCRYPTION_KEY` while there are no real sellers yet — then reconnect Instagram on your own store and re-enter your own Razorpay keys, since values encrypted with the old key can no longer be read.
+
 ---
 
 ## Part A — Manual steps
@@ -93,6 +104,7 @@ Full steps: [WHATSAPP-INSTAGRAM-GO-LIVE.md](WHATSAPP-INSTAGRAM-GO-LIVE.md) → "
 - [ ] Add CartHedge's own WhatsApp number to the Meta app (a number not used in the WhatsApp app), verify it, set the display name.
 - [ ] Create and get approved the three templates, **names and placeholder order exactly**: `carthedge_code` (Authentication, copy-code button), `order_update` (Utility: `Order update from {{1}}: {{2}}`), `seller_alert` (Utility: `CartHedge alert: {{1}} / {{2}} / Open it here: {{3}}`), language `en`.
 - [ ] Create a **System User** token with `whatsapp_business_messaging` (never-expiring), add a payment method to the WhatsApp account (auth/utility messages are charged: about ₹0.115 each in India).
+- [ ] **Register the number with Cloud API** (API only; WhatsApp Manager cannot do it, and an unregistered number sends nothing): `POST https://graph.facebook.com/v25.0/<PHONE_NUMBER_ID>/register` with `{"messaging_product":"whatsapp","pin":"<6 digits>"}` and the System User token. The PIN becomes the number's two-step PIN; keep it in the password manager. Max 10 tries per 72 h.
 - [ ] Render env: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN` (both or neither — boot checks). Leave `WHATSAPP_SELLER_CHANNEL` off until Phase 2.
 - [ ] Test: sign up a seller with your own phone; place a buyer order on your store; check the code and the order update arrive.
 

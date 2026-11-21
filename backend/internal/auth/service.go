@@ -88,6 +88,8 @@ type RegisterInput struct {
 	// PhoneToken is issued by VerifySignupOtp and proves the mobile is reachable
 	// by whoever is claiming the trial.
 	PhoneToken string `json:"phoneToken"`
+	// Sells is what the business offers: products (default) | services | both
+	Sells string `json:"sells"`
 }
 
 type Tokens struct {
@@ -159,11 +161,11 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, clientIP strin
 	var bizID string
 	err = tx.QueryRow(ctx, `insert into businesses
 		(code, name, owner_name, email, email_normalized, phone, phone_verified_at, password_hash,
-		 whatsapp, instagram, address, city, state, pincode, gstin, upi_id)
-		values ($1,$2,$3,$4,$5,$6,now(),$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
+		 whatsapp, instagram, address, city, state, pincode, gstin, upi_id, sells)
+		values ($1,$2,$3,$4,$5,$6,now(),$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning id`,
 		code, in.BusinessName, in.OwnerName, strings.ToLower(in.Email), httpx.NormalizeEmail(in.Email),
 		in.Phone, string(hash), in.WhatsApp, in.Instagram, in.Address, in.City, in.State,
-		in.Pincode, in.Gstin, in.UpiID).Scan(&bizID)
+		in.Pincode, in.Gstin, in.UpiID, in.Sells).Scan(&bizID)
 	if err != nil {
 		// someone claimed the same code between the check and the insert
 		if strings.Contains(err.Error(), "businesses_code_key") {

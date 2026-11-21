@@ -74,7 +74,12 @@ type Product struct {
 	HSN           string    `json:"hsn"`
 	GstRate       int       `json:"gstRate"` // percent; -1 = the store default
 	Legal
-	CreatedAt string `json:"createdAt"`
+	// what the item is and how its price reads (see kind.go)
+	Kind      string     `json:"kind"`      // product | service
+	PriceKind string     `json:"priceKind"` // fixed | from | quote
+	PriceUnit string     `json:"priceUnit"` // "per person"; services only
+	Ask       []Question `json:"ask"`       // what the assistant finds out before an enquiry is handed over
+	CreatedAt string     `json:"createdAt"`
 }
 
 // Legal is what India's e-commerce and packaged-goods rules ask a listing to
@@ -121,6 +126,9 @@ type Public struct {
 	Variants     []PublicVariant `json:"variants"`
 	Details      []Detail        `json:"details"`
 	SizeChart    string          `json:"sizeChart,omitempty"`
+	Kind         string          `json:"kind"`
+	PriceKind    string          `json:"priceKind"`
+	PriceUnit    string          `json:"priceUnit"`
 	Legal
 }
 
@@ -146,7 +154,7 @@ func ToPublic(products []Product) []Public {
 		out[i] = Public{ID: p.ID, Name: p.Name, Description: p.Description, Category: p.Category,
 			Price: p.Price, ComparePrice: p.ComparePrice, Images: orEmpty(p.Images), InStock: p.InStock,
 			Trending: p.Trending, Options: p.Options, Variants: variants, Details: details, SizeChart: p.SizeChart,
-			Legal: p.Legal}
+			Kind: p.Kind, PriceKind: p.PriceKind, PriceUnit: p.PriceUnit, Legal: p.Legal}
 	}
 	return out
 }
@@ -195,6 +203,11 @@ type Input struct {
 	MRP           *int      `json:"mrp"`
 	OriginCountry *string   `json:"originCountry"`
 	Manufacturer  *string   `json:"manufacturer"`
+	// omitted keeps what is stored (a new item is a fixed-price product)
+	Kind      string     `json:"kind"`
+	PriceKind string     `json:"priceKind"`
+	PriceUnit *string    `json:"priceUnit"`
+	Ask       []Question `json:"ask"`
 }
 
 // qty resolves the tracked quantity; an omitted or negative value (the API
@@ -229,8 +242,10 @@ func (in *Input) validate() error {
 	if strings.TrimSpace(in.Name) == "" {
 		return errors.New("name is required")
 	}
-	if in.Price <= 0 {
-		return errors.New("price must be positive (in paise)")
+	// Update fills these from the stored row first, so here an empty one is new
+	in.defaults(KindProduct, PriceFixed)
+	if err := in.shapeKind(); err != nil {
+		return err
 	}
 	in.Category = strings.TrimSpace(in.Category)
 	if len([]rune(in.Name)) > 200 || len([]rune(in.Category)) > 60 || len([]rune(in.Description)) > 5000 || len(in.Sku) > 64 {
@@ -334,17 +349,21 @@ func (s *Service) Create(ctx context.Context, bizID string, in Input) (*Product,
 	var id string
 	err = tx.QueryRow(ctx, `insert into products
 		(business_id, name, description, category, price, reseller_price, compare_price, sku, images, in_stock, stock_qty, trending,
-		 details, size_chart, hsn, gst_rate, options, mrp, origin_country, manufacturer)
+		 details, size_chart, hsn, gst_rate, options, mrp, origin_country, manufacturer, kind, price_kind, price_unit, ask)
 		values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,coalesce($13::jsonb,'[]'),coalesce($14,''),coalesce($15,''),coalesce($16,-1),
-		 coalesce($17::jsonb,'[]'),coalesce($18,0),coalesce($19,''),coalesce($20,''))
+		 coalesce($17::jsonb,'[]'),coalesce($18,0),coalesce($19,''),coalesce($20,''),$21,$22,coalesce($23,''),coalesce($24::jsonb,'[]'))
 		returning id`,
 		bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
 		string(images), in.stocked(), in.qty(), in.Trending, jsonParam(in.Details), in.SizeChart, in.HSN, in.GstRate,
-		jsonParam(in.Options), in.MRP, in.OriginCountry, in.Manufacturer).Scan(&id)
+		jsonParam(in.Options), in.MRP, in.OriginCountry, in.Manufacturer,
+		in.Kind, in.PriceKind, in.PriceUnit, jsonParam(in.Ask)).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
 	if err := writeVariants(ctx, tx, id, in.Variants, false); err != nil {
+		return nil, err
+	}
+	if err := widenSells(ctx, tx, bizID, in.Kind); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -354,15 +373,18 @@ func (s *Service) Create(ctx context.Context, bizID string, in Input) (*Product,
 }
 
 func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Product, error) {
-	if err := in.validate(); err != nil {
-		return nil, err
-	}
-
 	var wasInStock bool
 	var storedMRP int
-	if err := s.pool.QueryRow(ctx, `select in_stock, mrp from products where id=$1 and business_id=$2 and active`,
-		id, bizID).Scan(&wasInStock, &storedMRP); err != nil {
+	var kind, priceKind string
+	if err := s.pool.QueryRow(ctx, `select in_stock, mrp, kind, price_kind from products where id=$1 and business_id=$2 and active`,
+		id, bizID).Scan(&wasInStock, &storedMRP, &kind, &priceKind); err != nil {
 		return nil, ErrNotFound
+	}
+	// an edit that does not say what the item is (a stock sheet, an older
+	// client) keeps what it was
+	in.defaults(kind, priceKind)
+	if err := in.validate(); err != nil {
+		return nil, err
 	}
 	mrp := storedMRP
 	if in.MRP != nil {
@@ -383,16 +405,18 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 	err = tx.QueryRow(ctx, `update products set name=$3, description=$4, category=$5, price=$6, reseller_price=$7,
 		compare_price=$8, sku=$9, images=coalesce($10::jsonb, images),
 		in_stock = coalesce($11, case when $12::int is null then in_stock else $12::int <> 0 end),
-		stock_qty = coalesce($12::int, stock_qty),
+		stock_qty = case when $22 = 'service' then -1 else coalesce($12::int, stock_qty) end,
 		trending=$13, details=coalesce($14::jsonb, details), size_chart=coalesce($15, size_chart),
 		hsn=coalesce($16, hsn), gst_rate=coalesce($17, gst_rate), options=coalesce($18::jsonb, options),
 		mrp=coalesce($19, mrp), origin_country=coalesce($20, origin_country), manufacturer=coalesce($21, manufacturer),
+		kind=$22, price_kind=$23, price_unit=coalesce($24, price_unit), ask=coalesce($25::jsonb, ask),
 		updated_at=now()
 		where id=$1 and business_id=$2 returning in_stock`,
 		id, bizID, in.Name, in.Description, in.Category, in.Price, in.ResellerPrice, in.ComparePrice, in.Sku,
 		jsonParam(in.Images), in.InStock, qtyParam(in.StockQty), in.Trending,
 		jsonParam(in.Details), in.SizeChart, in.HSN, in.GstRate, jsonParam(in.Options),
-		in.MRP, in.OriginCountry, in.Manufacturer).Scan(&inStock)
+		in.MRP, in.OriginCountry, in.Manufacturer,
+		in.Kind, in.PriceKind, in.PriceUnit, jsonParam(in.Ask)).Scan(&inStock)
 	if err != nil {
 		return nil, err
 	}
@@ -400,6 +424,9 @@ func (s *Service) Update(ctx context.Context, bizID, id string, in Input) (*Prod
 		if err := writeVariants(ctx, tx, id, in.Variants, true); err != nil {
 			return nil, err
 		}
+	}
+	if err := widenSells(ctx, tx, bizID, in.Kind); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -444,7 +471,7 @@ func (s *Service) SetStock(ctx context.Context, bizID, id string, inStock *bool,
 // LowStock lists tracked products at or below a threshold, so the seller
 // restocks before the storefront sells something they cannot ship.
 func (s *Service) LowStock(ctx context.Context, bizID string, threshold int) ([]Product, error) {
-	return s.query(ctx, `p.business_id = $1 and p.active and p.stock_qty between 0 and $2`,
+	return s.query(ctx, `p.business_id = $1 and p.active and p.kind = 'product' and p.stock_qty between 0 and $2`,
 		"p.stock_qty asc", bizID, threshold)
 }
 
@@ -485,6 +512,7 @@ func (s *Service) Get(ctx context.Context, bizID, id string) (*Product, error) {
 type Filter struct {
 	Search      string
 	Category    string
+	Kind        string // product | service; anything else = both
 	Trending    bool
 	InStockOnly bool
 	MinPrice    int // paise
@@ -504,6 +532,7 @@ func FilterFrom(q url.Values) Filter {
 	return Filter{
 		Search:      q.Get("search"),
 		Category:    q.Get("category"),
+		Kind:        q.Get("kind"),
 		Trending:    q.Get("trending") == "true",
 		InStockOnly: q.Get("inStock") == "true",
 		MinPrice:    rupees("minPrice"),
@@ -529,6 +558,10 @@ func (f Filter) where(bizID string) (string, []any) {
 	if f.Category != "" {
 		args = append(args, f.Category)
 		where += fmt.Sprintf(" and p.category = $%d", len(args))
+	}
+	if f.Kind == KindProduct || f.Kind == KindService {
+		args = append(args, f.Kind)
+		where += fmt.Sprintf(" and p.kind = $%d", len(args))
 	}
 	if f.MinPrice > 0 {
 		args = append(args, f.MinPrice)
@@ -572,6 +605,7 @@ func (s *Service) query(ctx context.Context, where, order string, args ...any) (
 	rows, err := s.pool.Query(ctx, `select p.id, p.name, p.description, p.category, p.price, p.reseller_price,
 		p.compare_price, p.sku, p.images, p.in_stock, p.stock_qty, p.trending, p.active, p.created_at,
 		p.details, p.size_chart, p.hsn, p.gst_rate, p.options, p.mrp, p.origin_country, p.manufacturer,
+		p.kind, p.price_kind, p.price_unit, p.ask,
 		coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'name', v.name, 'options', v.options, 'price', v.price,
 			'sku', v.sku, 'inStock', v.in_stock, 'stockQty', v.stock_qty) order by v.position, v.name)
 			filter (where v.id is not null), '[]')
@@ -584,14 +618,17 @@ func (s *Service) query(ctx context.Context, where, order string, args ...any) (
 	var out []Product
 	for rows.Next() {
 		var p Product
-		var images, variants, details, options []byte
+		var images, variants, details, options, ask []byte
 		var createdAt time.Time
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.ResellerPrice,
 			&p.ComparePrice, &p.Sku, &images, &p.InStock, &p.StockQty, &p.Trending, &p.Active, &createdAt,
 			&details, &p.SizeChart, &p.HSN, &p.GstRate, &options, &p.MRP, &p.OriginCountry, &p.Manufacturer,
+			&p.Kind, &p.PriceKind, &p.PriceUnit, &ask,
 			&variants); err != nil {
 			return nil, err
 		}
+		p.Ask = []Question{}
+		json.Unmarshal(ask, &p.Ask)
 		json.Unmarshal(images, &p.Images)
 		json.Unmarshal(details, &p.Details)
 		json.Unmarshal(options, &p.Options)
@@ -717,13 +754,20 @@ func (s *Service) ResolveLine(ctx context.Context, q DB, bizID, productID, varia
 	}
 	var price, resellerPrice int
 	var inStock bool
-	err := q.QueryRow(ctx, `select name, price, reseller_price, in_stock from products
-		where id=$1 and business_id=$2 and active`, productID, bizID).Scan(&l.Name, &price, &resellerPrice, &inStock)
+	var kind string
+	err := q.QueryRow(ctx, `select name, price, reseller_price, in_stock, kind from products
+		where id=$1 and business_id=$2 and active`, productID, bizID).Scan(&l.Name, &price, &resellerPrice, &inStock, &kind)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return l, ErrNotFound
 	}
 	if err != nil {
 		return l, err
+	}
+	// every catalog line on its way into an order passes through here
+	// (storefront, link, manual order, draft, chat): a service has no fixed
+	// bill and nothing to ship, so it stops here whatever sent it
+	if kind == KindService {
+		return l, fmt.Errorf("%s is a service — it is booked by enquiry, not ordered", l.Name)
 	}
 	if !inStock {
 		return l, fmt.Errorf("%s is out of stock", l.Name)
@@ -831,28 +875,33 @@ func Release(ctx context.Context, conn DB, lines []Line) error {
 // Catalog renders the live catalog for the AI order parser, in paise — the draft
 // JSON the parser returns is in paise, so the two must agree.
 func (s *Service) Catalog(ctx context.Context, bizID string) (string, error) {
-	return s.catalog(ctx, bizID, func(paise int) string { return fmt.Sprintf("%d paise", paise) })
+	return s.catalog(ctx, bizID, func(p Product) string { return fmt.Sprintf("price %d paise", p.Price) }, false)
 }
 
 // CatalogForBuyer renders the same catalog in rupees, for prompts whose output is
 // read by a buyer. Formatting here instead of asking the model to divide by 100
 // is what stops "₹50 (5000 paise)" ending up in a customer's chat.
 func (s *Service) CatalogForBuyer(ctx context.Context, bizID string) (string, error) {
-	return s.catalog(ctx, bizID, notify.Rupees)
+	return s.catalog(ctx, bizID, func(p Product) string { return "price " + p.PriceLabel() }, true)
 }
 
-func (s *Service) catalog(ctx context.Context, bizID string, money func(int) string) (string, error) {
+// catalog lists what is on offer, one line each. The order parser reads only
+// what can be ordered, so it never drafts an order for a service.
+func (s *Service) catalog(ctx context.Context, bizID string, price func(Product) string, services bool) (string, error) {
 	products, err := s.List(ctx, bizID, Filter{InStockOnly: true})
 	if err != nil {
 		return "", err
 	}
 	var sb strings.Builder
 	for _, p := range products {
+		if p.IsService() && !services {
+			continue
+		}
 		names := make([]string, len(p.Variants))
 		for i, v := range p.Variants {
 			names[i] = v.Name
 		}
-		fmt.Fprintf(&sb, "%s | %s | %s | price %s | variants: %s\n", p.ID, p.Name, p.Category, money(p.Price), strings.Join(names, ", "))
+		fmt.Fprintf(&sb, "%s | %s | %s | %s | variants: %s\n", p.ID, p.Name, p.Category, price(p), strings.Join(names, ", "))
 	}
 	return sb.String(), nil
 }

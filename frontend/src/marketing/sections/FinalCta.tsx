@@ -9,8 +9,11 @@ import { cn } from '@/lib/cn';
 
 const BULBS = 23;
 
-/** The close: the whole strand lights at once over a seller still selling at night. */
-export function FinalCta() {
+/**
+ * The close: the whole strand lights at once over a seller still selling at
+ * night. The words and where the button leads default to the home page's.
+ */
+export function FinalCta({ title = finalCta.title, sub = finalCta.sub, cta = finalCta.cta, to = '/app/register' }: Partial<typeof finalCta> & { to?: string }) {
   const ref = useRef<HTMLElement>(null);
   const lit = useInView(ref, { once: true, margin: '-30%' });
   const reduced = useReducedMotion();
@@ -22,7 +25,7 @@ export function FinalCta() {
       <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-ink-950 shadow-float" data-theme="dark">
         <motion.img
           src="/demo/auth-seller.webp"
-          alt="A seller replying to buyers on her phone at night, next to folded kurtis and a tray of rings"
+          alt="A business owner replying to buyers on her phone at night"
           loading="lazy"
           decoding="async"
           style={reduced ? undefined : { y: imgY }}
@@ -56,12 +59,12 @@ export function FinalCta() {
         </div>
 
         <div className="relative flex min-h-[26rem] flex-col justify-end gap-6 px-6 pb-10 pt-24 sm:min-h-[30rem] sm:px-12 sm:pb-14">
-          <h2 className="max-w-[14ch] text-d1 font-semibold text-hi">{finalCta.title}</h2>
-          <p className="max-w-[40ch] text-lg text-mid">{finalCta.sub}</p>
+          <h2 className="max-w-[16ch] text-d1 font-semibold text-hi">{title}</h2>
+          <p className="max-w-[40ch] text-lg text-mid">{sub}</p>
           <div>
             <Tilt>
-              <Link to="/app/register" className={buttonLink('primary', 'lg')}>
-                {finalCta.cta}
+              <Link to={to} className={buttonLink('primary', 'lg')}>
+                {cta}
                 <ArrowRight className="size-4 transition-transform duration-std ease-spring group-hover:translate-x-0.5" />
               </Link>
             </Tilt>

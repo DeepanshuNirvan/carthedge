@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"carthedge/internal/customer"
+	"carthedge/internal/enquiry"
 	"carthedge/internal/httpx"
 	"carthedge/internal/notify"
 	"carthedge/internal/product"
@@ -25,6 +26,14 @@ type Cart struct {
 	Phone   string           `json:"phone"`
 	Address customer.Address `json:"address"`
 	Payment string           `json:"payment"` // cod | prepaid | ""
+	// Answers are the details a service asks for, in the buyer's words. Sent
+	// pins the enquiry already handed to the owner (enquiry.Lead.Hash), so it
+	// is handed over once and again only when it changes. Both live on the
+	// cart so every cart reset (a placed order, a new chat session) clears
+	// them, and both are omitted when empty: a product chat's stored cart and
+	// its summary hash are byte-for-byte what they were before services.
+	Answers []enquiry.Answer `json:"answers,omitempty"`
+	Sent    string           `json:"sent,omitempty"`
 }
 
 type CartItem struct {
@@ -39,6 +48,7 @@ type Store struct {
 	ID                string
 	Name              string
 	Code              string
+	Sells             string // products | services | both ("" = products): wording only
 	City              string
 	Notes             string
 	BaseURL           string
@@ -93,6 +103,7 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 	var problems, missing []string
 	var q Quote
 	var kept []CartItem
+	services := 0
 	for _, it := range c.Items {
 		p, ok, close := st.find(it)
 		if !ok {
@@ -106,7 +117,11 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 			continue
 		}
 		if !p.InStock {
-			problems = append(problems, p.Name+" is out of stock")
+			if p.IsService() {
+				problems = append(problems, p.Name+" is not being offered right now")
+			} else {
+				problems = append(problems, p.Name+" is out of stock")
+			}
 			continue
 		}
 		it.ProductID, it.Name = p.ID, p.Name
@@ -147,7 +162,7 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 					it.Qty = n
 				}
 			}
-		} else if p.StockQty >= 0 && it.Qty > p.StockQty {
+		} else if !p.IsService() && p.StockQty >= 0 && it.Qty > p.StockQty {
 			problems = append(problems, fmt.Sprintf("only %d of %s left", p.StockQty, p.Name))
 			it.Qty = p.StockQty
 		}
@@ -156,15 +171,26 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 		}
 		line.Qty = it.Qty
 		kept = append(kept, it)
+		if p.IsService() {
+			// an enquiry, not a bill: a service is never priced into the quote,
+			// so it can never reach an order summary or an order (see enquire)
+			services++
+			continue
+		}
 		if line.VariantID != "" || len(p.Variants) == 0 {
 			q.Lines = append(q.Lines, line)
 			q.Subtotal += line.Price * line.Qty
 		}
 	}
 	c.Items = kept
+	c.Answers = st.answersFor(c)
 	if len(c.Items) == 0 {
 		missing = append([]string{"what they would like to order"}, missing...)
 	}
+	// a chat about services alone ends in an enquiry: nothing is delivered, so
+	// there is no address, pincode or payment to ask for (enquire asks for
+	// what the business wants instead)
+	ships := services == 0 || services < len(kept)
 	// the seller's COD ceiling is checked on the COD total, charge included
 	codAllowed := st.Policies.CodMaxOrder == 0 || q.Subtotal == 0 ||
 		st.checkout().Totals(q.Subtotal, 0, "cod").Total <= st.Policies.CodMaxOrder
@@ -182,6 +208,8 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 		c.Address.Pincode = ""
 	}
 	switch {
+	case !ships:
+		c.Payment = ""
 	case c.Payment == "cod" && !st.CodEnabled:
 		problems = append(problems, "cash on delivery is not available at this shop")
 		c.Payment = ""
@@ -197,20 +225,22 @@ func (st Store) check(c Cart) (Cart, Quote, []string, []string) {
 
 	// plain words on purpose: the writer echoes these, and form language
 	// ("10-digit mobile number") is exactly what makes a chat feel automated
-	if c.Name == "" {
-		missing = append(missing, "name")
-	}
-	if c.Phone == "" {
-		missing = append(missing, "phone number")
-	}
-	if c.Address.Line == "" {
-		missing = append(missing, "address")
-	}
-	if c.Address.Pincode == "" {
-		missing = append(missing, "pincode")
-	}
-	if c.Payment == "" {
-		missing = append(missing, "payment: "+st.payOptions(codAllowed))
+	if ships {
+		if c.Name == "" {
+			missing = append(missing, "name")
+		}
+		if c.Phone == "" {
+			missing = append(missing, "phone number")
+		}
+		if c.Address.Line == "" {
+			missing = append(missing, "address")
+		}
+		if c.Address.Pincode == "" {
+			missing = append(missing, "pincode")
+		}
+		if c.Payment == "" {
+			missing = append(missing, "payment: "+st.payOptions(codAllowed))
+		}
 	}
 
 	if q.Subtotal > 0 {
@@ -314,8 +344,10 @@ func sameThing(a, b string) bool {
 	return false
 }
 
-// hash pins the exact cart a summary showed, so "yes" confirms only that.
+// hash pins the exact cart a summary showed, so "yes" confirms only that. It
+// is about the order: the enquiry kept beside it has its own pin (Sent).
 func (c Cart) hash() string {
+	c.Answers, c.Sent = nil, ""
 	b, _ := json.Marshal(c)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:8])
@@ -415,23 +447,32 @@ const (
 	ActSummary Action = "summary" // cart complete: show the summary, ask to confirm
 	ActPlace   Action = "place"   // buyer said yes to the summary they were shown
 	ActHandoff Action = "handoff" // a person from the shop must take over
+	ActLead    Action = "lead"    // an enquiry has what the business asked for: hand it to the owner
 )
 
 // decide is the whole conversation policy, kept pure so it can be tested
 // exhaustively. The model reports what the buyer meant; this decides what
 // happens, and nothing reaches an order without passing through here.
-func decide(u Understanding, stage, summaryHash string, c Cart, complete bool) Action {
+//
+// lead reports an enquiry that has everything the business asked for and has
+// not been handed to the owner in this form yet.
+func decide(u Understanding, stage, summaryHash string, c Cart, complete, lead bool) Action {
 	if u.Handoff != "" {
 		return ActHandoff
 	}
 	if u.Confirmed && stage == "confirming" && complete && c.hash() == summaryHash {
 		return ActPlace
 	}
+	// only a no, a later or spam holds the next step back
+	quiet := u.Intent == "decline" || u.Intent == "later" || u.Intent == "spam"
+	if lead && !quiet {
+		return ActLead
+	}
 	// a complete cart the buyer has not been shown yet gets its summary even if
 	// the last message was "ok" or a side question — otherwise the chat stalls
-	// one step from an order. Only a no, a later or spam holds it back.
+	// one step from an order.
 	shown := stage == "confirming" && c.hash() == summaryHash
-	if complete && !shown && u.Intent != "decline" && u.Intent != "later" && u.Intent != "spam" {
+	if complete && !shown && !quiet {
 		return ActSummary
 	}
 	if !u.needsReply() {

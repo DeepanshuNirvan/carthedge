@@ -4,6 +4,7 @@ export const nav = {
   links: [
     { label: 'Product', href: '#product' },
     { label: 'Features', href: '#features' },
+    { label: 'Services', href: '/services' },
     { label: 'Pricing', href: '#pricing' },
     { label: 'Guides', href: '#guides' },
     { label: 'Contact', href: '/contact' },
@@ -437,6 +438,155 @@ export const testimonials = {
   ],
 };
 
+// For businesses that sell a service, not a parcel. One page (/services) and one
+// section on the home page read from here. The server's no-JavaScript copy of
+// the page (internal/web servicesFallback) mirrors these words: change one,
+// change the other.
+export const services = {
+  seo: {
+    title: 'CartHedge for Services: AI Replies to Instagram & WhatsApp Enquiries',
+    description:
+      'Sell a service, not a parcel? CartHedge answers every Instagram and WhatsApp enquiry from your own details, collects what you need to quote, and hands you the enquiry. For trips, events, bookings, transport, classes and more.',
+  },
+  hero: {
+    title: 'Every enquiry answered.',
+    titleAccent: 'Every detail collected before you pick up the phone.',
+    sub: "For businesses that sell a service, not a parcel. CartHedge replies in the buyer's language from your own details, asks what you need to know, and hands you the enquiry ready to quote.",
+    ctaPrimary: 'Start free trial',
+    ctaSecondary: 'Watch a chat',
+  },
+  demo: {
+    title: 'One assistant. Whatever you do.',
+    sub: 'You choose the questions. It asks them the way you would, then writes the enquiry down for you.',
+    cardTitle: 'New enquiry',
+    cardMeta: 'Written down by CartHedge, not typed by you',
+    cardFoot: 'Lands in your Enquiries with an alert. You reply or send your price from there.',
+    trades: [
+      {
+        value: 'trips',
+        label: 'Trips',
+        business: 'Wander Co',
+        handle: 'ananya.goes',
+        messages: [
+          { from: 'buyer', text: 'Goa trip ka kya rate hai? 4 log hain' },
+          { from: 'ai', text: 'Goa Beach Trip ₹2,500 per person se shuru hota hai, Deluxe ₹4,000. Stay aur breakfast included hai. Kab jaana hai aapko?' },
+          { from: 'buyer', text: '12 se 15 Dec, Deluxe. Ananya, 98110 43210' },
+          { from: 'ai', text: 'Note kar liya, Ananya. Owner yahin aapko poori details aur final price bhej denge.' },
+        ],
+        enquiry: {
+          about: 'Goa Beach Trip (Deluxe) × 4',
+          answers: [
+            { label: 'Travel dates', value: '12 se 15 Dec' },
+            { label: 'Number of people', value: '4' },
+          ],
+          who: 'Ananya · 98110 43210',
+        },
+      },
+      {
+        value: 'events',
+        label: 'Events',
+        business: 'Phool & Parda Decor',
+        handle: 'meher.k',
+        messages: [
+          { from: 'buyer', text: "Hi, do you do haldi decor? What's the price?" },
+          { from: 'ai', text: 'Yes, we do. The price depends on the venue and the setup, so the owner shares it once we know a little more. What is the date, and where is it?' },
+          { from: 'buyer', text: "8 Feb, a farmhouse in Chattarpur, around 80 guests. I'm Meher, 99100 22110" },
+          { from: 'ai', text: 'Noted, Meher. The owner will send you the price and a few ideas right here.' },
+        ],
+        enquiry: {
+          about: 'Haldi Decor',
+          answers: [
+            { label: 'Event date', value: '8 Feb' },
+            { label: 'Venue and city', value: 'a farmhouse in Chattarpur' },
+            { label: 'Number of guests', value: 'around 80' },
+          ],
+          who: 'Meher · 99100 22110',
+        },
+      },
+      {
+        value: 'transport',
+        label: 'Transport',
+        business: 'Sahyadri Movers',
+        handle: 'rohit_pune',
+        messages: [
+          { from: 'buyer', text: 'Tempo chahiye Pune se Nashik, kal subah' },
+          { from: 'ai', text: 'Ji, Pune se Nashik hum jaate hain. Saaman kya hai, aur pickup kahan se hoga?' },
+          { from: 'buyer', text: '1BHK ka saaman, Kothrud se. Rohit 98220 11873' },
+          { from: 'ai', text: 'Note kar liya, Rohit. Owner gaadi aur rate confirm karke yahin batayenge.' },
+        ],
+        enquiry: {
+          about: 'Pune to Nashik Tempo',
+          answers: [
+            { label: 'Pickup location', value: 'Kothrud' },
+            { label: 'Date and time', value: 'kal subah' },
+            { label: 'What is being moved', value: '1BHK ka saaman' },
+          ],
+          who: 'Rohit · 98220 11873',
+        },
+      },
+      {
+        value: 'classes',
+        label: 'Classes',
+        business: 'Sur Guitar Studio',
+        handle: 'tara.plays',
+        messages: [
+          { from: 'buyer', text: 'Guitar classes ki fees kya hai?' },
+          { from: 'ai', text: 'Beginner batch ₹2,000 per month hai, hafte me do classes. Aap kaunse din aana chahenge?' },
+          { from: 'buyer', text: 'Weekends. Tara, 98991 04521' },
+          { from: 'ai', text: 'Note kar liya, Tara. Sir aapko batch ka time yahin bhej denge.' },
+        ],
+        enquiry: {
+          about: 'Beginner Guitar Batch',
+          answers: [{ label: 'Preferred days', value: 'Weekends' }],
+          who: 'Tara · 98991 04521',
+        },
+      },
+    ],
+  },
+  steps: {
+    title: 'Set up in an evening.',
+    items: [
+      { title: 'List what you do', copy: 'Each service with its details: what is included, how long, where. A fixed price, a starting price, or price on request.' },
+      { title: 'Choose what to ask', copy: 'The date, the place, how many people. Your questions, in your words, for each service.' },
+      { title: 'Connect Instagram', copy: 'One tap with the official login. The assistant starts answering enquiries from what you wrote.' },
+      { title: 'Quote and close', copy: 'Each enquiry arrives with the answers. Send your price from the app and it goes out on the same chat.' },
+    ],
+  },
+  never: {
+    title: 'What it will not do.',
+    sub: 'An assistant that guesses loses you customers. This one is built to stop and hand over.',
+    items: [
+      { title: 'Confirm a date or a slot', copy: 'Only you know your calendar. It notes the date and tells the buyer you will confirm it.' },
+      { title: 'Make up a price', copy: 'It says the price you set, word for word. For a service priced on request, it says you will share it and nothing more.' },
+      { title: 'Answer what it should not', copy: 'Medical, legal and money advice is politely declined. So is anything that has nothing to do with your business.' },
+      { title: 'Close a booking without you', copy: 'It hands you the enquiry. Payment and the final yes stay with you.' },
+    ],
+  },
+  fits: {
+    title: 'If people message you to ask "kitna lagega?", it fits.',
+    copy: 'Travel and trip planners, event and wedding decorators, photographers, makeup artists, salons, tutors and coaching, movers and transport, caterers, rentals, repairs and home services. If you also sell products, orders and enquiries run side by side in one app.',
+  },
+  faqTitle: 'Questions service businesses ask',
+  faqs: [
+    { q: 'I do not sell products. Is CartHedge still for me?', a: 'Yes. Choose "Services" when you sign up. You list what you do, the assistant answers enquiries about it on Instagram and WhatsApp, and each one reaches you with the details already collected. There is no cart, stock or delivery to set up.' },
+    { q: 'My price depends on the job. What does the assistant say?', a: 'Set the service to "price on request". The assistant never guesses a number. It tells the buyer you will share the price, collects what you need to work it out, and you send your quote from the app.' },
+    { q: 'Will it confirm a booking or a date on its own?', a: 'No. It notes the date the buyer wants and says you will confirm. Availability, the final price and payment are always yours.' },
+    { q: 'What kind of business can use it?', a: 'Any business that takes enquiries in chat. You write the questions the assistant should ask, so the same setup works for a trip planner, a decorator, a tutor or a transporter.' },
+    { q: 'I sell products and services. Do I need two accounts?', a: 'No. Choose "Both". Products are ordered and paid for as usual, services become enquiries, and both sit in the same app.' },
+    { q: 'What if the buyer asks something I never wrote down?', a: 'The assistant says the business will check and get back, and hands the chat to you when it needs a person. It answers only from what you entered.' },
+  ],
+  final: {
+    title: 'A slow reply sends the enquiry to someone else.',
+    sub: '30 days free. Set up in an evening. Cancel anytime.',
+    cta: 'Start free trial',
+  },
+  home: {
+    title: 'Sell a service, not a parcel?',
+    sub: 'The same assistant answers enquiries, collects the details you need, and hands them to you ready to quote.',
+    link: 'See how it works for services',
+  },
+};
+
 export const finalCta = {
   title: 'The stall stays open. Even at 2 a.m.',
   sub: '30 days free. Set up in an evening. Cancel anytime.',
@@ -449,6 +599,7 @@ export const footer = {
     title: 'Product',
     links: [
       { label: 'Features', href: '#features' },
+      { label: 'For services', href: '/services' },
       { label: 'Pricing', href: '#pricing' },
       { label: 'Guides', href: '#guides' },
       { label: 'Seller login', href: '/app/login' },

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Bot, Check, Inbox as InboxIcon, Lock, MessageSquareText, Pause, Play, Send, Sparkles, Trash2, Wand2 } from 'lucide-react';
 import type { AiDraft, ChatCart, ConversationMessage, ConversationSummary, DraftData } from '@/api/types';
 import { useAiMutations, useDrafts } from '@/api/ai';
@@ -197,7 +197,7 @@ function ConversationModal({
   onReview: (d: AiDraft) => void;
   onClose: () => void;
 }) {
-  const { data: conv, isLoading } = useConversation(id);
+  const { data: conv, isLoading, isError } = useConversation(id);
   const { reply, setAi } = useChannelMutations();
   const [text, setText] = useState('');
   const draft = conv?.draftId ? drafts.find((d) => d.id === conv.draftId && d.status === 'pending') : undefined;
@@ -205,7 +205,10 @@ function ConversationModal({
 
   return (
     <Modal open onClose={onClose} title={conv ? conv.contactName || conv.contactId : 'Conversation'} wide>
-      {isLoading || !conv ? (
+      {isError ? (
+        // a link to a chat that was erased or belongs elsewhere
+        <p className="text-sm text-mid">This chat is no longer available.</p>
+      ) : isLoading || !conv ? (
         <SkeletonRows rows={4} />
       ) : (
         <>
@@ -387,6 +390,17 @@ export default function AiDeskPage() {
   const [reply, setReply] = useState('');
   const [reviewing, setReviewing] = useState<AiDraft | null>(null);
   const [openConvId, setOpenConvId] = useState<string | null>(null);
+  // alerts and enquiries link here with ?conversation=<id>: open that chat
+  const [params, setParams] = useSearchParams();
+  const linked = params.get('conversation');
+  useEffect(() => {
+    if (linked) setOpenConvId(linked);
+  }, [linked]);
+  // closing drops the link too, so a reload or back does not reopen the chat
+  const closeConv = () => {
+    setOpenConvId(null);
+    if (linked) setParams({}, { replace: true });
+  };
   const { data: drafts, isLoading } = useDrafts();
   const { parse, reply: replyMut } = useAiMutations();
   const canReply = useCan('aiReply').allowed;
@@ -540,10 +554,10 @@ export default function AiDeskPage() {
           id={openConvId}
           drafts={drafts ?? []}
           onReview={(d) => {
-            setOpenConvId(null);
+            closeConv();
             setReviewing(d);
           }}
-          onClose={() => setOpenConvId(null)}
+          onClose={closeConv}
         />
       )}
       {reviewing && <DraftReview draft={reviewing} onClose={() => setReviewing(null)} />}

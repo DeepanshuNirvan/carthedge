@@ -8,6 +8,7 @@ import { PageHeader } from '../shell/PageHeader';
 import { ShareActions, productUrl } from '../shell/ShareActions';
 import { ProductForm } from './ProductForm';
 import { isPlainList } from '@/lib/options';
+import { catalogWords, priceParts } from '@/lib/catalog';
 import { BulkImportModal } from './BulkImportModal';
 import { OffersPanel } from './OffersPanel';
 import { Button, IconButton } from '@/ui/Button';
@@ -34,6 +35,8 @@ function ProductCard({
 }) {
   const { setStock, setTrending } = useProductMutations();
   const [shareOpen, setShareOpen] = useState(false);
+  const isService = product.kind === 'service';
+  const price = priceParts(product);
   return (
     <article className="panel group overflow-hidden rounded-xl transition-[transform,box-shadow] duration-std ease-enter [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-raised">
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-2">
@@ -49,7 +52,7 @@ function ProductCard({
         )}
         {!product.inStock && (
           <span className="absolute inset-x-2.5 bottom-2.5 rounded-full bg-ink-950/70 py-1.5 text-center text-xs font-semibold text-white backdrop-blur-md">
-            Out of stock
+            {isService ? 'Not taking bookings' : 'Out of stock'}
           </span>
         )}
         {/* always reachable on touch; reveals on hover only where a cursor exists */}
@@ -59,10 +62,10 @@ function ProductCard({
               <Share2 className="size-4" />
             </IconButton>
           )}
-          <IconButton label="Edit product" className="glass-nav text-hi" onClick={onEdit}>
+          <IconButton label={`Edit ${product.name}`} className="glass-nav text-hi" onClick={onEdit}>
             <Pencil className="size-4" />
           </IconButton>
-          <IconButton label="Delete product" className="glass-nav text-danger-ink" onClick={onDelete}>
+          <IconButton label={`Delete ${product.name}`} className="glass-nav text-danger-ink" onClick={onDelete}>
             <Trash2 className="size-4" />
           </IconButton>
         </div>
@@ -70,8 +73,14 @@ function ProductCard({
       <div className="p-3 sm:p-3.5">
         <p className="truncate text-[14px] font-semibold tracking-snug text-hi">{product.name}</p>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-sm">
-          <MoneyText paise={product.price} className="font-semibold text-hi" />
-          {Math.max(product.mrp, product.comparePrice) > product.price && (
+          {isService ? (
+            <span className="min-w-0 truncate font-semibold text-hi">
+              {price.prefix} <span className="tnum">{price.amount}</span> <span className="font-normal text-low">{price.unit}</span>
+            </span>
+          ) : (
+            <MoneyText paise={product.price} className="font-semibold text-hi" />
+          )}
+          {!isService && Math.max(product.mrp, product.comparePrice) > product.price && (
             <MoneyText paise={product.mrp > 0 ? product.mrp : product.comparePrice} strike className="text-xs" />
           )}
           {product.resellerPrice > 0 && (
@@ -82,6 +91,7 @@ function ProductCard({
         </p>
         <p className="mt-0.5 truncate text-xs text-low">
           {[
+            isService && 'Service',
             product.category,
             product.variants.length > 0 &&
               (isPlainList(product.options)
@@ -95,10 +105,10 @@ function ProductCard({
           <span className="flex items-center gap-2 text-xs text-mid">
             <Switch
               checked={product.inStock}
-              label={`Stock for ${product.name}`}
+              label={`${isService ? 'Bookings' : 'Stock'} for ${product.name}`}
               onChange={(inStock) => setStock.mutate({ id: product.id, inStock })}
             />
-            Stock
+            {isService ? 'Open' : 'Stock'}
           </span>
           <span className="flex items-center gap-2 text-xs text-mid">
             <Switch
@@ -164,19 +174,27 @@ export default function ProductsPage() {
   const { remove } = useProductMutations();
 
   const categories = [...new Set((products ?? []).map((p) => p.category).filter(Boolean))];
+  const words = catalogWords(business?.sells);
+  const openNew = () => {
+    setEditing(null);
+    setFormOpen(true);
+  };
 
   return (
     <>
       <PageHeader
-        title="Products"
+        title={words.title}
         subtitle={products ? `${products.length} in catalog` : undefined}
         actions={
           <>
-            <Button variant="secondary" icon={<FileUp className="size-4" />} onClick={() => setBulkOpen(true)}>
-              Bulk import
-            </Button>
-            <Button icon={<Plus className="size-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>
-              Add product
+            {/* the import sheet is a stock sheet: it has nothing to say about a service */}
+            {business?.sells !== 'services' && (
+              <Button variant="secondary" icon={<FileUp className="size-4" />} onClick={() => setBulkOpen(true)}>
+                Bulk import
+              </Button>
+            )}
+            <Button icon={<Plus className="size-4" />} onClick={openNew}>
+              Add {words.one}
             </Button>
           </>
         }
@@ -186,11 +204,11 @@ export default function ProductsPage() {
         <div className="relative basis-full sm:basis-auto">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-low" />
           <Input
-            placeholder="Search products"
+            placeholder={`Search ${words.many}`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-11 rounded-full pl-10 sm:h-10 sm:w-60"
-            aria-label="Search products"
+            aria-label={`Search ${words.many}`}
           />
         </div>
         <button
@@ -253,11 +271,13 @@ export default function ProductsPage() {
           message={
             search || category
               ? 'Try a different search or category.'
-              : 'Add your first product. It goes live on your storefront instantly.'
+              : business?.sells === 'services'
+                ? 'Add your first service with its details. The assistant answers from it, and it shows on your page.'
+                : `Add your first ${words.one}. It goes live on your storefront instantly.`
           }
           action={
-            <Button icon={<Plus className="size-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>
-              Add product
+            <Button icon={<Plus className="size-4" />} onClick={openNew}>
+              Add {words.one}
             </Button>
           }
         />
@@ -270,7 +290,7 @@ export default function ProductsPage() {
       <ProductForm open={formOpen} onClose={() => setFormOpen(false)} editing={editing} />
       <BulkImportModal open={bulkOpen} onClose={() => setBulkOpen(false)} />
 
-      <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Delete product">
+      <Modal open={!!deleting} onClose={() => setDeleting(null)} title={`Delete ${deleting?.kind === 'service' ? 'service' : 'product'}`}>
         <p className="text-sm text-mid">
           Remove <span className="font-medium text-hi">{deleting?.name}</span> from your catalog? Buyers will
           no longer see it. Existing orders keep their snapshot.
@@ -283,7 +303,7 @@ export default function ProductsPage() {
               deleting &&
               remove.mutate(deleting.id, {
                 onSuccess: () => {
-                  toast('success', 'Product removed');
+                  toast('success', 'Removed from your catalog');
                   setDeleting(null);
                 },
                 onError: (e) => toast('error', 'Delete failed', e.message),

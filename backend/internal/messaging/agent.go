@@ -10,6 +10,7 @@ import (
 
 	"carthedge/internal/ai"
 	"carthedge/internal/alert"
+	"carthedge/internal/enquiry"
 	"carthedge/internal/httpx"
 	"carthedge/internal/product"
 	"carthedge/internal/shop"
@@ -43,11 +44,11 @@ func (s *Service) handle(ctx context.Context, c dueConv) {
 		return
 	}
 	var autoReply, autoOrder, paused bool
-	var stage string
+	var stage, sells string
 	var profileRaw []byte
 	if err := s.pool.QueryRow(ctx, `select b.ai_auto_reply, b.ai_auto_order, coalesce(c.ai_paused_until > now(), false), c.stage,
-		b.ai_profile from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).Scan(
-		&autoReply, &autoOrder, &paused, &stage, &profileRaw); err != nil {
+		b.ai_profile, b.sells from conversations c join businesses b on b.id = c.business_id where c.id=$1`, c.id).Scan(
+		&autoReply, &autoOrder, &paused, &stage, &profileRaw, &sells); err != nil {
 		return
 	}
 	if paused && stage == "handoff" {
@@ -62,10 +63,51 @@ func (s *Service) handle(ctx context.Context, c dueConv) {
 		if !open && !paused && profile.Away != "" {
 			s.sendAway(ctx, c, profile.Away)
 		}
-		s.draftOnly(ctx, c)
+		s.draftOnly(ctx, c, sells)
 		return
 	}
 	s.converse(ctx, c, autoOrder, false)
+}
+
+// listen reads a chat the assistant is not answering and keeps the enquiry in
+// it up to date, so a seller who replies themselves still gets it written down.
+func (s *Service) listen(ctx context.Context, c dueConv) {
+	in, err := s.turnInput(ctx, c)
+	if err != nil {
+		s.log.Warn("dm listen: could not load the chat", "conversationId", c.id, "err", err)
+		return
+	}
+	if !in.Store.HasServices() {
+		return // nothing in the catalog a chat could be an enquiry about
+	}
+	res, err := s.ai.Listen(ctx, in)
+	if err != nil {
+		s.log.Warn("dm listen failed", "conversationId", c.id, "err", err)
+		return
+	}
+	if res.Action == ai.ActLead && !s.capture(ctx, c, res.Lead) {
+		return // not saved: the cart keeps its old pin, so the next message tries again
+	}
+	cart, _ := json.Marshal(res.Cart)
+	s.pool.Exec(ctx, `update conversations set cart=$2::jsonb where id=$1`, c.id, string(cart))
+}
+
+// capture hands an enquiry to the owner: stored, shown live, and alerted the
+// first time. A buyer changing a detail updates it quietly.
+func (s *Service) capture(ctx context.Context, c dueConv, lead enquiry.Lead) bool {
+	id, created, err := s.enquiries.Capture(ctx, c.biz, c.id, c.channel, lead)
+	if err != nil {
+		s.log.Error("could not save the enquiry", "conversationId", c.id, "err", err)
+		return false
+	}
+	s.bus.Publish(ctx, c.biz, "enquiryReady", httpx.M{"conversationId": c.id, "enquiryId": id, "created": created})
+	if created {
+		s.alerts.Seller(c.biz, alert.Alert{Kind: "newEnquiry",
+			Title: "New enquiry · " + lead.Title(),
+			Body:  fmt.Sprintf("%s (%s) asked on %s. Their details are on your Enquiries page.", lead.Name, lead.Phone, c.channel),
+			Path:  "/app/enquiries"})
+	}
+	return true
 }
 
 // sendAway posts the seller's away message, at most once per chat in 12
@@ -142,6 +184,12 @@ func (s *Service) converse(ctx context.Context, c dueConv, autoOrder, nudge bool
 		}
 		// a placed order already reset the chat and messaged the buyer
 		placed = o != nil
+	case ai.ActLead:
+		if !s.capture(ctx, c, res.Lead) {
+			// the buyer must not be told it is noted when it is not
+			s.handOff(ctx, c, "a buyer's enquiry could not be saved — their details are in the chat")
+			return
+		}
 	case ai.ActHandoff:
 		// stays with the seller until they resume it: a complaint must not be
 		// picked back up by the assistant just because nobody answered
@@ -254,6 +302,15 @@ func (s *Service) turnInput(ctx context.Context, c dueConv) (ai.TurnInput, error
 		return in, err
 	}
 	json.Unmarshal(cart, &in.Cart)
+	if st.HasServices() {
+		// a WhatsApp chat is on the buyer's own number: an enquiry need not ask for it
+		if c.channel == "whatsapp" {
+			var contact string
+			s.pool.QueryRow(ctx, `select contact_id from conversations where id=$1`, c.id).Scan(&contact)
+			in.ContactPhone, _ = httpx.NormalizePhone(contact)
+		}
+		in.Enquiry = s.enquiries.ForChat(ctx, c.id)
+	}
 
 	rows, err := s.pool.Query(ctx, `select direction, body from (
 			select m.direction, m.body, m.created_at from conversation_messages m
@@ -403,6 +460,8 @@ func (s *Service) nudgeQuiet(ctx context.Context) {
 		  and c.stage in ('open','confirming') and not c.parse_pending
 		  -- an emptied cart is stored as items:null, which jsonb_array_length rejects
 		  and case when jsonb_typeof(c.cart->'items') = 'array' then jsonb_array_length(c.cart->'items') else 0 end > 0
+		  -- an enquiry already with the owner is waiting on them, not on the buyer
+		  and coalesce(c.cart->>'sent', '') = ''
 		  and c.last_inbound_at between now() - make_interval(secs => $1) and now() - make_interval(secs => $2)
 		  and (c.ai_paused_until is null or c.ai_paused_until < now())
 		  and (c.nudged_at is null or c.nudged_at < c.last_inbound_at)

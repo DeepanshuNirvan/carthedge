@@ -130,7 +130,7 @@ func TestDecide(t *testing.T) {
 		{"spam", Understanding{Intent: "spam", ReplyNeeded: no()}, "open", "", false, ActSilent},
 	}
 	for _, c := range cases {
-		if got := decide(c.u, c.stage, c.hash, cart, c.complete); got != c.want {
+		if got := decide(c.u, c.stage, c.hash, cart, c.complete, false); got != c.want {
 			t.Errorf("%s: got %s want %s", c.name, got, c.want)
 		}
 	}

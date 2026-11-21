@@ -15,9 +15,9 @@ func (s *Service) LoadStore(ctx context.Context, bizID string) (Store, error) {
 	st := Store{ID: bizID, BaseURL: s.baseURL}
 	var razorpayKeyID, upiID string
 	err := s.pool.QueryRow(ctx, `select name, code, city, ai_notes, shipping_fee, free_shipping_above,
-		cod_enabled, cod_token_amount, razorpay_key_id, upi_id from businesses where id=$1`, bizID).Scan(
+		cod_enabled, cod_token_amount, razorpay_key_id, upi_id, sells from businesses where id=$1`, bizID).Scan(
 		&st.Name, &st.Code, &st.City, &st.Notes, &st.ShippingFee, &st.FreeShippingAbove,
-		&st.CodEnabled, &st.CodTokenAmount, &razorpayKeyID, &upiID)
+		&st.CodEnabled, &st.CodTokenAmount, &razorpayKeyID, &upiID, &st.Sells)
 	if err != nil {
 		return st, err
 	}

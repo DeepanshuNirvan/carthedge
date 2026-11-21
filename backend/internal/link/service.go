@@ -101,8 +101,13 @@ func (s *Service) Create(ctx context.Context, bizID, bizCode string, in CreateIn
 	}
 	// validate referenced products belong to this business
 	for _, ref := range in.Items {
-		if _, err := s.products.Get(ctx, bizID, ref.ProductID); err != nil {
+		p, err := s.products.Get(ctx, bizID, ref.ProductID)
+		if err != nil {
 			return nil, fmt.Errorf("product %s not found", ref.ProductID)
+		}
+		// a checkout link bills and ships; a service is enquired about
+		if p.IsService() {
+			return nil, fmt.Errorf("%s is a service: share its store page, or make a custom link for the amount you agreed", p.Name)
 		}
 	}
 	var expiresAt any

@@ -16,6 +16,7 @@ import (
 	"carthedge/internal/business"
 	"carthedge/internal/config"
 	"carthedge/internal/customer"
+	"carthedge/internal/enquiry"
 	"carthedge/internal/events"
 	"carthedge/internal/httpx"
 	"carthedge/internal/invoice"
@@ -45,6 +46,7 @@ type Deps struct {
 	Links      *link.Handler
 	Orders     *order.Handler
 	Customers  *customer.Handler
+	Enquiries  *enquiry.Handler
 	Analytics  *analytics.Handler
 	Broadcasts *broadcast.Handler
 	Invoices   *invoice.Handler
@@ -191,6 +193,14 @@ func New(d Deps) http.Handler {
 	// WhatsApp offers: the buyer's yes/no record, and stopping them on request
 	handle("GET /api/v1/customers/{id}/consents", d.Customers.Consents, authed, active)
 	handle("POST /api/v1/customers/{id}/marketing/stop", d.Customers.StopMarketing, authed, active)
+
+	// enquiries: what a chat about a service ends in, and the owner's pipeline
+	handle("GET /api/v1/enquiries", d.Enquiries.List, authed, active)
+	handle("POST /api/v1/enquiries", d.Enquiries.Create, authed, active, byBusiness("enquiryCreate", 60, time.Minute))
+	handle("PATCH /api/v1/enquiries/{id}", d.Enquiries.Update, authed, active)
+	handle("DELETE /api/v1/enquiries/{id}", d.Enquiries.Delete, authed, active)
+	// sends a message to the buyer, so it is capped like the other sends
+	handle("POST /api/v1/enquiries/{id}/quote", d.Enquiries.Quote, authed, active, byBusiness("enquiryQuote", 30, time.Minute))
 
 	// analytics & reports
 	handle("GET /api/v1/dashboard", d.Analytics.Dashboard, authed, active)

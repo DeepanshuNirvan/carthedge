@@ -13,6 +13,7 @@ import OrdersPage from './orders/OrdersPage';
 import ProductsPage from './products/ProductsPage';
 import LinksPage from './links/LinksPage';
 import CustomersPage from './customers/CustomersPage';
+import EnquiriesPage from './enquiries/EnquiriesPage';
 import AiDeskPage from './aiDesk/AiDeskPage';
 import InsightsPage from './insights/InsightsPage';
 import BroadcastsPage from './broadcasts/BroadcastsPage';
@@ -71,6 +72,7 @@ export default function AppRoot() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="links" element={<LinksPage />} />
           <Route path="customers" element={<CustomersPage />} />
+          <Route path="enquiries" element={<EnquiriesPage />} />
           <Route
             path="ai"
             element={

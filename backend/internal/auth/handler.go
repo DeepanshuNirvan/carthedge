@@ -9,6 +9,7 @@ import (
 	"carthedge/internal/httpx"
 	"carthedge/internal/middleware"
 	"carthedge/internal/otp"
+	"carthedge/internal/shop"
 )
 
 type Handler struct {
@@ -39,6 +40,13 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	in.Phone = phone
 	if msg := passwordProblem(in.Password); msg != "" {
 		httpx.Err(w, http.StatusBadRequest, msg)
+		return
+	}
+	if in.Sells == "" {
+		in.Sells = "products"
+	}
+	if !shop.ValidSells(in.Sells) {
+		httpx.Err(w, http.StatusBadRequest, "sells must be products, services or both")
 		return
 	}
 	if in.Pincode != "" && !httpx.ValidPincode(in.Pincode) {

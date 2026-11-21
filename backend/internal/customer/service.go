@@ -124,6 +124,8 @@ func (s *Service) Erase(ctx context.Context, bizID, id string) error {
 		{`delete from conversations where business_id=$1 and channel='whatsapp' and contact_id in ($2, '91'||$2)`, []any{bizID, phone}},
 		{`delete from checkout_sessions where business_id=$1 and phone=$2`, []any{bizID, phone}},
 		{`delete from waitlist where business_id=$1 and phone=$2`, []any{bizID, phone}},
+		// what they asked a service business for, with their name and number on it
+		{`delete from enquiries where business_id=$1 and phone=$2`, []any{bizID, phone}},
 	}
 	for _, st := range steps {
 		if _, err := tx.Exec(ctx, st.sql, st.args...); err != nil {

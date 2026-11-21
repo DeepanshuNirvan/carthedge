@@ -129,6 +129,8 @@ func (h *Handler) Practice(w http.ResponseWriter, r *http.Request) {
 		} else {
 			note = "In a real chat this order now waits on your AI desk for one tap."
 		}
+	case ActLead:
+		note = "In a real chat this enquiry now lands on your Enquiries page and you get an alert."
 	case ActHandoff:
 		note = "In a real chat the assistant pauses here and alerts you: " + res.Handoff
 	case ActSilent:

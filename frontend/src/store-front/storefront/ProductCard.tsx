@@ -5,6 +5,7 @@ import type { PublicProduct } from '@/api/types';
 import { useCart } from '@/store/cart';
 import { toast } from '@/store/ui';
 import { MoneyText } from '@/ui/MoneyText';
+import { priceParts } from '@/lib/catalog';
 import { NoPhoto } from '@/ui/NoPhoto';
 
 // The add control is identical whether it opens variants or adds straight to the
@@ -30,6 +31,9 @@ export function ProductCard({
   const discount = listPrice > product.price ? Math.round(((listPrice - product.price) / listPrice) * 100) : 0;
   const hasVariants = product.variants.length > 0;
   const href = `/s/${businessCode}/p/${product.id}`;
+  // a service is enquired about on its own page: nothing to add to a cart here
+  const isService = product.kind === 'service';
+  const price = priceParts(product);
 
   return (
     <motion.article
@@ -55,13 +59,14 @@ export function ProductCard({
             )}
             {!product.inStock && (
               <span className="absolute inset-x-2 bottom-2 rounded-full bg-ink-950/70 py-1.5 text-center text-xs font-semibold text-white backdrop-blur-md">
-                Sold out
+                {isService ? 'Not available now' : 'Sold out'}
               </span>
             )}
           </div>
         </Link>
 
         {product.inStock &&
+          !isService &&
           (hasVariants ? (
             <Link to={href} aria-label={`Choose options for ${product.name}`} className={addBtn}>
               <Plus className="size-[18px]" strokeWidth={2.5} />
@@ -83,8 +88,14 @@ export function ProductCard({
       <Link to={href} className="mt-2.5 block px-0.5">
         <h3 className="line-clamp-2 text-[13.5px] font-medium leading-snug text-hi">{product.name}</h3>
         <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
-          <MoneyText paise={product.price} className="text-[14px] font-semibold text-hi" />
-          {discount > 0 && (
+          {isService ? (
+            <span className="text-[14px] font-semibold text-hi">
+              {price.prefix} <span className="tnum">{price.amount}</span> <span className="text-xs font-normal text-low">{price.unit}</span>
+            </span>
+          ) : (
+            <MoneyText paise={product.price} className="text-[14px] font-semibold text-hi" />
+          )}
+          {!isService && discount > 0 && (
             <>
               <MoneyText paise={listPrice} strike className="text-xs" />
               <span className="text-xs font-semibold text-jade-ink">{discount}% off</span>

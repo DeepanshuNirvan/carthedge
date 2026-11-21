@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { motion, useSpring, useTransform } from 'framer-motion';
 import { useEffect } from 'react';
-import { AlertTriangle, ArrowUpRight, KanbanSquare, Link2, Repeat, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, ClipboardList, KanbanSquare, Link2, Repeat, ShieldCheck } from 'lucide-react';
 import { useDashboard, useSales, useTopProducts } from '@/api/analytics';
 import { useOrders } from '@/api/orders';
+import { useBusiness } from '@/api/business';
+import { useEnquiries } from '@/api/enquiries';
+import { takesEnquiries } from '@/lib/catalog';
 import { useSubscriptionInfo } from '@/api/plans';
 import { useAuth } from '@/store/auth';
 import { formatPaise, formatRupees } from '@/lib/money';
@@ -98,7 +101,24 @@ function RtoMeter() {
 
 function NeedsYou() {
   const { data: dash, isLoading } = useDashboard();
+  const { data: business } = useBusiness();
+  const enquiring = takesEnquiries(business?.sells);
+  const { data: enquiries } = useEnquiries('new', enquiring);
+  const waiting = enquiries?.counts.new ?? 0;
   const rows = [
+    // a business that takes enquiries sees them first: a waiting buyer is asking others too
+    ...(enquiring
+      ? [
+          {
+            to: '/app/enquiries',
+            icon: ClipboardList,
+            label: 'New enquiries',
+            hint: 'Waiting for your reply',
+            value: waiting,
+            tone: waiting > 0 ? 'text-gold-ink' : 'text-hi',
+          },
+        ]
+      : []),
     {
       to: '/app/orders',
       icon: KanbanSquare,
@@ -107,14 +127,19 @@ function NeedsYou() {
       value: dash?.pendingOrders ?? 0,
       tone: 'text-hi',
     },
-    {
-      to: '/app/customers',
-      icon: AlertTriangle,
-      label: 'COD at risk',
-      hint: 'Unconfirmed or flagged',
-      value: dash?.codAtRisk ?? 0,
-      tone: dash && dash.codAtRisk > 0 ? 'text-danger-ink' : 'text-hi',
-    },
+    // nothing is delivered by a services-only business, so nothing is at COD risk
+    ...(business?.sells === 'services'
+      ? []
+      : [
+          {
+            to: '/app/customers',
+            icon: AlertTriangle,
+            label: 'COD at risk',
+            hint: 'Unconfirmed or flagged',
+            value: dash?.codAtRisk ?? 0,
+            tone: dash && dash.codAtRisk > 0 ? 'text-danger-ink' : 'text-hi',
+          },
+        ]),
     {
       to: '/app/customers',
       icon: Repeat,
@@ -252,7 +277,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr]">
         <Card>
           <CardHeader title="Top products" subtitle="By revenue, last 30 days" />
           <div className="p-3 pt-4">

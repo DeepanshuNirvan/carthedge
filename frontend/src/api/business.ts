@@ -21,6 +21,7 @@ export type BusinessUpdate = Partial<
     | 'codEnabled'
     | 'codTokenAmount'
     | 'baselineRtoPercent'
+    | 'sells'
   >
 >;
 

@@ -7,6 +7,7 @@ import { PageLoader } from './ui/PageLoader';
 // each surface is its own lazy bundle — three.js never reaches app/store chunks
 const MarketingHome = lazy(() => import('./marketing/pages/HomePage'));
 const ContactPage = lazy(() => import('./marketing/pages/ContactPage'));
+const ServicesPage = lazy(() => import('./marketing/pages/ServicesPage'));
 const LegalPage = lazy(() => import('./marketing/pages/LegalPage'));
 const AppRoot = lazy(() => import('./app/AppRoot'));
 const AdminRoot = lazy(() => import('./admin/AdminRoot'));
@@ -30,6 +31,7 @@ const wrap = (node: ReactNode) => (
 export const router = createBrowserRouter([
   { path: '/', element: wrap(<MarketingHome />) },
   { path: '/contact', element: wrap(<ContactPage />) },
+  { path: '/services', element: wrap(<ServicesPage />) },
   // linked from the footer, and required before Meta will publish the app
   { path: '/privacy', element: wrap(<LegalPage doc="privacy" />) },
   { path: '/terms', element: wrap(<LegalPage doc="terms" />) },

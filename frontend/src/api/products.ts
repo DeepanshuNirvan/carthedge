@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { del, get, patch, post, put } from './http';
-import type { Offer, Product, ProductInput } from './types';
+import type { ItemKind, Offer, Product, ProductInput } from './types';
 
-type ProductFilters = { search?: string; category?: string; trending?: boolean };
+type ProductFilters = { search?: string; category?: string; trending?: boolean; kind?: ItemKind };
 
 export const useProducts = (filters: ProductFilters = {}) =>
   useQuery({
@@ -11,6 +11,7 @@ export const useProducts = (filters: ProductFilters = {}) =>
       get<{ products: Product[] }>('/api/v1/products', {
         search: filters.search,
         category: filters.category,
+        kind: filters.kind,
         trending: filters.trending ? 'true' : undefined,
       }),
     select: (d) => d.products,
