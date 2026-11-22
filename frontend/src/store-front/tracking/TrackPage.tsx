@@ -85,7 +85,14 @@ function TrackView() {
       toast('success', 'Payment received', 'Your order is confirmed.');
       setOrder(await trackOrder(order.orderCode, phone));
     } catch (err) {
-      toast('error', 'Payment failed', err instanceof Error ? err.message : undefined);
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('already paid')) {
+        // paid earlier but the app closed before it reported back: the server found it
+        toast('success', 'Payment received', 'We found your payment. Your order is confirmed.');
+        setOrder(await trackOrder(order.orderCode, phone).catch(() => order));
+      } else {
+        toast('error', 'Payment failed', msg || undefined);
+      }
     } finally {
       setBusy(false);
     }

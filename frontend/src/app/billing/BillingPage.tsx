@@ -175,7 +175,7 @@ export default function BillingPage() {
         signature: res.razorpay_signature,
       });
       qc.invalidateQueries({ queryKey: ['subscription'] });
-      toast('success', 'Subscription active', 'Welcome aboard. Everything is unlocked.');
+      toast('success', 'Subscription active', 'Your plan is active.');
     } catch (e) {
       toast('error', 'Payment not completed', e instanceof Error ? e.message : undefined);
     } finally {

@@ -26,8 +26,8 @@ export const strand = [
 ];
 
 export const hero = {
-  title: 'Every DM answered.',
-  titleAccent: 'Every order closed in the chat.',
+  title: 'Every DM answered',
+  titleAccent: 'Every order closed in the chat',
   sub: 'CartHedge replies to buyers in their language from your real catalog, collects the order and confirms it. You approve with a tap.',
   ctaPrimary: 'Start free trial',
   ctaSecondary: 'See the automations',
@@ -73,7 +73,7 @@ export const counter = {
 };
 
 export const problem = {
-  title: 'Your inbox has quietly become a full-time job.',
+  title: 'Your inbox has quietly become a full-time job',
   copy: 'The same few questions, hundreds of times a week, often after midnight. Leave a buyer on seen for an hour and they have usually bought somewhere else.',
   pile: [
     { from: 'riya.k', text: 'Price?' },
@@ -91,7 +91,7 @@ export const problem = {
 };
 
 export const autopilot = {
-  title: 'Every automation is a switch you hold.',
+  title: 'Every automation is a switch you hold',
   sub: 'Turn on what you trust. Reply to any chat yourself and the assistant steps back on it.',
   items: [
     {
@@ -157,7 +157,7 @@ export const autopilot = {
 
 // the assistant's settings, played back as a practice chat
 export const voice = {
-  title: 'It sells in your voice, by your rules.',
+  title: 'It sells in your voice, by your rules',
   sub: 'Set the tone once. It quotes your policies, keeps your hours and hands you the chats you choose.',
   store: 'Ritika’s Closet',
   practice: 'Practice chat. Nothing is sent.',
@@ -200,7 +200,7 @@ export const voice = {
 };
 
 export const languages = {
-  title: 'It replies the way your buyers type.',
+  title: 'It replies the way your buyers type',
   sub: 'Hinglish, Hindi, English and regional scripts, answered in the same language and script.',
   lines: [
     'pink wali kurti hai?',
@@ -219,7 +219,7 @@ export const languages = {
 };
 
 export const journey = {
-  title: 'One board for every order, from DM to doorstep.',
+  title: 'One board for every order, from DM to doorstep',
   sub: 'Orders from chats, links and your store land in the same place, and the buyer hears about every step on the chat they came from.',
   columns: [
     { status: 'new', label: 'New', note: 'Order code and payment link sent in the chat' },
@@ -244,7 +244,7 @@ export const aiDemo = {
 };
 
 export const calculator = {
-  title: 'And when COD comes back unopened.',
+  title: 'And when COD comes back unopened',
   sub: 'Re-confirming COD before dispatch is one of the switches above. Put in your numbers to see what it keeps.',
   orders: 'Orders per month',
   aov: 'Average order value',
@@ -258,14 +258,14 @@ export const calculator = {
 
 // the whole shop behind the chat: one desk per job, each with a sample of the real screen
 export const features = {
-  title: 'The whole shop, already built.',
+  title: 'The whole shop, already built',
   sub: 'Catalog, links, orders, returns, GST and reports live in the same app the assistant works from. Open any desk.',
   sample: 'Sample data',
   desks: [
     {
       key: 'catalog',
       label: 'Catalog & stock',
-      lede: 'Every size, colour and photo, with stock that keeps itself honest.',
+      lede: 'Every size, colour and photo, with stock that keeps itself honest',
       items: [
         { title: 'Options that fit the product', copy: 'Up to three groups, like size, colour or finish. Every combination gets its own price, SKU, stock and photos.' },
         { title: 'Stock that counts itself', copy: 'Orders draw it down and sold out shows at zero. Cancellations and received returns put it back.' },
@@ -278,7 +278,7 @@ export const features = {
     {
       key: 'links',
       label: 'Links & storefront',
-      lede: 'One branded link takes the buyer from browsing to paying to tracking.',
+      lede: 'One branded link takes the buyer from browsing to paying to tracking',
       items: [
         { title: 'Product, cart and custom links', copy: 'Send one item or a ready cart, or type any item and price in ten seconds.' },
         { title: 'QR codes and live counts', copy: 'Every link gets a QR code and a WhatsApp share, with clicks and orders counted.' },
@@ -291,7 +291,7 @@ export const features = {
     {
       key: 'orders',
       label: 'Orders & shipping',
-      lede: 'Every source lands on one board, and the busywork comes in bulk.',
+      lede: 'Every source lands on one board, and the busywork comes in bulk',
       items: [
         { title: 'One board for every order', copy: 'Instagram, links, storefront and walk-ins on one kanban, with search, filters and a table view.' },
         { title: 'Bulk actions', copy: 'Select up to 100 orders to change status, print packing slips or a pick list, or cancel.' },
@@ -304,7 +304,7 @@ export const features = {
     {
       key: 'returns',
       label: 'Returns & refunds',
-      lede: 'After-sales that runs on the return rules you set.',
+      lede: 'After-sales that runs on the return rules you set',
       items: [
         { title: 'Requests with photos', copy: 'Buyers ask from their order page with the reason, the pieces and photos.' },
         { title: 'Approve, pick up, receive', copy: 'Each step is one tap, and the buyer hears about every one of them.' },
@@ -317,7 +317,7 @@ export const features = {
     {
       key: 'money',
       label: 'GST & payments',
-      lede: 'Paid into your account, invoiced the way your CA expects.',
+      lede: 'Paid into your account, invoiced the way your CA expects',
       items: [
         { title: 'Real GST invoices', copy: 'Tax invoice or bill of supply, HSN and rate per product, numbered fresh each financial year.' },
         { title: 'CGST and SGST, or IGST', copy: 'Split by the place of supply on the delivery address, with the buyer’s GSTIN for B2B.' },
@@ -330,7 +330,7 @@ export const features = {
     {
       key: 'insights',
       label: 'Insights & reports',
-      lede: 'Numbers in rupees, and what to do about them.',
+      lede: 'Numbers in rupees, and what to do about them',
       items: [
         { title: 'Today at a glance', copy: 'Sales today, month revenue, pending orders, COD at risk and your repeat rate.' },
         { title: 'Money kept from RTO', copy: 'A meter of rupees saved from refused COD this month, against your old refusal rate.' },
@@ -343,7 +343,7 @@ export const features = {
     {
       key: 'security',
       label: 'Security & data',
-      lede: 'Built like it handles money, because it does.',
+      lede: 'Built like it handles money, because it does',
       items: [
         { title: 'Keys kept locked', copy: 'Your Razorpay keys and Instagram connection are stored encrypted, and the connection renews itself.' },
         { title: 'Official Instagram login', copy: 'No password sharing. Every message from Instagram is checked to be genuine. Disconnect anytime.' },
@@ -364,17 +364,17 @@ export const features = {
 };
 
 export const storefrontPreview = {
-  title: 'A shop link buyers trust inside Instagram.',
+  title: 'A shop link buyers trust inside Instagram',
   copy: 'Your logo, your products and your business code in the URL. It opens fast in the Instagram and WhatsApp browsers and checks out with a phone number. No app, no account.',
   notes: ['Phone OTP instead of a password', 'UPI opens GPay or PhonePe directly', 'Track the order at the same link'],
 };
 
 export const pricing = {
-  title: 'Plans that grow with your DMs.',
+  title: 'Plans that grow with your DMs',
   sub: 'Every plan starts with 30 days free. No card to try.',
   replacesLead: 'One plan replaces',
   replaces: ['the DM chatbot', 'the store builder', 'the Google Form', 'the invoice app', 'the Excel sheet', 'the order notebook'],
-  popular: 'Most popular',
+  popular: 'Recommended',
   perMonth: '/month',
   quotaNote: (quota: number, fee: string) => `${quota} orders included, then ${fee} an order`,
   cta: 'Start free trial',
@@ -395,7 +395,7 @@ export const trust = {
 };
 
 export const guides = {
-  title: 'Live by tonight.',
+  title: 'Live by tonight',
   steps: [
     { title: 'Create your business', copy: 'Name, WhatsApp and Instagram. Your trial starts at once.' },
     { title: 'Add your products', copy: 'One by one or a bulk CSV, with variants, reseller prices and photos.' },
@@ -449,14 +449,14 @@ export const services = {
       'Sell a service, not a parcel? CartHedge answers every Instagram and WhatsApp enquiry from your own details, collects what you need to quote, and hands you the enquiry. For trips, events, bookings, transport, classes and more.',
   },
   hero: {
-    title: 'Every enquiry answered.',
-    titleAccent: 'Every detail collected before you pick up the phone.',
+    title: 'Every enquiry answered',
+    titleAccent: 'Every detail collected before you pick up the phone',
     sub: "For businesses that sell a service, not a parcel. CartHedge replies in the buyer's language from your own details, asks what you need to know, and hands you the enquiry ready to quote.",
     ctaPrimary: 'Start free trial',
     ctaSecondary: 'Watch a chat',
   },
   demo: {
-    title: 'One assistant. Whatever you do.',
+    title: 'One assistant, whatever you do',
     sub: 'You choose the questions. It asks them the way you would, then writes the enquiry down for you.',
     cardTitle: 'New enquiry',
     cardMeta: 'Written down by CartHedge, not typed by you',
@@ -544,7 +544,7 @@ export const services = {
     ],
   },
   steps: {
-    title: 'Set up in an evening.',
+    title: 'Set up in an evening',
     items: [
       { title: 'List what you do', copy: 'Each service with its details: what is included, how long, where. A fixed price, a starting price, or price on request.' },
       { title: 'Choose what to ask', copy: 'The date, the place, how many people. Your questions, in your words, for each service.' },
@@ -553,7 +553,7 @@ export const services = {
     ],
   },
   never: {
-    title: 'What it will not do.',
+    title: 'What it will not do',
     sub: 'An assistant that guesses loses you customers. This one is built to stop and hand over.',
     items: [
       { title: 'Confirm a date or a slot', copy: 'Only you know your calendar. It notes the date and tells the buyer you will confirm it.' },
@@ -563,7 +563,7 @@ export const services = {
     ],
   },
   fits: {
-    title: 'If people message you to ask "kitna lagega?", it fits.',
+    title: 'If people message you to ask "kitna lagega?", it fits',
     copy: 'Travel and trip planners, event and wedding decorators, photographers, makeup artists, salons, tutors and coaching, movers and transport, caterers, rentals, repairs and home services. If you also sell products, orders and enquiries run side by side in one app.',
   },
   faqTitle: 'Questions service businesses ask',
@@ -576,7 +576,7 @@ export const services = {
     { q: 'What if the buyer asks something I never wrote down?', a: 'The assistant says the business will check and get back, and hands the chat to you when it needs a person. It answers only from what you entered.' },
   ],
   final: {
-    title: 'A slow reply sends the enquiry to someone else.',
+    title: 'A slow reply sends the enquiry to someone else',
     sub: '30 days free. Set up in an evening. Cancel anytime.',
     cta: 'Start free trial',
   },
@@ -588,7 +588,7 @@ export const services = {
 };
 
 export const finalCta = {
-  title: 'The stall stays open. Even at 2 a.m.',
+  title: 'The stall stays open, even at 2 a.m.',
   sub: '30 days free. Set up in an evening. Cancel anytime.',
   cta: 'Start free trial',
 };

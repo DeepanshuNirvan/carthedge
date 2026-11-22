@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion, useSpring, useTransform } from 'framer-motion';
 import { useEffect } from 'react';
 import { AlertTriangle, ArrowUpRight, ClipboardList, KanbanSquare, Link2, Repeat, ShieldCheck } from 'lucide-react';
-import { useDashboard, useSales, useTopProducts } from '@/api/analytics';
+import { minCodOutcomes, useDashboard, useSales, useTopProducts } from '@/api/analytics';
 import { useOrders } from '@/api/orders';
 import { useBusiness } from '@/api/business';
 import { useEnquiries } from '@/api/enquiries';
@@ -28,14 +28,6 @@ function Rupees({ paise, whole }: { paise: number; whole?: boolean }) {
   const text = useTransform(spring, (v) => (whole ? formatRupees(v) : formatPaise(Math.round(v))));
   return <motion.span className="tnum">{text}</motion.span>;
 }
-
-const greeting = () => {
-  const h = new Date().getHours();
-  return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-};
-
-/** Below this many settled COD orders the rate is noise, not a trend. */
-const minCodOutcomes = 5;
 
 /** Money kept from refused COD deliveries this month, with the rate against baseline. */
 function RtoMeter() {
@@ -194,8 +186,8 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
-        title={`${greeting()}${businessName ? `, ${businessName}` : ''}`}
-        subtitle={today}
+        title="Today"
+        subtitle={businessName ? `${today} · ${businessName}` : today}
         actions={
           <>
             <Link to="/app/links" className={buttonLink('secondary')}>

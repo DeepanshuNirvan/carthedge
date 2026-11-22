@@ -15,7 +15,7 @@ import { Sheet } from '@/ui/Modal';
 import { Button } from '@/ui/Button';
 import { Field, Input, Select } from '@/ui/Input';
 import { MoneyText } from '@/ui/MoneyText';
-import { StatusChip } from '@/ui/Badge';
+import { StatusChip, statusName } from '@/ui/Badge';
 import { SkeletonRows } from '@/ui/Skeleton';
 import { whatsappHref } from '@/lib/validators';
 import { formatPaise } from '@/lib/money';
@@ -318,11 +318,11 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
                   onChange={(e) => setNextStatus(e.target.value === order.status ? '' : (e.target.value as OrderStatus))}
                 >
                   <option value={order.status}>
-                    {order.status} {order.nextStatuses?.length ? '(current)' : '(final)'}
+                    {statusName(order.status)} {order.nextStatuses?.length ? '(current)' : '(final)'}
                   </option>
                   {(order.nextStatuses ?? orderStatuses.filter((s) => s !== order.status)).map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {statusName(s)}
                     </option>
                   ))}
                 </Select>

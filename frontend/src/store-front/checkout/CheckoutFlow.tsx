@@ -464,7 +464,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   <button
                     onClick={() => setMethod('prepaid')}
                     className={cn(
-                      'flex min-h-16 items-center gap-3 rounded-lg p-4 text-left transition-all duration-micro ease-spring active:scale-[0.99]',
+                      'flex min-h-16 items-center gap-3 rounded-lg p-4 text-left transition duration-micro ease-spring active:scale-[0.99]',
                       method === 'prepaid' ? 'bg-jade-500/10 shadow-[inset_0_0_0_1.5px_rgb(var(--jade-500))]' : 'neu',
                     )}
                   >
@@ -497,7 +497,7 @@ export function CheckoutFlow({ ctx, onDone }: { ctx: CheckoutContext; onDone: ()
                   <button
                     onClick={() => setMethod('cod')}
                     className={cn(
-                      'flex min-h-16 items-center gap-3 rounded-lg p-4 text-left transition-all duration-micro ease-spring active:scale-[0.99]',
+                      'flex min-h-16 items-center gap-3 rounded-lg p-4 text-left transition duration-micro ease-spring active:scale-[0.99]',
                       method === 'cod' ? 'bg-gold-400/10 shadow-[inset_0_0_0_1.5px_rgb(var(--gold-400))]' : 'neu',
                     )}
                   >

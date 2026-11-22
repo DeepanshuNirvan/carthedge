@@ -52,11 +52,8 @@ export function ServiceChat() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr] lg:gap-4">
-        <div className="relative flex items-center justify-center overflow-hidden rounded-2xl p-4 shadow-float sm:p-10">
-          <img src="/demo/aurora-texture.webp" alt="" aria-hidden loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
-          <div aria-hidden className="absolute inset-0 bg-bg/55" />
-
-          <div className="glass sheen relative w-full max-w-md rounded-xl">
+        <div className="stage-lit hairline relative flex items-center justify-center overflow-hidden rounded-2xl p-4 sm:p-10">
+          <div className="panel relative w-full max-w-md rounded-xl">
             <div className="flex items-center gap-2.5 border-b px-4 py-3">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-jade-500/15 text-caption font-semibold text-jade-ink">
                 {initials(chat.business)}

@@ -14,7 +14,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
               <span
                 aria-current={active ? 'step' : undefined}
                 className={cn(
-                  'flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tnum transition-all duration-std ease-spring',
+                  'flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tnum transition duration-std ease-spring',
                   done && 'bg-jade-500 text-[rgb(var(--text-on-accent))] clay',
                   active &&
                     'bg-bulb text-ink-950 shadow-[0_0_0_4px_rgb(var(--bulb)/0.18),0_4px_14px_-2px_rgb(var(--bulb)/0.6)]',

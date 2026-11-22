@@ -265,6 +265,14 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*Tokens, er
 	if revoked, err := s.rdb.Get(ctx, middleware.RevokedKey(bizID)).Int64(); err == nil && issued < revoked {
 		return nil, ErrBadRefresh
 	}
+	// the same gate as Login: a suspended (or purged) account stops renewing
+	// its session instead of living on through refreshes
+	// (a database blip is not a reason to sign everyone out: only a real answer refuses)
+	var status string
+	err = s.pool.QueryRow(ctx, `select status from businesses where id=$1`, bizID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && status != "active" && status != "deleted") {
+		return nil, ErrBadRefresh
+	}
 	return s.issueTokens(ctx, bizID, code)
 }
 

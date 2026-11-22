@@ -58,7 +58,7 @@ The DM stays the shop. Competitors move the buyer off to a website; CartHedge wo
 
 ## Evidence on Hand
 
-- Product photography: `frontend/public/demo/*.webp` (kurti, jhumka, juttis, cushion, chikankari, auth-seller, aurora-texture).
+- Product photography: `frontend/public/demo/*.webp` (kurti, jhumka, juttis, cushion, chikankari, auth-seller).
 - Marketing stats, testimonials and FAQs come from `site_settings` via `/api/v1/site`. The fallback copy lives in `frontend/src/strings/marketing.ts`; those testimonials are seed content, not verified customer quotes.
 - Plan prices are live from `/api/v1/plans`.
 - No real customer logos, press, or measured benchmarks exist. Don't invent any.

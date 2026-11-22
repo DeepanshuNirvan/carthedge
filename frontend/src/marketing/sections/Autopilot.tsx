@@ -95,18 +95,8 @@ export function Autopilot() {
       <SectionHead title={autopilot.title} sub={autopilot.sub} />
 
       <Reveal>
-        {/* the wallpaper: real glass on a dark ground, so the tiles above it are real glass too */}
-        <div className="relative overflow-hidden rounded-2xl p-2.5 shadow-float sm:p-3.5">
-          <img
-            src="/demo/aurora-texture.webp"
-            alt=""
-            aria-hidden
-            loading="lazy"
-            decoding="async"
-            className="absolute inset-0 size-full scale-110 object-cover"
-          />
-          <div aria-hidden className="absolute inset-0 bg-bg/45" />
-
+        {/* the control centre sits on the same lit stage as the desks below: switches on a counter, not glass on a wallpaper */}
+        <div className="stage-lit hairline relative overflow-hidden rounded-2xl p-2.5 sm:p-3.5">
           <div className="relative grid gap-2.5 sm:grid-cols-2 sm:gap-3.5 lg:auto-rows-[minmax(11.5rem,auto)] lg:grid-cols-4">
             {autopilot.items.map((item) => {
               const Icon = icons[item.key as Key];
@@ -115,7 +105,7 @@ export function Autopilot() {
                 <article
                   key={item.key}
                   className={cn(
-                    'glass sheen flex flex-col rounded-xl p-4 transition-[background-color,box-shadow] duration-expr sm:p-5',
+                    'panel flex flex-col rounded-xl p-4 transition-[background-color,box-shadow] duration-expr sm:p-5',
                     span[item.key],
                     on && 'bg-gradient-to-b from-jade-500/13 to-transparent to-70%',
                   )}

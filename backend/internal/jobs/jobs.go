@@ -37,6 +37,10 @@ type Extra struct {
 	PurgeDeleted func(ctx context.Context) (int, error)
 	BillOverage  func(ctx context.Context) (int, error)
 	HasFeature   func(ctx context.Context, bizID, feature string) bool
+	// SettlePayments books buyer payments whose checkout callback never came;
+	// ExpireUnpaid then cancels online orders nobody paid for
+	SettlePayments func(ctx context.Context) (int, error)
+	ExpireUnpaid   func(ctx context.Context) (int, error)
 }
 
 func New(pool *pgxpool.Pool, rdb *redis.Client, orders *order.Service, n *notify.Notifier, log *slog.Logger, baseURL string, extra Extra) *Runner {
@@ -79,6 +83,8 @@ func (r *Runner) runOnce(ctx context.Context) {
 		name string
 		run  func(context.Context) (int, error)
 	}{
+		{"settlePayments", r.extra.SettlePayments},
+		{"expireUnpaid", r.extra.ExpireUnpaid},
 		{"remindAbandoned", func(ctx context.Context) (int, error) { return r.orders.RemindAbandoned(ctx, r.extra.HasFeature) }},
 		{"billOverage", r.extra.BillOverage},
 		{"purgeDeleted", r.extra.PurgeDeleted},

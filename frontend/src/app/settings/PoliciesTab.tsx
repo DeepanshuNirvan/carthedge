@@ -65,7 +65,7 @@ export function PoliciesTab() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <NumberField
                   label="Days after delivery"
-                  hint="0 keeps returns off — buyers message you instead"
+                  hint="0 keeps returns off. Buyers message you instead"
                   value={returns.windowDays}
                   max={90}
                   onChange={(windowDays) => setReturns({ windowDays })}

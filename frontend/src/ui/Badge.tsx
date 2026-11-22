@@ -65,6 +65,11 @@ const statusTones: Record<string, Tone> = {
 
 const statusLabels: Record<string, string> = { rto: 'RTO', claimed: 'payment reported' };
 const labelOf = (s: string) => statusLabels[s] ?? s.replace(/_/g, ' ');
+/** A status as a sentence-case word, for plain text such as select options. */
+export const statusName = (s: string) => {
+  const l = labelOf(s);
+  return l.charAt(0).toUpperCase() + l.slice(1);
+};
 
 /**
  * Status pill that shows its own history: when the status changes, the old

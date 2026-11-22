@@ -215,7 +215,7 @@ export default function StorePage() {
             <button
               onClick={() => setCategory('')}
               className={cn(
-                'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95 sm:min-h-8',
+                'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition duration-micro ease-spring active:scale-95 sm:min-h-8',
                 category === ''
                   ? 'bg-hi text-bg'
                   : 'neu text-mid hover:text-hi',
@@ -228,7 +228,7 @@ export default function StorePage() {
                 key={c}
                 onClick={() => setCategory(c === category ? '' : c)}
                 className={cn(
-                  'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-micro ease-spring active:scale-95 sm:min-h-8',
+                  'inline-flex min-h-10 shrink-0 items-center justify-center rounded-full px-4 py-2 text-xs font-semibold transition duration-micro ease-spring active:scale-95 sm:min-h-8',
                   category === c
                     ? 'bg-hi text-bg'
                     : 'neu text-mid hover:text-hi',

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"carthedge/internal/config"
 	"carthedge/internal/httpx"
@@ -97,6 +98,11 @@ func (s *Service) BuyerCheckout(ctx context.Context, orderCode, kind string) (*C
 		return nil, errors.New("order not found")
 	}
 	if paymentStatus == "paid" || paymentStatus == "token_paid" {
+		return nil, errors.New("order is already paid")
+	}
+	// a buyer back on the page after paying (the in-app browser closed before
+	// the callback) must find the payment, not be charged a second time
+	if n, _ := s.SettlePending(ctx, orderID); n > 0 {
 		return nil, errors.New("order is already paid")
 	}
 	if closedStatuses[status] {
@@ -221,6 +227,113 @@ func (s *Service) VerifyBuyer(ctx context.Context, rzpOrderID, rzpPaymentID, sig
 		return nil
 	}
 	return s.orders.MarkPaid(ctx, orderID, kind)
+}
+
+// SettlePending asks Razorpay about buyer checkouts that never reported back —
+// the Instagram or WhatsApp browser closed between paying and the callback —
+// and books every captured one exactly as VerifyBuyer would. Buyer money lands
+// in the seller's own account, whose webhooks never reach the platform, so
+// this is the only safety net for those payments. orderID "" sweeps the
+// recent ones, least recently checked first; otherwise only that order's.
+// The error reports a payment that could not be checked, so nothing is
+// treated as unpaid on a guess.
+func (s *Service) SettlePending(ctx context.Context, orderID string) (int, error) {
+	rows, err := s.pool.Query(ctx, `select p.id, p.order_id, p.kind, p.razorpay_order_id, p.amount,
+		b.razorpay_key_id, b.razorpay_key_secret
+		from payments p join businesses b on b.id = p.business_id
+		where p.kind in ('order','token') and p.status <> 'paid' and p.razorpay_order_id <> ''
+		and p.order_id is not null and b.razorpay_key_id <> ''
+		and ($1 = '' and p.created_at between now() - interval '3 days' and now() - interval '2 minutes'
+			or p.order_id::text = $1)
+		order by p.updated_at limit 100`, orderID)
+	if err != nil {
+		return 0, err
+	}
+	type open struct {
+		id, orderID, kind, rzpOrderID, keyID, secretEnc string
+		amount                                          int
+	}
+	var list []open
+	for rows.Next() {
+		var o open
+		if rows.Scan(&o.id, &o.orderID, &o.kind, &o.rzpOrderID, &o.amount, &o.keyID, &o.secretEnc) == nil {
+			list = append(list, o)
+		}
+	}
+	rows.Close()
+	settled := 0
+	var unchecked error
+	for _, o := range list {
+		secret, err := s.cipher.Decrypt(o.secretEnc)
+		if err != nil || secret == "" {
+			unchecked = errors.New("seller keys unreadable")
+			continue
+		}
+		attempts, err := NewClient(o.keyID, secret).OrderPayments(ctx, o.rzpOrderID)
+		if err != nil {
+			s.log.Warn("razorpay payment lookup failed", "razorpayOrderId", o.rzpOrderID, "err", err)
+			unchecked = err
+			continue
+		}
+		// checked: the next sweep starts with the rows it has not looked at
+		s.pool.Exec(ctx, `update payments set updated_at=now() where id=$1 and status<>'paid'`, o.id)
+		for _, a := range attempts {
+			if a.Status != "captured" || a.Amount < o.amount {
+				continue
+			}
+			ct, err := s.pool.Exec(ctx, `update payments set status='paid', razorpay_payment_id=$2, updated_at=now()
+				where id=$1 and status<>'paid'`, o.id, a.ID)
+			if err != nil || ct.RowsAffected() == 0 {
+				break
+			}
+			if err := s.orders.MarkPaid(ctx, o.orderID, o.kind); err != nil {
+				s.log.Error("settle markPaid failed", "orderId", o.orderID, "err", err)
+			}
+			settled++
+			break
+		}
+	}
+	return settled, unchecked
+}
+
+// unpaidAfter is how long an online-payment order may wait for its money
+// before it is cancelled and its pieces go back on sale.
+const unpaidAfter = 48 * time.Hour
+
+// ExpireUnpaid cancels online-payment orders nobody paid for, so abandoned
+// checkouts stop holding stock. Only sellers with a Razorpay gateway: there
+// Razorpay is asked first and is the final word. A seller paid by plain UPI
+// checks their own bank, so those orders stay for them to decide.
+func (s *Service) ExpireUnpaid(ctx context.Context) (int, error) {
+	rows, err := s.pool.Query(ctx, `select o.id, o.business_id from orders o join businesses b on b.id = o.business_id
+		where o.status='new' and o.payment_method='prepaid' and o.payment_status in ('pending','failed')
+		and o.source <> 'manual' and o.replacement_of is null and b.razorpay_key_id <> ''
+		and o.created_at < now() - make_interval(secs => $1)
+		order by o.created_at limit 50`, unpaidAfter.Seconds())
+	if err != nil {
+		return 0, err
+	}
+	type due struct{ id, bizID string }
+	var list []due
+	for rows.Next() {
+		var d due
+		if rows.Scan(&d.id, &d.bizID) == nil {
+			list = append(list, d)
+		}
+	}
+	rows.Close()
+	cancelled := 0
+	for _, d := range list {
+		// paid after all: booked here instead of cancelled; and when Razorpay
+		// could not be asked, nothing is cancelled on a guess
+		if n, err := s.SettlePending(ctx, d.id); n > 0 || err != nil {
+			continue
+		}
+		if _, err := s.orders.SetStatus(ctx, d.bizID, d.id, "cancelled", "payment not completed within 48 hours"); err == nil {
+			cancelled++
+		}
+	}
+	return cancelled, nil
 }
 
 // ConfirmUpi is the seller's authed verdict on a buyer-claimed UPI transfer.

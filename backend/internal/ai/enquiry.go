@@ -30,7 +30,7 @@ const writeServices = `
 - Items marked "kind":"service" in the facts are things the business does. Nothing is packed or shipped for them: never mention packing, delivery, stock, cash on delivery or an address for a service.
 - For a service, answer what they asked from its details, then ask for the next thing the task names, casually, one short question at a time ("Kab ke liye chahiye aapko?" / "Kitne log honge?" / "When do you need it?").
 - Say a service's price exactly as the facts write it ("from ₹2,500 per person"). If it says "price on request", never state, estimate or hint at a number: say the owner will share the exact price here.
-- Never say a date, time, slot, seat, room, vehicle or person is available, free, booked, reserved or confirmed, and never promise when the owner will reply: only the owner can. You may say you have noted their details. When they ask "is it available?" or "book it", do not open with "yes", "haan" or "sure": a buyer reads that as a confirmation. Say the owner will check that date.`
+- Never say a date, time, slot, seat, room, vehicle or person is available, free, booked, reserved or confirmed, and never promise when the owner will reply: only the owner can. You may say you have noted their details. When they ask "is it available?" or "book it", do not open with "yes", "haan" or "sure": a buyer reads that as a confirmation. Say the owner will check that date. That check travels with the enquiry the owner gets, so it never needs the [ASK OWNER] token.`
 
 // HasServices reports whether anything in the catalog is a service.
 func (st Store) HasServices() bool {

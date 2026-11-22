@@ -209,7 +209,7 @@ function ProfileCard() {
               <Field label="Who answers during business hours">
                 <Select value={draft.replyWhen} onChange={(e) => update({ replyWhen: e.target.value as AiProfile['replyWhen'] })}>
                   <option value="">The assistant, all day</option>
-                  <option value="closed">Me — the assistant covers only after hours</option>
+                  <option value="closed">Me, the assistant covers only after hours</option>
                 </Select>
               </Field>
               <Field label="Away message" optional hint="Sent once per chat when you are closed and the assistant is not replying">

@@ -578,9 +578,11 @@ func (s *Service) ConfirmCod(ctx context.Context, code, token string) error {
 	var orderID, bizID string
 	err = s.pool.QueryRow(ctx, `update orders set cod_confirmed_at = now(),
 		status = case when status='new' then 'confirmed' else status end, updated_at = now()
-		where order_code=$1 and payment_method='cod' returning id, business_id`, code).Scan(&orderID, &bizID)
+		where order_code=$1 and payment_method='cod' and status in ('new','confirmed','packed')
+		returning id, business_id`, code).Scan(&orderID, &bizID)
 	if err != nil {
-		return ErrNotFound
+		// a cancelled (or already shipped) order has nothing left to confirm
+		return errors.New("this order can no longer be confirmed here")
 	}
 	s.rdb.Del(ctx, "codconfirm:"+code)
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed','buyer confirmed COD order')`, orderID)
@@ -660,28 +662,64 @@ func (s *Service) publishOrder(ctx context.Context, bizID, orderID, kind string)
 
 // MarkPaid records a captured payment; kind is "order" (full) or "token" (COD token).
 func (s *Service) MarkPaid(ctx context.Context, orderID, kind string) error {
+	// settles an order once: a second captured payment (two checkout tabs) or a
+	// late one on a refunded order must not rewrite what the order already says
 	var q string
 	if kind == "token" {
 		q = `update orders set payment_status='token_paid', cod_confirmed_at=now(),
 			status = case when status='new' then 'confirmed' else status end, updated_at=now()
-			where id=$1 returning order_code, business_id, (select phone from customers where id = orders.customer_id), coalesce(conversation_id::text, '')`
+			where id=$1 and payment_status in ('pending','failed','claimed')
+			returning order_code, business_id, (select phone from customers where id = orders.customer_id), coalesce(conversation_id::text, ''), status`
 	} else {
 		q = `update orders set payment_status='paid',
 			status = case when status='new' then 'confirmed' else status end, updated_at=now()
-			where id=$1 returning order_code, business_id, (select phone from customers where id = orders.customer_id), coalesce(conversation_id::text, '')`
+			where id=$1 and payment_status in ('pending','failed','claimed','token_paid')
+			returning order_code, business_id, (select phone from customers where id = orders.customer_id), coalesce(conversation_id::text, ''), status`
 	}
-	var code, bizID, phone, convID string
-	if err := s.pool.QueryRow(ctx, q, orderID).Scan(&code, &bizID, &phone, &convID); err != nil {
-		return ErrNotFound
+	var code, bizID, phone, convID, status string
+	err := s.pool.QueryRow(ctx, q, orderID).Scan(&code, &bizID, &phone, &convID, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// the money came in all the same: the seller has to send one back
+		if s.pool.QueryRow(ctx, `select order_code, business_id from orders where id=$1`, orderID).Scan(&code, &bizID) != nil {
+			return ErrNotFound
+		}
+		s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'payment','a second payment came in for this order')`, orderID)
+		s.alerts.Seller(bizID, alert.Alert{Kind: "duplicatePayment", Title: "Paid twice · " + code,
+			Body: "The buyer completed a second payment for order " + code + ". Refund the extra one from your Razorpay dashboard.",
+			Path: "/app/orders?order=" + orderID})
+		return nil
+	}
+	if err != nil {
+		return err
 	}
 	note := "payment received"
 	if kind == "token" {
 		note = "COD token payment received"
 	}
+	if status == "cancelled" || status == "rto" {
+		// paid after the order closed (the checkout was already open): the
+		// money is owed back, never "we are packing it"
+		s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,$2,$3)`, orderID, status, note+" after the order was closed")
+		if s.onClose != nil {
+			s.onClose(ctx, bizID, orderID, "cancelled")
+		}
+		s.TellBuyer("paid", bizID, convID, phone, fmt.Sprintf("We received your payment for order %s, but this order was already cancelled. %s will refund it to you.", code, s.storeName(ctx, bizID)))
+		s.publishOrder(ctx, bizID, orderID, "orderPaid")
+		return nil
+	}
 	s.pool.Exec(ctx, `insert into order_events (order_id, status, note) values ($1,'confirmed',$2)`, orderID, note)
 	s.TellBuyer("paid", bizID, convID, phone, fmt.Sprintf("Payment received for order %s. We are packing it! Track: %s", code, s.trackURL(code)))
 	s.publishOrder(ctx, bizID, orderID, "orderPaid")
 	return nil
+}
+
+// storeName is the seller's name for a buyer message, or a plain stand-in.
+func (s *Service) storeName(ctx context.Context, bizID string) string {
+	var name string
+	if s.pool.QueryRow(ctx, `select name from businesses where id=$1`, bizID).Scan(&name) != nil || name == "" {
+		return "The shop"
+	}
+	return name
 }
 
 // NotifyUpiClaim tells the seller a buyer says they have transferred to the
@@ -1032,6 +1070,11 @@ func (s *Service) RemindAbandoned(ctx context.Context, can func(ctx context.Cont
 		return 0, err
 	}
 	if !s.notify.OffersOn() {
+		return 0, nil
+	}
+	// a reminder is a shop's nudge, not a 2 a.m. ping: the 1–24 hour window
+	// always holds a daytime hour, India time
+	if h := time.Now().In(shop.IST).Hour(); h < 10 || h >= 20 {
 		return 0, nil
 	}
 	rows, err := s.pool.Query(ctx, `update checkout_sessions cs set reminded_at=now()

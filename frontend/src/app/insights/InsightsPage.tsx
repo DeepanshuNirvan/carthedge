@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowUpRight, Clock3, Hourglass, Repeat, ShieldCheck, TrendingUp } from 'lucide-react';
-import { useDashboard, useInsights } from '@/api/analytics';
+import { minCodOutcomes, useDashboard, useInsights } from '@/api/analytics';
 import { PageHeader } from '../shell/PageHeader';
 import { MoneyText } from '@/ui/MoneyText';
 import { Skeleton } from '@/ui/Skeleton';
@@ -91,11 +91,19 @@ export default function InsightsPage() {
         </InsightCard>
 
         <InsightCard icon={<ShieldCheck className="size-5" />} tone="jade" title="RTO defence" action={{ to: '/app/orders', label: 'See the board' }}>
-          {meter && meter.codOutcomes > 0 ? (
+          {meter && meter.codOutcomes > 0 && meter.codOutcomes < minCodOutcomes ? (
+            `${meter.codOutcomes} of ${minCodOutcomes} COD deliveries settled this month. Your refusal rate shows once there is enough to trust.`
+          ) : meter && meter.codOutcomes > 0 ? (
             <>
-              Your COD refusal rate is <span className="font-medium text-hi">{meter.actualPercent}%</span> against a{' '}
-              {meter.baselinePercent}% baseline, that's <MoneyText paise={meter.savedThisMonth} compact /> protected this
-              month.
+              Your COD refusal rate is <span className="font-medium text-hi">{meter.actualPercent}%</span>
+              {meter.actualPercent <= meter.baselinePercent ? (
+                <>
+                  {' '}against a {meter.baselinePercent}% baseline, that's <MoneyText paise={meter.savedThisMonth} compact /> kept
+                  this month.
+                </>
+              ) : (
+                <>, above your {meter.baselinePercent}% baseline. Ask buyers with a refusal on record for a UPI token before you ship.</>
+              )}
               {insights?.rtoTrend?.lastMonthPercent !== undefined && (
                 <>
                   {' '}

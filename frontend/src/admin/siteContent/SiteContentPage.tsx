@@ -201,8 +201,8 @@ export default function SiteContentPage() {
         <Card className="lg:col-span-2">
           <CardHeader title="Social links" subtitle="Shown in the site footer" />
           <div className="grid gap-4 p-5 pt-4 sm:grid-cols-2 lg:grid-cols-4">
-            {(['instagram', 'twitter', 'linkedin', 'youtube'] as const).map((key) => (
-              <Field key={key} label={key[0].toUpperCase() + key.slice(1)} optional>
+            {([['instagram', 'Instagram'], ['twitter', 'X (Twitter)'], ['linkedin', 'LinkedIn'], ['youtube', 'YouTube']] as const).map(([key, label]) => (
+              <Field key={key} label={label} optional>
                 <Input
                   placeholder="https://…"
                   value={form.social[key]}

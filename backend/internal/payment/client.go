@@ -31,37 +31,28 @@ func (c *Client) KeyID() string { return c.keyID }
 
 // CreateOrder creates a Razorpay order; amount in paise.
 func (c *Client) CreateOrder(ctx context.Context, amount int, receipt string, notes map[string]string) (string, error) {
-	if !c.Configured() {
-		return "", fmt.Errorf("razorpay keys not configured")
-	}
-	body, _ := json.Marshal(map[string]any{
-		"amount":   amount,
-		"currency": "INR",
-		"receipt":  receipt,
-		"notes":    notes,
-	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.razorpay.com/v1/orders", bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	req.SetBasicAuth(c.keyID, c.keySecret)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.hc.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("razorpay order create failed: %s", raw)
-	}
 	var out struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(raw, &out); err != nil || out.ID == "" {
+	if err := c.call(ctx, http.MethodPost, "/orders", map[string]any{
+		"amount": amount, "currency": "INR", "receipt": receipt, "notes": notes,
+	}, &out); err != nil {
+		return "", err
+	}
+	if out.ID == "" {
 		return "", fmt.Errorf("razorpay returned unexpected response")
 	}
 	return out.ID, nil
+}
+
+// OrderPayments is every payment attempt Razorpay holds on one of its orders —
+// how a checkout whose callback never reached us is found and settled.
+func (c *Client) OrderPayments(ctx context.Context, rzpOrderID string) ([]Payment, error) {
+	var out struct {
+		Items []Payment `json:"items"`
+	}
+	err := c.call(ctx, http.MethodGet, "/orders/"+rzpOrderID+"/payments", nil, &out)
+	return out.Items, err
 }
 
 // Refund returns money on a captured payment (amount in paise). Razorpay
@@ -226,7 +217,7 @@ var ErrBadKeys = errors.New("razorpay rejected the keys")
 // Verify checks the key pair with Razorpay, so a typo is caught when the
 // seller saves it instead of on a buyer's checkout.
 func (c *Client) Verify(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.razorpay.com/v1/orders?count=1", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+"/orders?count=1", nil)
 	if err != nil {
 		return err
 	}

@@ -277,6 +277,8 @@ func (s *Service) BillOverage(ctx context.Context) (int, error) {
 		}
 		if err := s.platform.AddAddon(ctx, d.subID, fmt.Sprintf("%d orders above the plan quota", orders), fee); err != nil {
 			s.log.Error("overage addon failed", "businessId", d.bizID, "fee", notify.Rupees(fee), "err", err)
+			// not billed after all: the next tick tries again while the window lasts
+			s.pool.Exec(ctx, `update subscriptions set overage_billed_at=null where business_id=$1`, d.bizID)
 			continue
 		}
 		billed++

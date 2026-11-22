@@ -30,6 +30,8 @@ const (
 	// a buyer who went quiet mid-order gets one follow-up in this window
 	nudgeAfter  = 4 * time.Hour
 	nudgeBefore = 22 * time.Hour
+	// follow-ups go out only in daytime hours, India time
+	nudgeFrom, nudgeUntil = 10, 20
 )
 
 var (
@@ -195,6 +197,10 @@ func (s *Service) converse(ctx context.Context, c dueConv, autoOrder, nudge bool
 		// picked back up by the assistant just because nobody answered
 		s.pool.Exec(ctx, `update conversations set ai_paused_until=now() + interval '100 years' where id=$1`, c.id)
 		s.alertOwner(ctx, c, res.Handoff)
+	default:
+		if res.AskOwner {
+			s.askOwner(ctx, c)
+		}
 	}
 	// a buyer backing out while their order waits for the seller's tap must
 	// not leave a draft the seller could still confirm
@@ -452,6 +458,11 @@ func (s *Service) SetAIPaused(ctx context.Context, bizID, convID string, paused 
 // nudgeQuiet sends one gentle follow-up to buyers who stopped mid-order,
 // while the messaging window is still open.
 func (s *Service) nudgeQuiet(ctx context.Context) {
+	// a follow-up is a shopkeeper checking in, never a ping at 3 a.m.: buyers
+	// who went quiet late in the evening hear from the shop the next morning
+	if h := time.Now().In(shop.IST).Hour(); h < nudgeFrom || h >= nudgeUntil {
+		return
+	}
 	// claimed by stamping nudged_at up front, so two instances never both
 	// follow up with the same buyer
 	rows, err := s.pool.Query(ctx, `update conversations set nudged_at=now()
@@ -504,6 +515,22 @@ func (s *Service) sellerAnswering(ctx context.Context, bizID string) bool {
 	var p shop.AIProfile
 	json.Unmarshal(raw, &p)
 	return p.ReplyWhen == "closed" && p.Hours.OpenAt(time.Now())
+}
+
+// askOwner tells the seller the assistant promised a buyer the shop would
+// check something it had no answer for. The assistant keeps the chat; only
+// that one answer is the owner's.
+func (s *Service) askOwner(ctx context.Context, c dueConv) {
+	var contact string
+	if err := s.pool.QueryRow(ctx, `select coalesce(nullif(contact_name,''), contact_id) from conversations where id=$1`,
+		c.id).Scan(&contact); err != nil {
+		return
+	}
+	s.bus.Publish(ctx, c.biz, "chatNeedsSeller", httpx.M{"conversationId": c.id, "reason": "They asked something only you can answer. Open the AI desk to reply."})
+	s.alerts.Seller(c.biz, alert.Alert{Kind: "chatQuestion",
+		Title: "A buyer is waiting for your answer on " + c.channel,
+		Body:  contact + " asked something your catalog and settings do not cover, and was told you would check. Reply from the AI desk.",
+		Path:  "/app/ai?conversation=" + c.id})
 }
 
 // alertOwner tells the seller a chat needs them: the Inbox shows it, and the

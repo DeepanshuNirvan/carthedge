@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -73,7 +74,7 @@ How a great seller texts:
 - Never claim to be a person. If asked whether you are a bot, say honestly you are the shop's assistant and the owner also sees this chat.
 
 Hard rules:
-- Use ONLY the facts below. Never invent prices, discounts, offers, stock, sizes, delivery dates or times, policies or links. If the facts do not answer something, say the shop will check and get back; do not guess.
+- Use ONLY the facts below. Never invent prices, discounts, offers, stock, sizes, delivery dates or times, policies or links. If the facts do not answer something, say the shop will check and get back, without promising when ("abhi", "right away"); do not guess. Whenever you say that, end with the token [ASK OWNER] on its own line: it is removed before sending and asks the owner to reply.
 - Copy amounts and links exactly as written in the facts. Never write a link that is not in the facts.
 - If one of the shop's FAQs in the facts answers what they asked, give that answer exactly as written; you may add a short lead-in or the next step.
 - Never write an order summary or totals yourself.
@@ -88,6 +89,10 @@ What this message must do:
 %s`
 
 const summaryToken = "[SUMMARY]"
+
+// askOwnerToken is how the writer flags a promise to check with the shop; Go
+// strips it and alerts the owner, so "we'll get back to you" is always kept.
+const askOwnerToken = "[ASK OWNER]"
 
 // Understanding is the model's reading of the buyer's latest messages.
 type Understanding struct {
@@ -152,6 +157,9 @@ type TurnResult struct {
 	Handoff     string
 	Intent      string
 	Lead        enquiry.Lead // set on ActLead: the enquiry to hand to the owner
+	// AskOwner: the reply told the buyer the shop will check something the
+	// facts do not answer; the owner must be told or nobody ever gets back
+	AskOwner bool
 }
 
 // Turn runs one buyer turn. It returns what to send and the new chat state;
@@ -169,7 +177,7 @@ func (s *Service) Turn(ctx context.Context, in TurnInput) (*TurnResult, error) {
 		if len(cart.Items) > 0 && len(lead.Items) == len(cart.Items) {
 			what = "enquiry" // only services in the cart: nothing was being ordered
 		}
-		reply, err := s.write(ctx, in, languageFor(in, ""), facts,
+		reply, _, err := s.write(ctx, in, languageFor(in, ""), facts,
 			"The customer went quiet before finishing their "+what+". Send ONE short, friendly follow-up about the item they were looking at, and ask if they would like to go ahead. No pressure and no made-up urgency.", "")
 		return &TurnResult{Action: ActReply, Messages: reply, Cart: cart, Quote: quote, Stage: in.Stage, SummaryHash: in.SummaryHash}, err
 	}
@@ -220,7 +228,7 @@ func (s *Service) Turn(ctx context.Context, in TurnInput) (*TurnResult, error) {
 		}
 		task = replyTask(*u, in, cart, problems, missing, asks)
 	}
-	res.Messages, err = s.write(ctx, in, languageFor(in, u.Language), facts, task, summary)
+	res.Messages, res.AskOwner, err = s.write(ctx, in, languageFor(in, u.Language), facts, task, summary)
 	return res, err
 }
 
@@ -620,7 +628,7 @@ const maxWords = 55
 // retry naming the problem, then a plain holding line rather than a guess. A
 // reply that is merely too long gets one rewrite, and is used as-is if the
 // rewrite fails — long but true beats a holding line.
-func (s *Service) write(ctx context.Context, in TurnInput, language, facts, task, summary string) ([]string, error) {
+func (s *Service) write(ctx context.Context, in TurnInput, language, facts, task, summary string) (msgs []string, askOwner bool, err error) {
 	if language == "" {
 		language = "the language the customer writes in"
 	}
@@ -635,9 +643,9 @@ func (s *Service) write(ctx context.Context, in TurnInput, language, facts, task
 	for attempt := 0; attempt < 2; attempt++ {
 		raw, err := s.client.Complete(ctx, system+note, transcript(in.Transcript, 16), false)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		text := tidy(raw)
+		text, asked := withoutAskOwner(tidy(raw))
 		ok, why := grounded(text, facts)
 		switch {
 		case !ok || text == "":
@@ -646,17 +654,29 @@ func (s *Service) write(ctx context.Context, in TurnInput, language, facts, task
 				note = "\n\nYour previous draft broke a hard rule: " + why + ". Rewrite it using only the facts."
 			}
 		case len(strings.Fields(strings.ReplaceAll(text, summaryToken, ""))) > maxWords && attempt == 0:
-			long = text
+			long, askOwner = text, asked
 			note = "\n\nYour previous draft was too long for a DM. Say the same thing in at most two short lines."
 		default:
-			return compose(text, summary), nil
+			return compose(text, summary), asked, nil
 		}
 	}
 	if long != "" {
-		return compose(long, summary), nil
+		return compose(long, summary), askOwner, nil
 	}
-	return compose(holdingLine(language), summary), nil
+	// the holding line promises the shop will check: that is the owner's to keep
+	return compose(holdingLine(language), summary), true, nil
 }
+
+// withoutAskOwner strips the writer's ask-the-owner flag from a reply.
+func withoutAskOwner(text string) (string, bool) {
+	if !askOwnerRe.MatchString(text) {
+		return text, false
+	}
+	return tidy(askOwnerRe.ReplaceAllString(text, "")), true
+}
+
+// models sometimes change the token's case or spacing
+var askOwnerRe = regexp.MustCompile(`(?i)\[\s*ask\s+owner\s*\]`)
 
 // maxTexts caps how many separate messages one reply becomes; anything beyond
 // joins the last one. ponytail: fixed at 3, a setting if sellers ask for it.

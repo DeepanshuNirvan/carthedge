@@ -54,7 +54,7 @@ export function OptionPicker({
                   disabled={state === 'soldOut'}
                   onClick={() => onPicks(pick(variants, picks, g, selected ? undefined : v.name))}
                   className={cn(
-                    'inline-flex items-center gap-2 rounded-full font-medium transition-all duration-micro ease-spring active:scale-95',
+                    'inline-flex items-center gap-2 rounded-full font-medium transition duration-micro ease-spring active:scale-95',
                     compact ? 'min-h-9 px-3.5 py-1.5 text-xs' : 'min-h-11 min-w-12 justify-center px-4 py-2.5 text-sm',
                     swatch && (compact ? 'pl-1' : 'pl-1.5'),
                     selected ? 'bg-hi text-bg shadow-raised' : 'neu text-hi hover:bg-surface-3',

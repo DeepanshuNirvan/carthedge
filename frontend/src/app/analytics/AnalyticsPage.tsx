@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
                   aria-label="Report month"
                   value={month || report?.month || ''}
                   onChange={(e) => setMonth(e.target.value)}
-                  className="h-10 w-[9.5rem] rounded-full neu-inset px-3.5 text-sm text-hi focus:shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400))] focus:outline-none"
+                  className="h-10 w-44 rounded-full neu-inset px-3.5 text-sm text-hi focus:shadow-[inset_0_0_0_1.5px_rgb(var(--jade-400))] focus:outline-none"
                 />
                 <Button variant="secondary" size="sm" onClick={exportReport} disabled={!report}>
                   Export

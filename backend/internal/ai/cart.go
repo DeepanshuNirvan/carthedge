@@ -435,8 +435,27 @@ func grounded(reply, facts string) (bool, string) {
 			return false, "the link " + u + " is not in the facts"
 		}
 	}
+	// "2-3 din me aa jayega" is a promise like a price is: the facts must make it
+	known := map[string]bool{}
+	for _, m := range factTimeRe.FindAllStringSubmatch(facts, -1) {
+		known[m[1]], known[m[2]] = true, m[2] != ""
+	}
+	for _, m := range timeRe.FindAllStringSubmatch(reply, -1) {
+		if !known[m[1]] || (m[2] != "" && !known[m[2]]) {
+			return false, "the time \"" + strings.TrimSpace(m[0]) + "\" is not in the facts"
+		}
+	}
 	return true, ""
 }
+
+// timeRe is a number of days or hours in a reply ("2-3 din", "5 days",
+// "24 ghante"); factTimeRe is the looser form a seller types in a policy
+// ("2 to 4 working days").
+var (
+	timeUnit   = `(?:din|days?|hours?|hrs?|ghante|दिन|घंटे)`
+	timeRe     = regexp.MustCompile(`(?i)\b(\d{1,3})(?:\s*(?:-|–|to|se)\s*(\d{1,3}))?\s*` + timeUnit)
+	factTimeRe = regexp.MustCompile(`(?i)\b(\d{1,3})(?:\s*(?:-|–|to|se)\s*(\d{1,3}))?[^\d\n"]{0,24}?` + timeUnit)
+)
 
 // Action is what a turn does with the buyer's message.
 type Action string

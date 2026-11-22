@@ -55,7 +55,7 @@ export async function downloadExport() {
   const base = import.meta.env.VITE_API_BASE_URL || '';
   const token = useAuth.getState().accessToken;
   const res = await fetch(`${base}/api/v1/account/export`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  if (!res.ok) throw new Error(res.status === 429 ? 'Try again in a while — exports are limited to a few an hour.' : 'Export failed');
+  if (!res.ok) throw new Error(res.status === 429 ? 'Try again in a while. Exports are limited to a few an hour.' : 'Export failed');
   const blob = await res.blob();
   const name = res.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'carthedge-export.json';
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });

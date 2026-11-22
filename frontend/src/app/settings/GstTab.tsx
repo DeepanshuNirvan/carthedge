@@ -56,9 +56,9 @@ export function GstTab() {
             <Field label="GST registration">
               <Select value={draft.registration} onChange={(e) => update({ registration: e.target.value as GstProfile['registration'] })}>
                 <option value="">{gstinValue ? 'Regular (I have a GSTIN)' : 'Not registered'}</option>
-                <option value="regular">Regular taxpayer — tax invoices</option>
-                <option value="composition">Composition scheme — bill of supply</option>
-                <option value="unregistered">Not registered — plain invoices, no GST</option>
+                <option value="regular">Regular taxpayer: tax invoices</option>
+                <option value="composition">Composition scheme: bill of supply</option>
+                <option value="unregistered">Not registered: plain invoices, no GST</option>
               </Select>
             </Field>
           </div>
@@ -82,10 +82,10 @@ export function GstTab() {
               ))}
             </Select>
           </Field>
-          <Field label="Usual HSN code" optional hint="4, 6 or 8 digits — e.g. 6204 for women's garments">
+          <Field label="Usual HSN code" optional hint="4, 6 or 8 digits, like 6204 for women's garments">
             <Input inputMode="numeric" maxLength={8} value={draft.defaultHsn} onChange={(e) => update({ defaultHsn: e.target.value.replace(/\D/g, '') })} />
           </Field>
-          <Field label="Invoice prefix" hint={`Next invoice looks like ${prefix}/${fyShort()}/0001 — numbering restarts each April`}>
+          <Field label="Invoice prefix" hint={`Next invoice looks like ${prefix}/${fyShort()}/0001. Numbering restarts each April`}>
             <Input maxLength={4} value={draft.prefix} placeholder={prefix} onChange={(e) => update({ prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })} />
           </Field>
           <div className="sm:col-span-2">

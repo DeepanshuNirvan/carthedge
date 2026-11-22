@@ -3,6 +3,9 @@ import { get } from './http';
 import { fillDays } from '@/lib/date';
 import type { Dashboard, Insights, MonthlyReport, SalesPoint, TopProduct } from './types';
 
+/** Below this many settled COD orders a refusal rate is noise, not a trend. */
+export const minCodOutcomes = 5;
+
 export const useDashboard = () =>
   useQuery({
     queryKey: ['dashboard'],

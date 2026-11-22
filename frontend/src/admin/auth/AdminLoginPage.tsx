@@ -8,6 +8,7 @@ import { toast } from '@/store/ui';
 import { Wordmark } from '@/marketing/Wordmark';
 import { Field, Input, PasswordInput } from '@/ui/Input';
 import { Button } from '@/ui/Button';
+import { LaneGround } from '@/ui/LaneGround';
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -31,10 +32,7 @@ export default function AdminLoginPage() {
   return (
     <div className="grain relative flex min-h-dvh items-center justify-center overflow-hidden p-5">
       {/* the staff console: the same night lane, one lamp over a single pane of glass */}
-      <div aria-hidden className="absolute inset-0">
-        <img src="/demo/aurora-texture.webp" alt="" className="absolute inset-0 size-full object-cover opacity-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_50%_40%,rgb(var(--bg)/0.55),rgb(var(--bg))_85%)]" />
-      </div>
+      <LaneGround />
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}

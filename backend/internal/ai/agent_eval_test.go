@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -41,11 +42,12 @@ type scenario struct {
 }
 
 type step struct {
-	buyer  string
-	action Action
-	reply  string
-	stage  string
-	cart   Cart
+	buyer    string
+	action   Action
+	reply    string
+	stage    string
+	cart     Cart
+	askOwner bool
 }
 
 func loadDotEnv() {
@@ -167,6 +169,14 @@ func TestAgentEval(t *testing.T) {
 			}
 		}},
 		{name: "are you a bot", bursts: []burst{{"aap bot ho kya? ya real insaan?"}}},
+		{name: "a question the catalog cannot answer goes to the owner", bursts: []burst{{"kurti machine wash kar sakte hain? aur Friday tak Pune pahunch jayegi?"}}, check: func(t *testing.T, l []step) {
+			if !l[0].askOwner {
+				t.Errorf("a reply that defers to the shop must ask the owner: %q", l[0].reply)
+			}
+			if r := strings.ToLower(l[0].reply); strings.Contains(r, "friday tak pahunch") || strings.Contains(r, "machine wash kar sakte") {
+				t.Errorf("must not promise what the facts do not say: %q", l[0].reply)
+			}
+		}},
 		{name: "bargaining", bursts: []burst{{"kurti 999 me de do please"}}, check: func(t *testing.T, l []step) {
 			if l[0].action != ActHandoff {
 				t.Errorf("a discount request should go to the seller, got %s", l[0].action)
@@ -248,7 +258,7 @@ func TestAgentEval(t *testing.T) {
 		{name: "service: price on request is never guessed", services: "services", bursts: []burst{
 			{"wedding decor ka rate kya hai? roughly bata do"}, {"25000 me ho jayega?"},
 		}, check: func(t *testing.T, l []step) {
-			if strings.Contains(l[0].reply, "₹") || strings.Contains(strings.ToLower(l[0].reply), "rs") {
+			if moneyRe.MatchString(l[0].reply) {
 				t.Errorf("a price was stated for a quote-only service: %q", l[0].reply)
 			}
 		}},
@@ -320,8 +330,9 @@ func TestAgentEval(t *testing.T) {
 				if err != nil {
 					t.Fatalf("turn failed: %v", err)
 				}
-				steps = append(steps, step{buyer: strings.Join(b, " / "), action: res.Action, reply: strings.Join(res.Messages, "\n"), stage: res.Stage, cart: res.Cart})
-				fmt.Fprintf(&out, "  [%s → stage %s, intent %s%s]\n", res.Action, res.Stage, res.Intent, ifs(res.Handoff != "", ", handoff: "+res.Handoff))
+				steps = append(steps, step{buyer: strings.Join(b, " / "), action: res.Action, reply: strings.Join(res.Messages, "\n"), stage: res.Stage, cart: res.Cart, askOwner: res.AskOwner})
+				fmt.Fprintf(&out, "  [%s → stage %s, intent %s%s%s]\n", res.Action, res.Stage, res.Intent,
+					ifs(res.Handoff != "", ", handoff: "+res.Handoff), ifs(res.AskOwner, ", asks owner"))
 				for _, m := range res.Messages {
 					fmt.Fprintf(&out, "SHOP: %s\n", strings.ReplaceAll(m, "\n", "\n      "))
 					transcriptLines = append(transcriptLines, ChatLine{Who: "shop", Text: m})
@@ -348,6 +359,9 @@ func TestAgentEval(t *testing.T) {
 		})
 	}
 }
+
+// moneyRe is a stated price: a rupee sign, or "rs"/"rupees" as a word next to a number
+var moneyRe = regexp.MustCompile(`(?i)₹|\brs\.?\s*\d|\d+\s*(?:rs|rupees?)\b`)
 
 func ifs(c bool, s string) string {
 	if c {

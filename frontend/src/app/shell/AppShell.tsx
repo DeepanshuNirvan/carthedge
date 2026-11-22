@@ -233,7 +233,7 @@ function TrialBanner() {
   const left = daysLeft(sub.endsAt);
   if (sub.status === 'expired' || (sub.status !== 'trial' && left === 0)) {
     return (
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-danger/12 px-4 py-2 text-center text-xs font-medium text-danger-ink">
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-bg bg-gradient-to-r from-danger/12 to-danger/12 px-4 py-2 text-center text-xs font-medium text-danger-ink">
         Your subscription has expired and your store is paused.
         <Link to="/app/billing" className="underline underline-offset-2">
           Renew now
@@ -243,7 +243,7 @@ function TrialBanner() {
   }
   if (sub.status === 'trial') {
     return (
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-gold-400/12 px-4 py-2 text-center text-xs font-medium text-gold-ink lg:hidden">
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-bg bg-gradient-to-r from-gold-400/12 to-gold-400/12 px-4 py-2 text-center text-xs font-medium text-gold-ink lg:hidden">
         Trial: {left} {left === 1 ? 'day' : 'days'} left.
         <Link to="/app/billing" className="underline underline-offset-2">
           Pick a plan
@@ -287,7 +287,7 @@ function SupportBanner() {
   const end = useSupport((s) => s.end);
   if (!session) return null;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-gold-400/14 px-4 py-2 text-center text-xs font-medium text-gold-ink">
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-bg bg-gradient-to-r from-gold-400/14 to-gold-400/14 px-4 py-2 text-center text-xs font-medium text-gold-ink">
       Support view of {session.businessName}: read-only, ends {formatDateTime(session.expiresAt)}.
       <button
         onClick={() => {

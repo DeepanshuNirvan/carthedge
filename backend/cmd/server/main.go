@@ -123,6 +123,9 @@ func main() {
 	orderSvc.SetDirectMessenger(messagingSvc.SendToConversation)
 	jobs.New(pool, rdb, orderSvc, notifier, log, cfg.PublicBaseURL, jobs.Extra{
 		PurgeDeleted: authSvc.PurgeDeleted, BillOverage: planSvc.BillOverage, HasFeature: planSvc.HasFeature,
+		// lookups that failed are logged one by one and retried next tick
+		SettlePayments: func(ctx context.Context) (int, error) { n, _ := paySvc.SettlePending(ctx, ""); return n, nil },
+		ExpireUnpaid:   paySvc.ExpireUnpaid,
 	}).Start(ctx)
 	adminSvc := admin.NewService(pool, rdb, cfg, notifier)
 	adminSvc.SetAutopayCanceller(planSvc.CancelAutopay)

@@ -370,19 +370,21 @@ export default function LinkCheckoutPage() {
             )}
           </motion.div>
 
-          <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-low">
-            <ShieldCheck className="size-3.5 text-jade-ink" />
-            {link.business.onlinePayment === 'gateway'
-              ? 'Payments secured by Razorpay'
-              : link.business.onlinePayment === 'upi'
-                ? 'Pay by UPI direct to the seller'
-                : 'Cash on delivery'}
-            <span aria-hidden className="text-dim">
-              |
-            </span>{' '}
-            Powered by
-            <LogoMark size={13} className="-ml-0.5" />
-            CartHedge
+          {/* two phrases that each stay whole: on a narrow phone the second drops to its own line */}
+          <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-low">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5 text-jade-ink" />
+              {link.business.onlinePayment === 'gateway'
+                ? 'Payments secured by Razorpay'
+                : link.business.onlinePayment === 'upi'
+                  ? 'Pay by UPI direct to the seller'
+                  : 'Cash on delivery'}
+            </span>
+            <span className="flex items-center gap-1.5">
+              Powered by
+              <LogoMark size={13} className="-ml-0.5" />
+              CartHedge
+            </span>
           </p>
         </div>
       </main>

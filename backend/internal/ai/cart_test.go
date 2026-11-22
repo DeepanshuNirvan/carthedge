@@ -303,3 +303,36 @@ func TestHandoffRuleFollowsSeller(t *testing.T) {
 		t.Errorf("handled topics must leave the handoff list:\n%s", let)
 	}
 }
+
+func TestAskOwnerTokenNeverReachesTheBuyer(t *testing.T) {
+	for _, in := range []string{
+		"Wash care ka hum shop se check karke batate hain 🙏\n[ASK OWNER]",
+		"Hum check karke batate hain [ask owner]",
+		"Hum check karke batate hain\n[ Ask  Owner ]",
+	} {
+		text, asked := withoutAskOwner(in)
+		if !asked || strings.Contains(strings.ToLower(text), "owner") || strings.Contains(text, "[") {
+			t.Errorf("%q → %q asked=%v", in, text, asked)
+		}
+	}
+	if text, asked := withoutAskOwner("Haan ji, M available hai"); asked || text != "Haan ji, M available hai" {
+		t.Errorf("a plain reply was flagged: %q %v", text, asked)
+	}
+}
+
+func TestGroundedRefusesInventedDeliveryTimes(t *testing.T) {
+	facts := `{"policies":{"deliveryTime":"dispatched within 2 days; metro cities 2 to 4 working days","returns":"exchange within 7 days of delivery"}}`
+	for reply, want := range map[string]bool{
+		"Metro me 2-4 din me pahunch jayega 😊":      true,
+		"Dispatch 2 days me ho jata hai":            true,
+		"Exchange 7 din tak ho sakta hai":           true,
+		"Kal tak, bas 1 din me aa jayega!":          false,
+		"3-5 days me deliver ho jayega":             false,
+		"Owner 24 ghante me reply karenge":          false,
+		"M size available hai, 2 colours me milega": true, // a count, not a time
+	} {
+		if got, why := grounded(reply, facts); got != want {
+			t.Errorf("grounded(%q) = %v (%s), want %v", reply, got, why, want)
+		}
+	}
+}
